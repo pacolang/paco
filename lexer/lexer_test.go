@@ -14,7 +14,7 @@ func TestLex(t *testing.T) {
 		fmt.Printf("item recieved: %s\n", item.Value)
 		fmt.Printf("item type: %d\n", item.Type)
 
-		if item.Type == itemError {
+		if item.Type == itemEOF {
 			break
 		}
 	}

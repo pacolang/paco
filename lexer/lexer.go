@@ -55,9 +55,7 @@ func (lexer *Lexer) back() {
 // run iterate through the runes of the lexer inputs and lex them
 func (lexer *Lexer) run() {
 	for lexer.Position < len(lexer.Input) {
-		rune := lexer.next()
-
-		switch {
+		switch rune := lexer.next(); {
 		// Lex the number in case it starts with a +, - or a number
 		case rune == '+' || rune == '-' || ('0' <= rune && rune <= '9'):
 			lexer.back()
@@ -66,7 +64,7 @@ func (lexer *Lexer) run() {
 		}
 	}
 
-	lexer.emit(itemError)
+	lexer.emit(itemEOF)
 }
 
 // Lex creates a Lexer with the given input, runs it in a go routine and returns the lexer and

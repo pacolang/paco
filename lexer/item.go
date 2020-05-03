@@ -13,6 +13,7 @@ type Item struct {
 
 const (
 	itemError ItemType = iota
+	itemEOF
 	itemNumber
 )
 
