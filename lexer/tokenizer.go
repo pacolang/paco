@@ -36,6 +36,7 @@ func Tokenize(code string) []Token {
 	return tokens
 }
 
+// appendNumberToken iterates through all the next numbers and appends the token
 func appendNumberToken() {
 	var value string
 
@@ -69,7 +70,7 @@ func appendSymbolToken() {
 	}
 }
 
-// appendStringToken iterate through all the next letters and appends the token
+// appendStringToken iterates through all the next letters and appends the token
 func appendStringToken() {
 	var value string
 
