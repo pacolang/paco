@@ -21,15 +21,15 @@ func Tokenize(code string) []Token {
 		character = characters[index]
 
 		if IsLetter(character) {
-			AppendStringToken()
+			appendStringToken()
 		}
 	}
 
 	return tokens
 }
 
-// AppendStringToken iterate through all the next letters and appends the token
-func AppendStringToken() {
+// appendStringToken iterate through all the next letters and appends the token
+func appendStringToken() {
 	var value string
 
 	// Iterate through all the next letters
