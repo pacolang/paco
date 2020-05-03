@@ -19,9 +19,9 @@ type Lexer struct {
 }
 
 // emit allows to add the current token to the channel
-func (lexer *Lexer) emit(itemType ItemType) {
+func (lexer *Lexer) emit(t ItemType) {
 	lexer.Items <- Item{
-		Type:  itemType,
+		Type:  t,
 		Value: lexer.Input[lexer.Start:lexer.Position],
 	}
 
@@ -42,6 +42,10 @@ func (lexer *Lexer) next() (rune rune) {
 	return rune
 }
 
+func (lexer *Lexer) ignore() {
+	lexer.Start = lexer.Position
+}
+
 // back moves to the latest position in the input
 func (lexer *Lexer) back() {
 	lexer.Position -= lexer.Width
@@ -50,19 +54,28 @@ func (lexer *Lexer) back() {
 // run iterate through the runes of the lexer inputs and lex them
 func (lexer *Lexer) run() {
 	for lexer.Position < len(lexer.Input) {
-		lexer.next()
+		rune := lexer.next()
+
+		switch {
+		// Lex the number in case it starts with a +, - or a number
+		case rune == '+' || rune == '-' || ('0' <= rune && rune <= '9'):
+			lexer.back()
+			lexNumber(lexer)
+			break
+		}
 	}
+
+	lexer.emit(itemError)
 }
 
 // Lex creates a Lexer with the given input, runs it in a go routine and returns the lexer and
 // its channel for items
 func Lex(input string) (*Lexer, chan Item) {
 	lexer := &Lexer{
-		Input: input,
+		Input: input + " ",
 		Items: make(chan Item),
 	}
 
-	// Go routine for later
-	lexer.run()
+	go lexer.run()
 	return lexer, lexer.Items
 }

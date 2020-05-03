@@ -13,6 +13,7 @@ type Item struct {
 
 const (
 	itemError ItemType = iota
+	itemNumber
 )
 
 // String methods is the one used by Printf

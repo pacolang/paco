@@ -1,7 +1,21 @@
 package lexer
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestLex(t *testing.T) {
-	Lex("console\n  |println(hello)\n  |printf('hello %s!', 'hugo')")
+	_, channel := Lex("+12.42")
+
+	for {
+		item := <-channel
+
+		fmt.Printf("item recieved: %s\n", item.Value)
+		fmt.Printf("item type: %d\n", item.Type)
+
+		if item.Type == itemError {
+			break
+		}
+	}
 }
