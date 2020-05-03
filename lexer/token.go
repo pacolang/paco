@@ -7,6 +7,7 @@ const (
 	COMMENT           = "-"
 	QUOTE             = "'"
 	COMMA             = ","
+	EQUALS            = "="
 
 	// Keywords
 	FUNCTION = "fn"
