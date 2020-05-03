@@ -1,0 +1,14 @@
+includes (
+  'console'
+)
+
+fn hello() string
+  'hello world'
+end
+
+hello = 1329
+
+- prints 1329 and prints my name
+console
+  |println(hello)
+  |printf('hello %s!', 'hugo')
