@@ -13,6 +13,7 @@ const (
 type Lexer struct {
 	Input    string
 	Start    int
+	Width    int
 	Position int
 	Items    chan Item
 }
@@ -20,7 +21,7 @@ type Lexer struct {
 // emit allows to add the current token to the channel
 func (lexer *Lexer) emit(itemType ItemType) {
 	lexer.Items <- Item{
-		Type: itemType,
+		Type:  itemType,
 		Value: lexer.Input[lexer.Start:lexer.Position],
 	}
 
@@ -28,17 +29,22 @@ func (lexer *Lexer) emit(itemType ItemType) {
 }
 
 // next moves the position to the next rune and returns it
-func (lexer *Lexer) next() rune {
+func (lexer *Lexer) next() (rune rune) {
 	// Returns EOF if the position if over the length of the input
 	if lexer.Position >= len(lexer.Input) {
 		return EOF
 	}
 
 	// Decodes the first rune in the given input, gets it and its width
-	rune, width := utf8.DecodeRuneInString(lexer.Input[lexer.Position:])
-	lexer.Position += width
+	rune, lexer.Width = utf8.DecodeRuneInString(lexer.Input[lexer.Position:])
+	lexer.Position += lexer.Width
 
 	return rune
+}
+
+// back moves to the latest position in the input
+func (lexer *Lexer) back() {
+	lexer.Position -= lexer.Width
 }
 
 // run iterate through the runes of the lexer inputs and lex them
