@@ -42,6 +42,7 @@ func (lexer *Lexer) next() (rune rune) {
 	return rune
 }
 
+// ignore moves the current starting position to ignore a token
 func (lexer *Lexer) ignore() {
 	lexer.Start = lexer.Position
 }
