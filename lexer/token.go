@@ -2,19 +2,37 @@ package lexer
 
 const (
 	// Special characters
-	LEFT_PARENTHESES  = "("
-	RIGHT_PARENTHESES = ")"
-	COMMENT           = "-"
-	QUOTE             = "'"
-	COMMA             = ","
-	EQUALS            = "="
+	LeftParentheses  = "left parentheses"
+	RightParentheses = "right parentheses"
+	Quote            = "quote"
+	Comma            = "comma"
+	Equals           = "equals"
+	Pipe             = "pipe"
 
 	// Keywords
-	FUNCTION = "fn"
-	END      = "end"
-	STRING   = "string"
-	INCLUDES = "includes"
+	Function = "fn"
+	End      = "end"
+	String   = "string"
+	Includes = "includes"
+
+	// Token types
+	Keyword = "keyword"
+	Name    = "name"
+	Number  = "number"
 )
+
+var keywords = []string{
+	Function, End, String, Includes,
+}
+
+var symbols = map[string]string{
+	LeftParentheses:  "(",
+	RightParentheses: ")",
+	Quote:            "'",
+	Comma:            ",",
+	Equals:           "=",
+	Pipe:             "|",
+}
 
 // A Token is used to reference a part of the code with its value
 type Token struct {

@@ -23,9 +23,50 @@ func Tokenize(code string) []Token {
 		if IsLetter(character) {
 			appendStringToken()
 		}
+
+		if IsSymbol(character) {
+			appendSymbolToken()
+		}
+
+		if IsNumber(character) {
+			appendNumberToken()
+		}
 	}
 
 	return tokens
+}
+
+func appendNumberToken() {
+	var value string
+
+	// Iterate through all the next numbers
+	for IsNumber(character) {
+		// Append the character to the value
+		value += character
+
+		index++
+		character = characters[index]
+	}
+
+	tokens = append(tokens, Token{
+		Type:  Number,
+		Value: value,
+	})
+}
+
+// appendSymbolToken searches through the symbols to add a token
+func appendSymbolToken() {
+	// Iterate through the symbols to append the found one
+	for name, symbol := range symbols {
+		if symbol != character {
+			continue
+		}
+
+		tokens = append(tokens, Token{
+			Type:  name,
+			Value: symbol,
+		})
+	}
 }
 
 // appendStringToken iterate through all the next letters and appends the token
@@ -42,7 +83,22 @@ func appendStringToken() {
 	}
 
 	tokens = append(tokens, Token{
-		Type:  "name",
+		Type:  getStringTokenType(value),
 		Value: value,
 	})
+}
+
+// getStringTokenType returns the right token type via
+func getStringTokenType(value string) string {
+	// Iterate through the keywords to see if the given value is a keyword
+	for _, keyword := range keywords {
+		if value != keyword {
+			continue
+		}
+
+		return Keyword
+	}
+
+	// Returns "name" by default
+	return Name
 }
