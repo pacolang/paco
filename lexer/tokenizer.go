@@ -13,6 +13,9 @@ var (
 
 // Tokenize returns an array of tokens for the given code
 func Tokenize(code string) []Token {
+	// Add a space at the end to make sure it does not get out of the range
+	code += " "
+
 	// Get all characters of the code
 	characters = strings.Split(code, "")
 
