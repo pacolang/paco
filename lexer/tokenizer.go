@@ -20,6 +20,7 @@ func Tokenize(code string) []Token {
 	for index = 0; index < len(characters); index++ {
 		character = characters[index]
 
+		// Append the tokens for letters, symbols and numbers
 		if IsLetter(character) {
 			appendStringToken()
 		}
@@ -58,13 +59,13 @@ func appendNumberToken() {
 // appendSymbolToken searches through the symbols to add a token
 func appendSymbolToken() {
 	// Iterate through the symbols to append the found one
-	for name, symbol := range symbols {
+	for _, symbol := range symbols {
 		if symbol != character {
 			continue
 		}
 
 		tokens = append(tokens, Token{
-			Type:  name,
+			Type:  Symbol,
 			Value: symbol,
 		})
 	}

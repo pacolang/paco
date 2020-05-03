@@ -19,6 +19,7 @@ const (
 	Keyword = "keyword"
 	Name    = "name"
 	Number  = "number"
+	Symbol  = "symbol"
 )
 
 var keywords = []string{
