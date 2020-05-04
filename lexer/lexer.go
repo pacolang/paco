@@ -58,6 +58,7 @@ func (lexer *Lexer) run() {
 		switch rune := lexer.next(); {
 		case IsAlphaNumeric(rune):
 			lexer.back()
+			lexIdentifier(lexer)
 			break
 
 		case IsSpace(rune):

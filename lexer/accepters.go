@@ -51,3 +51,30 @@ func lexString(lexer *Lexer) {
 
 	lexer.emit(itemString)
 }
+
+// lexIdentifier scans an alphanumeric or field
+func lexIdentifier(lexer *Lexer) {
+	Loop:
+	for {
+		switch rune := lexer.next(); {
+		case IsAlphaNumeric(rune) || rune == '.' && lexer.Input[lexer.Start] == '.':
+			// let the characters be included
+		default:
+			lexer.back()
+			word := lexer.Input[lexer.Start:lexer.Position]
+
+			switch {
+			case keywords[word] > itemKeyword:
+				lexer.emit(keywords[word])
+			case word[0] == '|':
+				lexer.emit(itemField)
+			case word == "true" || word == "false":
+				lexer.emit(itemBoolean)
+			default:
+				lexer.emit(itemIdentifier)
+			}
+
+			break Loop
+		}
+	}
+}

@@ -18,7 +18,17 @@ const (
 	itemString
 	itemPipe
 	itemEquals
+	itemField
+	itemBoolean
+	itemIdentifier
+	// Delimit the keywords
+	itemKeyword
+	itemFunction
 )
+
+var keywords = map[string]ItemType{
+	"fn": itemFunction,
+}
 
 // String methods is the one used by Printf
 func (item Item) String() string {
