@@ -56,6 +56,10 @@ func (lexer *Lexer) back() {
 func (lexer *Lexer) run() {
 	for lexer.Position < len(lexer.Input) {
 		switch rune := lexer.next(); {
+		case rune == '"':
+			lexString(lexer)
+			break
+
 		// Lex the number in case it starts with a +, - or a number
 		case rune == '+' || rune == '-' || ('0' <= rune && rune <= '9'):
 			lexer.back()

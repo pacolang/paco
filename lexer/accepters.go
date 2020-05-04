@@ -22,6 +22,7 @@ func (lexer *Lexer) acceptRun(valid string) {
 	lexer.back()
 }
 
+// lexNumber emits the next number by accepting numbers like -14.50 or +192
 func lexNumber(lexer *Lexer) {
 	lexer.accept("+-")
 	digits := "0123456789"
@@ -32,4 +33,21 @@ func lexNumber(lexer *Lexer) {
 	}
 
 	lexer.emit(itemNumber)
+}
+
+// lexString emits the next string by accepting double quotes
+func lexString(lexer *Lexer) {
+	Loop:
+	for {
+		switch rune := lexer.next(); rune {
+		case '"':
+			break Loop
+		// Ignore \
+		case '\\':
+			lexer.next()
+			break
+		}
+	}
+
+	lexer.emit(itemString)
 }

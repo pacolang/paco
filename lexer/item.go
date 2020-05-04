@@ -15,6 +15,7 @@ const (
 	itemError ItemType = iota
 	itemEOF
 	itemNumber
+	itemString
 )
 
 // String methods is the one used by Printf
