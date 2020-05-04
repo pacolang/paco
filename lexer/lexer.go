@@ -55,7 +55,8 @@ func (lexer *Lexer) back() {
 // run iterate through the runes of the lexer inputs and lex them
 func (lexer *Lexer) run() {
 	for lexer.Position < len(lexer.Input) {
-		switch rune := lexer.next(); {
+		rune := lexer.next()
+		switch {
 		case IsAlphaNumeric(rune):
 			lexer.back()
 			lexIdentifier(lexer)
@@ -69,24 +70,6 @@ func (lexer *Lexer) run() {
 			ignoreComments(lexer)
 			break
 
-		// Emit parentheses
-		case rune == '(':
-			lexer.emit(itemLeftParentheses)
-			break
-
-		case rune == ')':
-			lexer.emit(itemRightParentheses)
-			break
-
-		// Special symbols
-		case rune == '=':
-			lexer.emit(itemEquals)
-			break
-
-		case rune == '|':
-			lexer.emit(itemPipe)
-			break
-
 		// Lex the string
 		case rune == '"':
 			lexString(lexer)
@@ -97,6 +80,12 @@ func (lexer *Lexer) run() {
 			lexer.back()
 			lexNumber(lexer)
 			break
+		}
+
+		// Emit a symbol if found
+		value, valid := symbols[rune]
+		if valid {
+			lexer.emit(value)
 		}
 	}
 

@@ -2,9 +2,15 @@ package lexer
 
 // lexNumber emits the next number by accepting numbers like -14.50 or +192
 func lexNumber(lexer *Lexer) {
-	lexer.accept("+-")
+	isSymbol := lexer.accept("+-")
 	digits := "0123456789"
-	lexer.acceptRun(digits)
+	width := lexer.acceptRun(digits)
+
+	// If its only a symbol do not register the item as a number
+	if isSymbol && width == 0 {
+		lexer.back()
+		return
+	}
 
 	if lexer.accept(".") {
 		lexer.acceptRun(digits)

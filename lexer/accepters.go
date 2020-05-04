@@ -17,8 +17,11 @@ func (lexer *Lexer) accept(valid string) bool {
 }
 
 // acceptRun consumes a run of runes from the valid set
-func (lexer *Lexer) acceptRun(valid string) {
+func (lexer *Lexer) acceptRun(valid string) int {
+	position := lexer.Position
 	for strings.IndexRune(valid, lexer.next()) >= 0 {
 	}
 	lexer.back()
+
+	return lexer.Position - position
 }

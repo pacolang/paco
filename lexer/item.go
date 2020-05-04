@@ -18,6 +18,10 @@ const (
 	itemString
 	itemPipe
 	itemEquals
+	itemPlus
+	itemMinus
+	itemDivide
+	itemTimes
 	itemField
 	itemBoolean
 	itemIdentifier
@@ -36,6 +40,17 @@ var keywords = map[string]ItemType{
 	"includes": itemIncludes,
 	"string":   itemStringType,
 	"int":      itemIntType,
+}
+
+var symbols = map[rune]ItemType{
+	'|': itemPipe,
+	'(': itemLeftParentheses,
+	')': itemRightParentheses,
+	'=': itemEquals,
+	'+': itemPlus,
+	'-': itemMinus,
+	'*': itemTimes,
+	'/': itemDivide,
 }
 
 // String methods is the one used by Printf
