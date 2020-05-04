@@ -26,10 +26,16 @@ const (
 	// Delimit the keywords
 	itemKeyword
 	itemFunction
+	itemIncludes
+	itemStringType
+	itemIntType
 )
 
 var keywords = map[string]ItemType{
-	"fn": itemFunction,
+	"fn":       itemFunction,
+	"includes": itemIncludes,
+	"string":   itemStringType,
+	"int":      itemIntType,
 }
 
 // String methods is the one used by Printf
