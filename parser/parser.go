@@ -98,7 +98,7 @@ func parseAssignment(parser *Parser, identifier string) Node {
 			parser.parseItem(item),
 		},
 	}
-	
+
 	return node
 }
 
