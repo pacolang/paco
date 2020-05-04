@@ -78,3 +78,12 @@ func lexIdentifier(lexer *Lexer) {
 		}
 	}
 }
+
+// ignoreComments ignore the rest of the line where a comment has been started
+func ignoreComments(lexer *Lexer) {
+	var rune rune
+	for rune != '\n' {
+		rune = lexer.next()
+	}
+	lexer.ignore()
+}

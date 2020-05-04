@@ -65,6 +65,10 @@ func (lexer *Lexer) run() {
 			lexer.ignore()
 			break
 
+		case rune == '-':
+			ignoreComments(lexer)
+			break
+
 		// Emit parentheses
 		case rune == '(':
 			lexer.emit(itemLeftParentheses)
