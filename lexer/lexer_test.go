@@ -6,16 +6,16 @@ import (
 )
 
 func TestLex(t *testing.T) {
-	_, channel := Lex(`console|println("hello")
-- hey guys
-console|println("hello")`)
+	_, channel := Lex(`console
+	|println("hello")
+	|println("hello")`)
 
 	for {
 		item := <-channel
 
 		fmt.Println(item)
 
-		if item.Type == itemEOF {
+		if item.Type == ItemEOF {
 			break
 		}
 	}

@@ -41,7 +41,7 @@ func lexIdentifier(lexer *Lexer) {
 Loop:
 	for {
 		switch rune := lexer.next(); {
-		case IsAlphaNumeric(rune) || rune == '.' && lexer.Input[lexer.Start] == '.':
+		case IsAlphaNumeric(rune):
 			// let the characters be included
 		default:
 			lexer.back()

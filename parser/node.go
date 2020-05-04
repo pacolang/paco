@@ -10,5 +10,7 @@ type Node struct {
 }
 
 const (
-	Program nodeType = iota
+	CallExpression nodeType = iota
+	NumberLiteral
+	StringLiteral
 )
