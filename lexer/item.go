@@ -25,12 +25,15 @@ const (
 	ItemField
 	ItemBoolean
 	ItemIdentifier
+	ItemComma
 	ItemLeftParentheses
 	ItemRightParentheses
 	// Delimit the keywords
 	ItemKeyword
 	ItemFunction
 	ItemIncludes
+	// Delimit the types
+	ItemTypes
 	ItemStringType
 	ItemIntType
 )
@@ -44,6 +47,7 @@ var keywords = map[string]ItemType{
 
 var symbols = map[rune]ItemType{
 	'|': ItemPipe,
+	',': ItemComma,
 	'(': ItemLeftParentheses,
 	')': ItemRightParentheses,
 	'=': ItemEquals,
@@ -59,5 +63,5 @@ func (item Item) String() string {
 		return item.Value
 	}
 
-	return fmt.Sprintf("%q", item.Value)
+	return fmt.Sprintf("typ: %d | val: %q", item.Type, item.Value)
 }

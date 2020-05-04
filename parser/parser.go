@@ -2,6 +2,7 @@ package parser
 
 import (
 	"../lexer"
+	"../log"
 )
 
 type Parser struct {
@@ -57,19 +58,24 @@ func (parser *Parser) run() {
 
 // parseItem returns the parsed node from the given item
 func (parser *Parser) parseItem(item lexer.Item) Node {
-	switch item.Type {
-	case lexer.ItemNumber:
+	switch {
+	case item.Type == lexer.ItemNumber:
 		return Node{
 			Type:  NumberLiteral,
 			Value: item.Value,
 		}
-	case lexer.ItemString:
+
+	case item.Type == lexer.ItemString:
 		return Node{
 			Type:  StringLiteral,
 			Value: item.Value,
 		}
-	case lexer.ItemIdentifier:
+
+	case item.Type == lexer.ItemIdentifier:
 		return parseIdentifier(parser, item.Value)
+
+	case item.Type > lexer.ItemKeyword:
+		return parseKeyword(parser, item.Type)
 	}
 
 	return Node{}
@@ -88,6 +94,58 @@ func parseIdentifier(parser *Parser, identifier string) Node {
 	return Node{}
 }
 
+//
+func parseKeyword(parser *Parser, keyword lexer.ItemType) Node {
+	switch keyword {
+	case lexer.ItemFunction:
+		return parseFunction(parser)
+	}
+
+	return Node{}
+}
+
+func parseFunction(parser *Parser) Node {
+	identifier := parser.next()
+	if identifier.Type != lexer.ItemIdentifier {
+		log.Errorf("name of the function should be an identifier")
+	}
+
+	node := Node{
+		Type: Function,
+		Value: identifier.Value,
+	}
+
+	item := parser.next()
+	if item.Type != lexer.ItemLeftParentheses {
+		log.Errorf("the left parentheses is missing")
+	}
+
+	for item.Type != lexer.ItemRightParentheses {
+		node.Params = append(node.Params, parseParam(parser))
+		item = parser.next()
+	}
+
+	return node
+}
+
+func parseParam(parser *Parser) Node {
+	identifier := parser.next()
+	if identifier.Type != lexer.ItemIdentifier {
+		log.Errorf("name of the param should be an identifier")
+	}
+
+	typ := parser.next()
+	if typ.Type < lexer.ItemTypes {
+		log.Errorf("param type isn't valid")
+	}
+
+	return Node{
+		Type: types[typ.Type],
+		Value: identifier.Value,
+	}
+}
+
+// parseAssignment parses a variable assignment
 func parseAssignment(parser *Parser, identifier string) Node {
 	item := parser.next()
 

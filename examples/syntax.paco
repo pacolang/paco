@@ -2,7 +2,7 @@ includes (
   "console"
 )
 
-fn hello() string
+fn hello(hugo string) string
   "hello world"
 end
 

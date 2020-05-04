@@ -6,9 +6,7 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	code := `console|println("hello")
-- hey how are you
-hey = 9`
+	code := `fn hello(val int)`
 
 	fmt.Println(Parse(code).nodes)
 }
