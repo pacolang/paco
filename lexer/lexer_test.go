@@ -6,7 +6,7 @@ import (
 )
 
 func TestLex(t *testing.T) {
-	_, channel := Lex(`hello|print = "jgk\"eaz"`)
+	_, channel := Lex(`console|println("hello")`)
 
 	for {
 		item := <-channel

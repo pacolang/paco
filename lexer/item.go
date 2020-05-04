@@ -21,6 +21,8 @@ const (
 	itemField
 	itemBoolean
 	itemIdentifier
+	itemLeftParentheses
+	itemRightParentheses
 	// Delimit the keywords
 	itemKeyword
 	itemFunction

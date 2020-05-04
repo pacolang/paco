@@ -65,6 +65,16 @@ func (lexer *Lexer) run() {
 			lexer.ignore()
 			break
 
+		// Emit parentheses
+		case rune == '(':
+			lexer.emit(itemLeftParentheses)
+			break
+
+		case rune == ')':
+			lexer.emit(itemRightParentheses)
+			break
+
+		// Special symbols
 		case rune == '=':
 			lexer.emit(itemEquals)
 			break
