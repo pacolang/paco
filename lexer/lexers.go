@@ -68,6 +68,11 @@ func ignoreComments(lexer *Lexer) {
 	var rune rune
 	for rune != '\n' {
 		rune = lexer.next()
+
+		if rune == EOF {
+			lexer.emit(ItemEOF)
+			break
+		}
 	}
 	lexer.ignore()
 }

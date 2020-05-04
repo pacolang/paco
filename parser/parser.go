@@ -77,12 +77,29 @@ func (parser *Parser) parseItem(item lexer.Item) Node {
 
 // parseIdentifier identifies whether the identifier is a function call or an assignment
 func parseIdentifier(parser *Parser, identifier string) Node {
-	switch parser.next().Type {
+	item := parser.next()
+	switch item.Type {
 	case lexer.ItemLeftParentheses:
 		return parseCall(parser, identifier)
+	case lexer.ItemEquals:
+		return parseAssignment(parser, identifier)
 	}
 
 	return Node{}
+}
+
+func parseAssignment(parser *Parser, identifier string) Node {
+	item := parser.next()
+
+	node := Node{
+		Type: Assignment,
+		Value: identifier,
+		Params: []Node{
+			parser.parseItem(item),
+		},
+	}
+	
+	return node
 }
 
 // parseCall parses a function call and returns its node

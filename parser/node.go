@@ -13,4 +13,5 @@ const (
 	CallExpression nodeType = iota
 	NumberLiteral
 	StringLiteral
+	Assignment
 )
