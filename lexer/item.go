@@ -16,6 +16,8 @@ const (
 	itemEOF
 	itemNumber
 	itemString
+	itemPipe
+	itemEquals
 )
 
 // String methods is the one used by Printf

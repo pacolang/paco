@@ -1,9 +1,9 @@
 includes (
-  'console'
+  "console"
 )
 
 fn hello() string
-  'hello world'
+  "hello world"
 end
 
 hello = 1329
@@ -11,4 +11,4 @@ hello = 1329
 - prints 1329 and prints my name
 console
   |println(hello)
-  |printf('hello %s!', 'hugo')
+  |printf("hello %s!", "hugo")

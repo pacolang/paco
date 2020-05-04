@@ -56,6 +56,23 @@ func (lexer *Lexer) back() {
 func (lexer *Lexer) run() {
 	for lexer.Position < len(lexer.Input) {
 		switch rune := lexer.next(); {
+		case IsAlphaNumeric(rune):
+			lexer.back()
+			break
+
+		case IsSpace(rune):
+			lexer.ignore()
+			break
+
+		case rune == '=':
+			lexer.emit(itemEquals)
+			break
+
+		case rune == '|':
+			lexer.emit(itemPipe)
+			break
+
+		// Lex the string
 		case rune == '"':
 			lexString(lexer)
 			break

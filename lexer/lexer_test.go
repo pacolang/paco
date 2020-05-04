@@ -6,13 +6,12 @@ import (
 )
 
 func TestLex(t *testing.T) {
-	_, channel := Lex(`+12.42 "jgk\"eaz"`)
+	_, channel := Lex(`hello = "jgk\"eaz"`)
 
 	for {
 		item := <-channel
 
-		fmt.Printf("item recieved: %s\n", item.Value)
-		fmt.Printf("item type: %d\n", item.Type)
+		fmt.Println(item)
 
 		if item.Type == itemEOF {
 			break
