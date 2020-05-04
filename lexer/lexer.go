@@ -89,7 +89,7 @@ func (lexer *Lexer) run() {
 		}
 	}
 
-	lexer.emit(itemEOF)
+	lexer.emit(ItemEOF)
 }
 
 // Lex creates a Lexer with the given input, runs it in a go routine and returns the lexer and

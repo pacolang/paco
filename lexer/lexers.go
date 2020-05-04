@@ -16,7 +16,7 @@ func lexNumber(lexer *Lexer) {
 		lexer.acceptRun(digits)
 	}
 
-	lexer.emit(itemNumber)
+	lexer.emit(ItemNumber)
 }
 
 // lexString emits the next string by accepting double quotes
@@ -33,7 +33,7 @@ Loop:
 		}
 	}
 
-	lexer.emit(itemString)
+	lexer.emit(ItemString)
 }
 
 // lexIdentifier scans an alphanumeric or field
@@ -48,14 +48,14 @@ Loop:
 			word := lexer.Input[lexer.Start:lexer.Position]
 
 			switch {
-			case keywords[word] > itemKeyword:
+			case keywords[word] > ItemKeyword:
 				lexer.emit(keywords[word])
 			case word[0] == '|':
-				lexer.emit(itemField)
+				lexer.emit(ItemField)
 			case word == "true" || word == "false":
-				lexer.emit(itemBoolean)
+				lexer.emit(ItemBoolean)
 			default:
-				lexer.emit(itemIdentifier)
+				lexer.emit(ItemIdentifier)
 			}
 
 			break Loop

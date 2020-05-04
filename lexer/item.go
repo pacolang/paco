@@ -12,50 +12,50 @@ type Item struct {
 }
 
 const (
-	itemError ItemType = iota
-	itemEOF
-	itemNumber
-	itemString
-	itemPipe
-	itemEquals
-	itemPlus
-	itemMinus
-	itemDivide
-	itemTimes
-	itemField
-	itemBoolean
-	itemIdentifier
-	itemLeftParentheses
-	itemRightParentheses
+	ItemError ItemType = iota
+	ItemEOF
+	ItemNumber
+	ItemString
+	ItemPipe
+	ItemEquals
+	ItemPlus
+	ItemMinus
+	ItemDivide
+	ItemTimes
+	ItemField
+	ItemBoolean
+	ItemIdentifier
+	ItemLeftParentheses
+	ItemRightParentheses
 	// Delimit the keywords
-	itemKeyword
-	itemFunction
-	itemIncludes
-	itemStringType
-	itemIntType
+	ItemKeyword
+	ItemFunction
+	ItemIncludes
+	ItemStringType
+	ItemIntType
 )
 
 var keywords = map[string]ItemType{
-	"fn":       itemFunction,
-	"includes": itemIncludes,
-	"string":   itemStringType,
-	"int":      itemIntType,
+	"fn":       ItemFunction,
+	"includes": ItemIncludes,
+	"string":   ItemStringType,
+	"int":      ItemIntType,
 }
 
 var symbols = map[rune]ItemType{
-	'|': itemPipe,
-	'(': itemLeftParentheses,
-	')': itemRightParentheses,
-	'=': itemEquals,
-	'+': itemPlus,
-	'-': itemMinus,
-	'*': itemTimes,
-	'/': itemDivide,
+	'|': ItemPipe,
+	'(': ItemLeftParentheses,
+	')': ItemRightParentheses,
+	'=': ItemEquals,
+	'+': ItemPlus,
+	'-': ItemMinus,
+	'*': ItemTimes,
+	'/': ItemDivide,
 }
 
 // String methods is the one used by Printf
 func (item Item) String() string {
-	if item.Type == itemError {
+	if item.Type == ItemError {
 		return item.Value
 	}
 
