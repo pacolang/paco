@@ -25,6 +25,7 @@ func Parse(input string) Parser {
 	return parser
 }
 
+// add appends the given node to the array of nodes of the parser
 func (parser *Parser) add(node Node) {
 	parser.nodes = append(parser.nodes, node)
 }
@@ -40,18 +41,21 @@ func (parser *Parser) next() (item lexer.Item) {
 // run wait for the items in the channel and parse them
 func (parser *Parser) run() {
 	for {
+		// Gets the next item
 		item := parser.next()
 
+		// Break the loop if EOF occurs
 		if item.Type == lexer.ItemEOF {
 			break
 		}
 
+		// Adds the parsed item
 		parser.add(parser.parseItem(item))
-
 		parser.position++
 	}
 }
 
+// parseItem returns the parsed node from the given item
 func (parser *Parser) parseItem(item lexer.Item) Node {
 	switch item.Type {
 	case lexer.ItemNumber:
@@ -71,6 +75,7 @@ func (parser *Parser) parseItem(item lexer.Item) Node {
 	return Node{}
 }
 
+// parseIdentifier identifies whether the identifier is a function call or an assignment
 func parseIdentifier(parser *Parser, identifier string) Node {
 	switch parser.next().Type {
 	case lexer.ItemLeftParentheses:
@@ -80,6 +85,7 @@ func parseIdentifier(parser *Parser, identifier string) Node {
 	return Node{}
 }
 
+// parseCall parses a function call and returns its node
 func parseCall(parser *Parser, identifier string) Node {
 	var params []Node
 
