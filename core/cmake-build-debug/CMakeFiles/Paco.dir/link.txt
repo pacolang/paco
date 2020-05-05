@@ -1,2 +1,0 @@
-/Library/Developer/CommandLineTools/usr/bin/ar qc libPaco.a  CMakeFiles/Paco.dir/console.c.o CMakeFiles/Paco.dir/main.c.o
-/Library/Developer/CommandLineTools/usr/bin/ranlib libPaco.a
