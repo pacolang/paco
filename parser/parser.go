@@ -6,11 +6,11 @@ import (
 )
 
 type Parser struct {
-	itemsChannel  chan lexer.Item
-	previousItems []lexer.Item
-	item          lexer.Item
-	position      int
-	nodes         []Node
+	ItemsChannel  chan lexer.Item
+	PreviousItems []lexer.Item
+	Item          lexer.Item
+	Position      int
+	Nodes         []Node
 }
 
 // Create the parser and run it
@@ -18,7 +18,7 @@ func Parse(input string) Parser {
 	_, channel := lexer.Lex(input)
 
 	parser := Parser{
-		itemsChannel: channel,
+		ItemsChannel: channel,
 	}
 
 	parser.run()
@@ -26,15 +26,15 @@ func Parse(input string) Parser {
 	return parser
 }
 
-// add appends the given node to the array of nodes of the parser
+// add appends the given node to the array of Nodes of the parser
 func (parser *Parser) add(node Node) {
-	parser.nodes = append(parser.nodes, node)
+	parser.Nodes = append(parser.Nodes, node)
 }
 
-// next moves the position to the next item and returns it
+// next moves the Position to the next Item and returns it
 func (parser *Parser) next() (item lexer.Item) {
-	item = <-parser.itemsChannel
-	parser.previousItems = append(parser.previousItems, item)
+	item = <-parser.ItemsChannel
+	parser.PreviousItems = append(parser.PreviousItems, item)
 
 	return
 }
@@ -42,7 +42,7 @@ func (parser *Parser) next() (item lexer.Item) {
 // run wait for the items in the channel and parse them
 func (parser *Parser) run() {
 	for {
-		// Gets the next item
+		// Gets the next Item
 		item := parser.next()
 
 		// Break the loop if EOF occurs
@@ -50,13 +50,13 @@ func (parser *Parser) run() {
 			break
 		}
 
-		// Adds the parsed item
+		// Adds the parsed Item
 		parser.add(parser.parseItem(item))
-		parser.position++
+		parser.Position++
 	}
 }
 
-// parseItem returns the parsed node from the given item
+// parseItem returns the parsed node from the given Item
 func (parser *Parser) parseItem(item lexer.Item) Node {
 	switch {
 	case item.Type == lexer.ItemNumber:

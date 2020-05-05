@@ -10,5 +10,5 @@ func TestParse(t *testing.T) {
 console|println("hey")
 end`
 
-	fmt.Println(Parse(code).nodes)
+	fmt.Println(Parse(code).Nodes)
 }
