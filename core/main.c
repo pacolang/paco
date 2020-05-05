@@ -1,6 +1,2 @@
 #include "console.h"
-
-int main() {
-  println("hello");
-  return 0;
-}
+int main(){println("hello brah");return 0;}

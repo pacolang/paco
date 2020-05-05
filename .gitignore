@@ -1,2 +1,5 @@
 .idea
 core/cmake-build-debug
+core/.idea
+*.o
+core/main.c
