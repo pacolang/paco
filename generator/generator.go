@@ -30,12 +30,12 @@ func Generate(input string) {
 		strings.Join(mainCalls, ""),
 	)
 
-	err := ioutil.WriteFile("../core/main.c", []byte(code), 0644)
+	err := ioutil.WriteFile("./core/main.c", []byte(code), 0644)
 	if err != nil {
 		panic(err)
 	}
 
-	cmd := exec.Command("gcc", "../core/main.c", "../core/console.o")
+	cmd := exec.Command("gcc", "./core/main.c", "./core/console.o", "-o", "test")
 
 	err = cmd.Run()
 	if err != nil {
