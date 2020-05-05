@@ -94,7 +94,6 @@ func parseIdentifier(parser *Parser, identifier string) Node {
 	return Node{}
 }
 
-//
 func parseKeyword(parser *Parser, keyword lexer.ItemType) Node {
 	switch keyword {
 	case lexer.ItemFunction:
@@ -123,6 +122,28 @@ func parseFunction(parser *Parser) Node {
 	for item.Type != lexer.ItemRightParentheses {
 		node.Params = append(node.Params, parseParam(parser))
 		item = parser.next()
+
+		if item.Type == lexer.ItemEOF {
+			log.Errorf("the right parentheses is missing")
+		}
+	}
+
+	item = parser.next()
+	if item.Type > lexer.ItemTypes {
+		node.ReturnType = types[item.Type]
+	}
+
+	if item.Type == lexer.ItemEOF {
+		log.Errorf("empty function declaration")
+	}
+
+	for item.Type != lexer.ItemEnd {
+		node.Body = append(node.Body, parser.parseItem(item))
+		item = parser.next()
+
+		if item.Type == lexer.ItemEOF {
+			log.Errorf("end was not found")
+		}
 	}
 
 	return node
@@ -140,8 +161,9 @@ func parseParam(parser *Parser) Node {
 	}
 
 	return Node{
-		Type: types[typ.Type],
+		Type: Parameter,
 		Value: identifier.Value,
+		ReturnType: types[typ.Type],
 	}
 }
 

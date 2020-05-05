@@ -6,10 +6,11 @@ type nodeType int
 
 // A Node is used to make the AST tree
 type Node struct {
-	Type   nodeType
-	Value  string
-	Params []Node
-	Body   []Node
+	Type       nodeType
+	Value      string
+	Params     []Node
+	Body       []Node
+	ReturnType nodeType
 }
 
 const (
@@ -18,6 +19,7 @@ const (
 	StringLiteral
 	Assignment
 	Function
+	Parameter
 )
 
 var types = map[lexer.ItemType]nodeType{

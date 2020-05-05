@@ -32,6 +32,7 @@ const (
 	ItemKeyword
 	ItemFunction
 	ItemIncludes
+	ItemEnd
 	// Delimit the types
 	ItemTypes
 	ItemStringType
@@ -43,6 +44,7 @@ var keywords = map[string]ItemType{
 	"includes": ItemIncludes,
 	"string":   ItemStringType,
 	"int":      ItemIntType,
+	"end":      ItemEnd,
 }
 
 var symbols = map[rune]ItemType{
