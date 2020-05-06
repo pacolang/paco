@@ -10,5 +10,14 @@ func TestParse(t *testing.T) {
 console|println("hey")
 end`
 
-	fmt.Println(Parse(code).Nodes)
+	parser := Parse(code)
+	for {
+		node := <-parser.NodesChannel
+
+		if node.Type == EOF {
+			break
+		}
+
+		fmt.Println(node)
+	}
 }

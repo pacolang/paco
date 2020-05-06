@@ -23,7 +23,7 @@ func Parse(input string) Parser {
 		NodesChannel: make(chan Node),
 	}
 
-	parser.run()
+	go parser.run()
 
 	return parser
 }
@@ -49,11 +49,14 @@ func (parser *Parser) run() {
 
 		// Break the loop if EOF occurs
 		if item.Type == lexer.ItemEOF {
+			parser.emit(Node{
+				Type: EOF,
+			})
 			break
 		}
 
 		// Parse the current item
-		parser.parseItem(item)
+		parser.emit(parser.parseItem(item))
 		parser.Position++
 	}
 }

@@ -15,6 +15,7 @@ type Node struct {
 
 const (
 	CallExpression NodeType = iota
+	EOF
 	NumberLiteral
 	StringLiteral
 	Assignment
