@@ -10,7 +10,6 @@ type Parser struct {
 	ItemsChannel  chan lexer.Item
 	PreviousItems []lexer.Item
 	Item          lexer.Item
-	Position      int
 	NodesChannel  chan Node
 }
 
@@ -57,6 +56,5 @@ func (parser *Parser) run() {
 
 		// Parse the current item
 		parser.emit(parser.parseItem(item))
-		parser.Position++
 	}
 }
