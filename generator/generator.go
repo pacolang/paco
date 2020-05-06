@@ -21,6 +21,9 @@ func Generate(input string) {
 	}
 
 	generator.run()
+	fmt.Println(generator.mainCalls)
+	fmt.Println(generator.imports)
+	fmt.Println(generator.functions)
 }
 
 // next returns the next node sent by the parser
@@ -34,6 +37,11 @@ func (generator *Generator) next() parser.Node {
 // addMainCall appends the given string to the main calls array of the generator
 func (generator *Generator) addMainCall(call string) {
 	generator.mainCalls = append(generator.mainCalls, call)
+}
+
+// addFunction appends the given function to the function's array of the generator
+func (generator *Generator) addFunction(function string) {
+	generator.functions = append(generator.functions, function)
 }
 
 // addImport appends the given import to the imports array of the generator
@@ -66,6 +74,9 @@ func (generator *Generator) run() {
 		switch node.Type {
 		case parser.CallExpression:
 			generator.addMainCall(generateCall(generator, node))
+			break
+		case parser.Function:
+			generator.addFunction(generateFunction(generator, node))
 			break
 		}
 	}
