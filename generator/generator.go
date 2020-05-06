@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"github.com/hugolgst/paco/parser"
+	"strings"
 )
 
 // The Generator will take the parsers's nodes to generate the C code with it
@@ -21,9 +22,8 @@ func Generate(input string) {
 	}
 
 	generator.run()
-	fmt.Println(generator.mainCalls)
-	fmt.Println(generator.imports)
-	fmt.Println(generator.functions)
+
+	fmt.Println(generator.assemble())
 }
 
 // next returns the next node sent by the parser
@@ -80,4 +80,14 @@ func (generator *Generator) run() {
 			break
 		}
 	}
+}
+
+// assemble brings all the parts of the code together
+func (generator *Generator) assemble() string {
+	return fmt.Sprintf(
+		cCode,
+		strings.Join(generator.imports, "\n"),
+		strings.Join(generator.functions, "\n"),
+		strings.Join(generator.mainCalls, ";"),
+	)
 }

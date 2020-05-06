@@ -12,4 +12,5 @@ var (
 	cParam    = "%s %s"
 	cFunction = "%s %s(%s){%s}"
 	cReturn   = "return %s;"
+	cCode     = "%s\n%s\nint main(){%s}"
 )
