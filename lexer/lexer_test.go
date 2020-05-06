@@ -7,7 +7,7 @@ import (
 
 func TestLex(t *testing.T) {
 	_, channel := Lex(`console
-	|println("hello")
+	|println("hey")
 	|println("hello")`)
 
 	for {

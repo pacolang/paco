@@ -50,8 +50,6 @@ Loop:
 			switch {
 			case keywords[word] > ItemKeyword:
 				lexer.emit(keywords[word])
-			case word[0] == '|':
-				lexer.emit(ItemField)
 			case word == "true" || word == "false":
 				lexer.emit(ItemBoolean)
 			default:

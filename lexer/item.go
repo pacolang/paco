@@ -22,7 +22,6 @@ const (
 	ItemMinus
 	ItemDivide
 	ItemTimes
-	ItemField
 	ItemBoolean
 	ItemIdentifier
 	ItemComma

@@ -56,6 +56,8 @@ func (lexer *Lexer) back() {
 func (lexer *Lexer) run() {
 	for lexer.Position < len(lexer.Input) {
 		rune := lexer.next()
+		value, valid := symbols[rune]
+
 		switch {
 		case IsAlphaNumeric(rune):
 			lexer.back()
@@ -80,12 +82,10 @@ func (lexer *Lexer) run() {
 			lexer.back()
 			lexNumber(lexer)
 			break
-		}
 
-		// Emit a symbol if found
-		value, valid := symbols[rune]
-		if valid {
+		case valid:
 			lexer.emit(value)
+			break
 		}
 	}
 

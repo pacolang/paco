@@ -1,6 +1,9 @@
 package parser
 
-import "github.com/hugolgst/paco/lexer"
+import (
+	"github.com/hugolgst/paco/lexer"
+	"strings"
+)
 
 // parseItem returns the parsed node from the given Item
 func (parser *Parser) parseItem(item lexer.Item) Node {
@@ -19,11 +22,9 @@ func (parser *Parser) parseItem(item lexer.Item) Node {
 
 	case item.Type == lexer.ItemIdentifier:
 		return parseIdentifier(parser, item.Value)
-		break
 
 	case item.Type > lexer.ItemKeyword:
 		return parseKeyword(parser, item.Type)
-		break
 	}
 
 	return Node{}
@@ -41,14 +42,20 @@ func parseKeyword(parser *Parser, keyword lexer.ItemType) Node {
 
 // parseIdentifier identifies whether the identifier is a function call or an assignment
 func parseIdentifier(parser *Parser, identifier string) Node {
-	switch item := parser.next(); item.Type {
+	item := parser.next()
+
+	switch {
 	// If the next item is a parentheses, then it is a function
-	case lexer.ItemLeftParentheses:
+	case item.Type == lexer.ItemLeftParentheses:
 		return parseCall(parser, identifier)
 
 	// If the next item is an equal symbol, then it is an assignment
-	case lexer.ItemEquals:
+	case item.Type == lexer.ItemEquals:
 		return parseAssignment(parser, identifier)
+
+	case item.Type == lexer.ItemIdentifier && strings.HasPrefix(item.Value, "|"):
+		parser.next()
+		return parseCall(parser, identifier + item.Value)
 	}
 
 	return Node{}
