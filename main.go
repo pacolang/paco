@@ -1,8 +1,8 @@
 package main
 
 import (
-	"./generator"
-	"./log"
+	"github.com/hugolgst/paco/generator"
+	"github.com/hugolgst/paco/log"
 	"io/ioutil"
 	"os"
 )

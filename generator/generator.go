@@ -1,8 +1,8 @@
 package generator
 
 import (
-	"../parser"
 	"fmt"
+	"github.com/hugolgst/paco/parser"
 	"io/ioutil"
 	"os/exec"
 	"strings"
@@ -11,6 +11,11 @@ import (
 var (
 	imports   []string
 	mainCalls []string
+	functions []string
+	types = map[parser.NodeType]string{
+		parser.StringLiteral: "char*",
+		parser.NumberLiteral: "int",
+	}
 )
 
 func Generate(input string) {
@@ -18,6 +23,9 @@ func Generate(input string) {
 
 	for _, node := range nodes {
 		switch node.Type {
+		case parser.Function:
+			functions = append(functions, generateFunction(node))
+			break
 		case parser.CallExpression:
 			mainCalls = append(mainCalls, generateCall(node))
 			break
@@ -25,8 +33,9 @@ func Generate(input string) {
 	}
 
 	code := fmt.Sprintf(
-		"%s\nint main(){%sreturn 0;}",
+		"%s\n%s\nint main(){%sreturn 0;}",
 		strings.Join(imports, "\n"),
+		strings.Join(functions, "\n"),
 		strings.Join(mainCalls, ""),
 	)
 
@@ -43,10 +52,61 @@ func Generate(input string) {
 	}
 }
 
-func generateCall(node parser.Node) string {
-	split := strings.Split(node.Value, "|")
+func generateNode(node parser.Node) string {
+	switch node.Type {
+	case parser.CallExpression:
+		return generateCall(node)
+	}
 
-	imports = append(imports, fmt.Sprintf(`#include "%s.h"`, split[0]))
+	return ""
+}
+
+func generateParam(node parser.Node) string {
+	return fmt.Sprintf("%s %s", types[node.ReturnType], node.Value)
+}
+
+func generateFunction(node parser.Node) string {
+	returnType := types[node.ReturnType]
+	if returnType == "" {
+		returnType = "void"
+	}
+
+	var params []string
+	for _, param := range node.Params {
+		params = append(params, generateParam(param))
+	}
+
+	joinedParams := ""
+	if len(params) > 0 {
+		joinedParams = strings.Join(params, ",")
+	}
+
+	var body []string
+	for i := 0; i < len(node.Body)-1; i++ {
+		body = append(body, generateNode(node.Body[i]))
+	}
+
+	return fmt.Sprintf(
+		"%s %s(%s){%sreturn %s;}",
+		returnType,
+		node.Value,
+		joinedParams,
+		strings.Join(body, ";"),
+		node.Body[len(node.Body)-1].Value,
+	)
+}
+
+func generateCall(node parser.Node) string {
+	var identifier string
+	if strings.Contains(node.Value, "|") {
+		split := strings.Split(node.Value, "|")
+
+		imports = append(imports, fmt.Sprintf(`#include "%s.h"`, split[0]))
+
+		identifier = split[1]
+	} else {
+		identifier = node.Value
+	}
 
 	var params []string
 	for _, param := range node.Params {
@@ -55,7 +115,7 @@ func generateCall(node parser.Node) string {
 
 	call := fmt.Sprintf(
 		"%s(%s);",
-		split[1],
+		identifier,
 		strings.Join(params, ","),
 	)
 

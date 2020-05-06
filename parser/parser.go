@@ -1,16 +1,17 @@
 package parser
 
 import (
-	"../lexer"
-	"../log"
+	"github.com/hugolgst/paco/lexer"
 )
 
+// A Parser receives the items from the lexer, parses them to get nodes and push them
+// into the nodes channel
 type Parser struct {
 	ItemsChannel  chan lexer.Item
 	PreviousItems []lexer.Item
 	Item          lexer.Item
 	Position      int
-	Nodes         []Node
+	NodesChannel  chan Node
 }
 
 // Create the parser and run it
@@ -19,6 +20,7 @@ func Parse(input string) Parser {
 
 	parser := Parser{
 		ItemsChannel: channel,
+		NodesChannel: make(chan Node),
 	}
 
 	parser.run()
@@ -27,8 +29,8 @@ func Parse(input string) Parser {
 }
 
 // add appends the given node to the array of Nodes of the parser
-func (parser *Parser) add(node Node) {
-	parser.Nodes = append(parser.Nodes, node)
+func (parser *Parser) emit(node Node) {
+	parser.NodesChannel <- node
 }
 
 // next moves the Position to the next Item and returns it
@@ -50,151 +52,8 @@ func (parser *Parser) run() {
 			break
 		}
 
-		// Adds the parsed Item
-		parser.add(parser.parseItem(item))
+		// Parse the current item
+		parser.parseItem(item)
 		parser.Position++
-	}
-}
-
-// parseItem returns the parsed node from the given Item
-func (parser *Parser) parseItem(item lexer.Item) Node {
-	switch {
-	case item.Type == lexer.ItemNumber:
-		return Node{
-			Type:  NumberLiteral,
-			Value: item.Value,
-		}
-
-	case item.Type == lexer.ItemString:
-		return Node{
-			Type:  StringLiteral,
-			Value: item.Value,
-		}
-
-	case item.Type == lexer.ItemIdentifier:
-		return parseIdentifier(parser, item.Value)
-
-	case item.Type > lexer.ItemKeyword:
-		return parseKeyword(parser, item.Type)
-	}
-
-	return Node{}
-}
-
-// parseIdentifier identifies whether the identifier is a function call or an assignment
-func parseIdentifier(parser *Parser, identifier string) Node {
-	item := parser.next()
-	switch item.Type {
-	case lexer.ItemLeftParentheses:
-		return parseCall(parser, identifier)
-	case lexer.ItemEquals:
-		return parseAssignment(parser, identifier)
-	}
-
-	return Node{}
-}
-
-func parseKeyword(parser *Parser, keyword lexer.ItemType) Node {
-	switch keyword {
-	case lexer.ItemFunction:
-		return parseFunction(parser)
-	}
-
-	return Node{}
-}
-
-func parseFunction(parser *Parser) Node {
-	identifier := parser.next()
-	if identifier.Type != lexer.ItemIdentifier {
-		log.Errorf("name of the function should be an identifier")
-	}
-
-	node := Node{
-		Type: Function,
-		Value: identifier.Value,
-	}
-
-	item := parser.next()
-	if item.Type != lexer.ItemLeftParentheses {
-		log.Errorf("the left parentheses is missing")
-	}
-
-	for item.Type != lexer.ItemRightParentheses {
-		node.Params = append(node.Params, parseParam(parser))
-		item = parser.next()
-
-		if item.Type == lexer.ItemEOF {
-			log.Errorf("the right parentheses is missing")
-		}
-	}
-
-	item = parser.next()
-	if item.Type > lexer.ItemTypes {
-		node.ReturnType = types[item.Type]
-	}
-
-	if item.Type == lexer.ItemEOF {
-		log.Errorf("empty function declaration")
-	}
-
-	for item.Type != lexer.ItemEnd {
-		node.Body = append(node.Body, parser.parseItem(item))
-		item = parser.next()
-
-		if item.Type == lexer.ItemEOF {
-			log.Errorf("end was not found")
-		}
-	}
-
-	return node
-}
-
-func parseParam(parser *Parser) Node {
-	identifier := parser.next()
-	if identifier.Type != lexer.ItemIdentifier {
-		log.Errorf("name of the param should be an identifier")
-	}
-
-	typ := parser.next()
-	if typ.Type < lexer.ItemTypes {
-		log.Errorf("param type isn't valid")
-	}
-
-	return Node{
-		Type: Parameter,
-		Value: identifier.Value,
-		ReturnType: types[typ.Type],
-	}
-}
-
-// parseAssignment parses a variable assignment
-func parseAssignment(parser *Parser, identifier string) Node {
-	item := parser.next()
-
-	node := Node{
-		Type: Assignment,
-		Value: identifier,
-		Params: []Node{
-			parser.parseItem(item),
-		},
-	}
-
-	return node
-}
-
-// parseCall parses a function call and returns its node
-func parseCall(parser *Parser, identifier string) Node {
-	var params []Node
-
-	item := parser.next()
-	for item.Type != lexer.ItemRightParentheses {
-		params = append(params, parser.parseItem(item))
-		item = parser.next()
-	}
-
-	return Node{
-		Type:   CallExpression,
-		Value:  identifier,
-		Params: params,
 	}
 }

@@ -1,20 +1,20 @@
 package parser
 
-import "../lexer"
+import "github.com/hugolgst/paco/lexer"
 
-type nodeType int
+type NodeType int
 
 // A Node is used to make the AST tree
 type Node struct {
-	Type       nodeType
+	Type       NodeType
 	Value      string
 	Params     []Node
 	Body       []Node
-	ReturnType nodeType
+	ReturnType NodeType
 }
 
 const (
-	CallExpression nodeType = iota
+	CallExpression NodeType = iota
 	NumberLiteral
 	StringLiteral
 	Assignment
@@ -22,7 +22,7 @@ const (
 	Parameter
 )
 
-var types = map[lexer.ItemType]nodeType{
+var types = map[lexer.ItemType]NodeType{
 	lexer.ItemStringType: StringLiteral,
 	lexer.ItemIntType:    NumberLiteral,
 }
