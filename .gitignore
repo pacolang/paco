@@ -3,3 +3,4 @@ core/cmake-build-debug
 core/.idea
 *.o
 core/main.c
+core/libpaco.a

@@ -16,14 +16,13 @@ type Generator struct {
 }
 
 // Generate takes the code and generates the matching C code
-func Generate(input string) {
+func Generate(input string) string {
 	generator := &Generator{
 		nodesChannel: parser.Parse(input).NodesChannel,
 	}
 
 	generator.run()
-
-	fmt.Println(generator.assemble())
+	return generator.assemble()
 }
 
 // next returns the next node sent by the parser

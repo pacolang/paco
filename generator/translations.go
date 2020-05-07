@@ -7,10 +7,10 @@ var (
 		parser.StringLiteral: "char*",
 		parser.NumberLiteral: "int",
 	}
-	cImports  = "#include <%s.h>"
+	cImports  = "#include \"%s.h\""
 	cCall     = "%s(%s);"
 	cParam    = "%s %s"
 	cFunction = "%s %s(%s){%s}"
 	cReturn   = "return %s;"
-	cCode     = "%s\n%s\nint main(){%s}"
+	cCode     = "%s\n%s\nint main(){%s;return 0;}"
 )

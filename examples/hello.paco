@@ -1,6 +1,5 @@
-fn hello(hey string) int
+fn hello()
   console|println("hello world")
-  0
 end
 
 hello()
