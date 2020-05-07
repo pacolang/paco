@@ -2,5 +2,5 @@
 #include "console.h"
 
 void println(char *message) {
-  printf(message);
+  printf("%s\n", message);
 }
