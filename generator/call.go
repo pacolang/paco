@@ -25,7 +25,7 @@ func generateCall(generator *Generator, node parser.Node) string {
 	}
 
 	// Translate the params
-	params := generateParams(node.Params)
+	params := generateParams(generator, node.Params)
 
 	// Link all the translations together
 	return fmt.Sprintf(
@@ -36,13 +36,13 @@ func generateCall(generator *Generator, node parser.Node) string {
 }
 
 // generateParams returns the parameters translated in C from the given nodes parameters
-func generateParams(params []parser.Node) (cParams []string) {
+func generateParams(generator *Generator, params []parser.Node) (cParams []string) {
 	// Translate each parameter
 	for _, param := range params {
 		// Append the translated parameter in C
 		cParams = append(
 			cParams,
-			param.Value,
+			generateInstruction(generator, param),
 		)
 	}
 

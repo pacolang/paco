@@ -41,7 +41,7 @@ func generateFunctionBody(generator *Generator, node parser.Node) (bodyInstructi
 			instruction = fmt.Sprintf(cReturn, instruction)
 		}
 
-		bodyInstructions += instruction
+		bodyInstructions += instruction + ";"
 	}
 
 	return

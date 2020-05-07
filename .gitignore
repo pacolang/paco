@@ -1,6 +1,6 @@
 .idea
 core/cmake-build-debug
 core/.idea
-*.o
+core/*.o
 core/main.c
 core/libpaco.a

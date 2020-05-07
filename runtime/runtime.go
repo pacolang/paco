@@ -12,6 +12,7 @@ import (
 // Run
 func Run(input, executableName string) {
 	code := generator.Generate(input)
+	fmt.Println(code)
 
 	// Generate the executable using gcc
 	p := pipe.Line(

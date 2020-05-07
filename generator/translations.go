@@ -8,7 +8,7 @@ var (
 		parser.NumberLiteral: "int",
 	}
 	cImports  = "#include \"%s.h\""
-	cCall     = "%s(%s);"
+	cCall     = "%s(%s)"
 	cParam    = "%s %s"
 	cFunction = "%s %s(%s){%s}"
 	cReturn   = "return %s;"

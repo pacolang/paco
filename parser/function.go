@@ -12,6 +12,7 @@ func parseCall(parser *Parser, identifier string) Node {
 	// While the item is a right parentheses parses the params
 	for item := parser.next(); item.Type != lexer.ItemRightParentheses; {
 		params = append(params, parser.parseItem(item))
+
 		item = parser.next()
 	}
 
@@ -31,7 +32,7 @@ func parseFunction(parser *Parser) Node {
 	}
 
 	node := Node{
-		Type: Function,
+		Type:  Function,
 		Value: identifier.Value,
 	}
 
@@ -89,8 +90,8 @@ func parseParam(parser *Parser, item lexer.Item) Node {
 	}
 
 	return Node{
-		Type: Parameter,
-		Value: item.Value,
+		Type:       Parameter,
+		Value:      item.Value,
 		ReturnType: types[typ.Type],
 	}
 }

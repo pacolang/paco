@@ -7,6 +7,10 @@ func generateInstruction(generator *Generator, node parser.Node) string {
 	switch node.Type {
 	case parser.CallExpression:
 		return generateCall(generator, node)
+	case parser.StringLiteral:
+		return node.Value
+	case parser.NumberLiteral:
+		return node.Value
 	}
 
 	return ""
