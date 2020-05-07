@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <time.h>
-#include "math.h"
+#include "random.h"
 
 int randInt(int lower, int upper) {
   srand(time(NULL));
