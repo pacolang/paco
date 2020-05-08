@@ -61,6 +61,10 @@ func parseIdentifier(parser *Parser, identifier string) Node {
 	case item.Type == lexer.ItemEquals:
 		return parseAssignment(parser, identifier)
 
+	// If the next item is a type then it is an empty variable assignment
+	case item.Type > lexer.ItemTypes:
+		return parseEmptyAssignment(identifier, item.Type)
+
 	case item.Type == lexer.ItemIdentifier && strings.HasPrefix(item.Value, "|"):
 		parser.next()
 		return parseCall(parser, identifier + item.Value)

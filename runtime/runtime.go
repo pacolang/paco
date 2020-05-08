@@ -1,9 +1,8 @@
 package runtime
 
 import (
-	"fmt"
 	"github.com/hugolgst/paco/generator"
-	"gopkg.in/pipe.v2"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -12,23 +11,32 @@ import (
 // Run
 func Run(input, executableName string) {
 	code := generator.Generate(input)
-	fmt.Println(code)
+	writeCode(code)
 
 	// Generate the executable using gcc
-	p := pipe.Line(
-		pipe.ChDir(getPacoPath() + "/core"),
-		pipe.Println(code),
-		pipe.Exec("gcc", "-L.", "-lpaco", "-x", "c", "-O", "-Wall", "-o", executableName, "-"),
-	)
-
-	output, err := pipe.CombinedOutput(p)
-	if err != nil {
-		fmt.Printf("%v\n", err)
+	cmd := exec.Command("gcc", "main.c", "-L.", "-lpaco", "-o", executableName)
+	cmd.Dir = "core"
+	if err := cmd.Run(); err != nil {
+		log.Fatalf("cmd.Run() failed with %s\n", err)
 	}
-	fmt.Printf("%s", output)
 
-	// Moves the executable
+	// Moves the executable and deletes the source file
 	movesExecutable(executableName)
+	deleteFile("main.c")
+}
+
+// writeCode writes the code into a C file
+func writeCode(code string) {
+	file, err := os.Create("./core/main.c")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	_, err = io.WriteString(file, code)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // movesExecutable moves the generated executable to a ne
@@ -37,6 +45,19 @@ func movesExecutable(executableName string) {
 		"mv",
 		getPacoPath() + "/core/" + executableName,
 		getCurrentPath() + "/" + executableName,
+	)
+
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("mv failed with %s\n", err)
+	}
+}
+
+// deleteFile deletes the given file
+func deleteFile(file string) {
+	cmd := exec.Command(
+		"rm",
+		getPacoPath() + "/core/" + file,
 	)
 
 	err := cmd.Run()

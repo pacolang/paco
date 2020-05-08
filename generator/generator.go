@@ -73,15 +73,18 @@ func (generator *Generator) run() {
 		switch node.Type {
 		case parser.CallExpression:
 			generator.addMainCall(generateCall(generator, node))
-			break
+
 		case parser.Function:
 			generator.addFunction(generateFunction(generator, node))
-			break
+
 		case parser.Assignment:
 			generator.addMainCall(generateAssignment(node))
+
+		case parser.EmptyAssignment:
+			generator.addMainCall(generateEmptyAssignment(node))
+
 		case parser.Condition:
 			generator.addMainCall(generateCondition(generator, node))
-			break
 		}
 	}
 }

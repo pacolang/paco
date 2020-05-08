@@ -21,6 +21,7 @@ const (
 	Variable
 	Condition
 	Assignment
+	EmptyAssignment
 	Function
 	Parameter
 )
