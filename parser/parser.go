@@ -55,6 +55,6 @@ func (parser *Parser) run() {
 		}
 
 		// Parse the current item
-		parser.emit(parser.parseItem(item))
+		parser.emit(parseItem(parser, item))
 	}
 }

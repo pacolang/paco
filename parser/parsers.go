@@ -6,7 +6,7 @@ import (
 )
 
 // parseItem returns the parsed node from the given Item
-func (parser *Parser) parseItem(item lexer.Item) Node {
+func parseItem(parser *Parser, item lexer.Item) Node {
 	switch {
 	case item.Type == lexer.ItemNumber:
 		return Node{
@@ -41,6 +41,8 @@ func parseKeyword(parser *Parser, keyword lexer.ItemType) Node {
 	switch keyword {
 	case lexer.ItemFunction:
 		return parseFunction(parser)
+	case lexer.ItemIf:
+		return parseCondition(parser)
 	}
 
 	return Node{}

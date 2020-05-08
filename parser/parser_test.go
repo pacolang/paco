@@ -6,12 +6,10 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	code := `fn hello()
-  hey = "yo"
-  console|println(*hey)
-end
-
-hello()`
+	code := `text = "hello"
+if *text == "hello"
+    console|println("bingo")
+end`
 
 	parser := Parse(code)
 	for {

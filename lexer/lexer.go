@@ -89,8 +89,11 @@ func (lexer *Lexer) run() {
 
 		case rune == '=':
 			// Check if it is a double equals or not
-			if lexer.next() == '=' {
+			nextRune := lexer.next()
+			if nextRune == '=' {
 				lexer.emit(ItemEqualityCheck)
+			} else if nextRune == '!' {
+				lexer.emit(ItemNotEqualityCheck)
 			} else {
 				lexer.back()
 				lexer.emit(ItemEquals)

@@ -6,7 +6,7 @@ func parseAssignment(parser *Parser, identifier string) Node {
 		Type: Assignment,
 		Value: identifier,
 		Params: []Node{
-			parser.parseItem(parser.next()),
+			parseItem(parser, parser.next()),
 		},
 	}
 }

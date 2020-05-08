@@ -28,7 +28,10 @@ const (
 	ItemLeftParentheses
 	ItemRightParentheses
 	ItemVariableValue
+	// Delimit the equality operators
+	ItemEquality
 	ItemEqualityCheck
+	ItemNotEqualityCheck
 	// Delimit the keywords
 	ItemKeyword
 	ItemFunction

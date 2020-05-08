@@ -19,6 +19,7 @@ const (
 	NumberLiteral
 	StringLiteral
 	Variable
+	Condition
 	Assignment
 	Function
 	Parameter

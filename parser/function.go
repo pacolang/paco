@@ -11,7 +11,7 @@ func parseCall(parser *Parser, identifier string) Node {
 
 	// While the item is a right parentheses parses the params
 	for item := parser.next(); item.Type != lexer.ItemRightParentheses; {
-		params = append(params, parser.parseItem(item))
+		params = append(params, parseItem(parser, item))
 
 		item = parser.next()
 	}
@@ -66,7 +66,7 @@ func parseFunction(parser *Parser) Node {
 
 	// Add body nodes
 	for item.Type != lexer.ItemEnd {
-		node.Body = append(node.Body, parser.parseItem(item))
+		node.Body = append(node.Body, parseItem(parser, item))
 		item = parser.next()
 
 		if item.Type == lexer.ItemEOF {
