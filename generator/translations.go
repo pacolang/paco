@@ -14,4 +14,5 @@ var (
 	cReturn     = "return %s;"
 	cCode       = "%s\n%s\nint main(){%s;return 0;}"
 	cAssignment = "%s %s = %s;"
+	cCondition  = "if(%s){%s}"
 )

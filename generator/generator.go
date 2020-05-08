@@ -77,6 +77,11 @@ func (generator *Generator) run() {
 		case parser.Function:
 			generator.addFunction(generateFunction(generator, node))
 			break
+		case parser.Assignment:
+			generator.addMainCall(generateAssignment(node))
+		case parser.Condition:
+			generator.addMainCall(generateCondition(generator, node))
+			break
 		}
 	}
 }

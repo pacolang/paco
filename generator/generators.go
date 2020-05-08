@@ -19,6 +19,9 @@ func generateInstruction(generator *Generator, node parser.Node) string {
 
 	case parser.Variable:
 		return node.Value
+
+	case parser.Condition:
+		return generateCondition(generator, node)
 	}
 
 	return ""

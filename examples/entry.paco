@@ -1,0 +1,4 @@
+userEntry string
+console|println("enter something")
+stdio|scanf("%s" *userEntry)
+console|println(*userEntry)
