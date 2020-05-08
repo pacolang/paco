@@ -52,6 +52,8 @@ Loop:
 				lexer.emit(keywords[word])
 			case word == "true" || word == "false":
 				lexer.emit(ItemBoolean)
+			case word[0] == '*':
+				lexer.emit(ItemVariableValue)
 			default:
 				lexer.emit(ItemIdentifier)
 			}

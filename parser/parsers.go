@@ -20,6 +20,12 @@ func (parser *Parser) parseItem(item lexer.Item) Node {
 			Value: item.Value,
 		}
 
+	case item.Type == lexer.ItemVariableValue:
+		return Node{
+			Type: Variable,
+			Value: item.Value[1:],
+		}
+
 	case item.Type == lexer.ItemIdentifier:
 		return parseIdentifier(parser, item.Value)
 

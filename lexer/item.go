@@ -27,6 +27,7 @@ const (
 	ItemComma
 	ItemLeftParentheses
 	ItemRightParentheses
+	ItemVariableValue
 	// Delimit the keywords
 	ItemKeyword
 	ItemFunction

@@ -6,9 +6,12 @@ import (
 )
 
 func TestLex(t *testing.T) {
-	_, channel := Lex(`console
-	|println("hey")
-	|println("hello")`)
+	_, channel := Lex(`fn hello()
+  hey = "yo"
+  console|println(*hey)
+end
+
+hello()`)
 
 	for {
 		item := <-channel

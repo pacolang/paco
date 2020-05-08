@@ -18,6 +18,7 @@ const (
 	EOF
 	NumberLiteral
 	StringLiteral
+	Variable
 	Assignment
 	Function
 	Parameter
