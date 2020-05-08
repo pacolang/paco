@@ -1,6 +1,6 @@
 fn hello()
-  hey = "yo"
-  console|println(*hey)
+  message = "Hello world"
+  console|println(*message)
 end
 
 hello()

@@ -28,11 +28,13 @@ const (
 	ItemLeftParentheses
 	ItemRightParentheses
 	ItemVariableValue
+	ItemEqualityCheck
 	// Delimit the keywords
 	ItemKeyword
 	ItemFunction
 	ItemIncludes
 	ItemEnd
+	ItemIf
 	// Delimit the types
 	ItemTypes
 	ItemStringType
@@ -45,6 +47,7 @@ var keywords = map[string]ItemType{
 	"string":   ItemStringType,
 	"int":      ItemIntType,
 	"end":      ItemEnd,
+	"if":       ItemIf,
 }
 
 var symbols = map[rune]ItemType{
@@ -52,7 +55,6 @@ var symbols = map[rune]ItemType{
 	',': ItemComma,
 	'(': ItemLeftParentheses,
 	')': ItemRightParentheses,
-	'=': ItemEquals,
 	'+': ItemPlus,
 	'-': ItemMinus,
 	'*': ItemTimes,

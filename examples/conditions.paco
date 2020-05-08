@@ -1,0 +1,4 @@
+text = "hello"
+if text == "hello"
+    console|println("bingo")
+end
