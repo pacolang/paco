@@ -19,6 +19,7 @@ var functions = map[string]string{
 	"println":                "",
 	"print":                  "",
 	"random|randInt":         "int",
+	"random|randString":      "char*",
 	"console|getStringEntry": "char*",
 	"console|getIntEntry":    "int",
 }

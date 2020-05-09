@@ -1,6 +1,2 @@
-fn hello()
-  message = "Hello world"
-  console|println(*message)
-end
-
-hello()
+token = random|randString(100)
+console|println(*token)
