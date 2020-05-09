@@ -10,7 +10,7 @@ func generateCondition(generator *Generator, node parser.Node) (statement string
 	boolean := generateBoolean(generator, node.Params[0])
 
 	// If the condition contains and/or operators
-	if len(node.Params) == 1 {
+	if len(node.Params) > 1 {
 		for i := 1; i < len(node.Params); i += 2 {
 			boolean += node.Params[i].Value + generateBoolean(generator, node.Params[i+1])
 		}

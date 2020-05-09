@@ -16,14 +16,13 @@ console
 number = console|getIntEntry()
 stdio|printf("You've entered: %d\n" *number)
 
-if *number < 0
-    console|println("the number mustn't be less than 0")
-end
-
-if *number > 6
-    console|println("the number mustn't be greater than 6")
-end
-
-if *number == rollDice()
-    console|print("same number as the computer!")
+if *number < 0 or *number > 6
+    console|println("the number must be contained between 0 and 6")
+else
+    computerNumber = rollDice()
+    if *number == *computerNumber
+        console|println("you won! same number as the computer!")
+    else
+        stdio|printf("you lost! the computer's number was %d" *computerNumber)
+    end
 end

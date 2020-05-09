@@ -1,6 +1,8 @@
 package generator
 
-import "github.com/hugolgst/paco/parser"
+import (
+	"github.com/hugolgst/paco/parser"
+)
 
 // generateInstruction returns the translated string for the given node
 func generateInstruction(generator *Generator, node parser.Node) string {
