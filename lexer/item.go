@@ -42,6 +42,8 @@ const (
 	ItemIncludes
 	ItemEnd
 	ItemIf
+	ItemOr
+	ItemAnd
 	// Delimit the types
 	ItemTypes
 	ItemStringType
@@ -55,6 +57,8 @@ var keywords = map[string]ItemType{
 	"int":      ItemIntType,
 	"end":      ItemEnd,
 	"if":       ItemIf,
+	"or":       ItemOr,
+	"and":      ItemAnd,
 }
 
 var symbols = map[rune]ItemType{

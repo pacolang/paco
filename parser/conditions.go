@@ -10,6 +10,46 @@ func parseCondition(parser *Parser) (node Node) {
 	node = Node{
 		Type: Condition,
 		Params: []Node{
+			parseBoolean(parser),
+		},
+	}
+
+	item := parser.next()
+	for item.Type == lexer.ItemOr || item.Type == lexer.ItemAnd {
+		operator := "||"
+		if item.Type == lexer.ItemAnd {
+			operator = "&&"
+		}
+
+		// Append the next boolean and the operator
+		node.Params = append(
+			node.Params,
+			Node{
+				Type: ConditionOperator,
+				Value: operator,
+			},
+			parseBoolean(parser),
+		)
+		item = parser.next()
+	}
+
+	// Add body items
+	for item.Type != lexer.ItemEnd {
+		node.Body = append(node.Body, parseItem(parser, item))
+		item = parser.next()
+
+		if item.Type == lexer.ItemEOF {
+			log.Errorf("end was not found")
+		}
+	}
+
+	return
+}
+
+func parseBoolean(parser *Parser) (node Node) {
+	node = Node{
+		Type: Boolean,
+		Params: []Node{
 			parseItem(parser, parser.next()),
 		},
 		Value: parser.next().Value,
@@ -20,17 +60,6 @@ func parseCondition(parser *Parser) (node Node) {
 		node.Params,
 		parseItem(parser, parser.next()),
 	)
-
-	// Add body nodes
-	item := parser.next()
-	for item.Type != lexer.ItemEnd {
-		node.Body = append(node.Body, parseItem(parser, item))
-		item = parser.next()
-
-		if item.Type == lexer.ItemEOF {
-			log.Errorf("end was not found")
-		}
-	}
 
 	return
 }

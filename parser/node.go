@@ -20,6 +20,8 @@ const (
 	StringLiteral
 	Variable
 	Condition
+	Boolean
+	ConditionOperator
 	Assignment
 	EmptyAssignment
 	Function

@@ -17,7 +17,7 @@ number = console|getIntEntry()
 stdio|printf("You've entered: %d\n" *number)
 
 if *number < 0
-    console|println("the number must me less than 0")
+    console|println("the number mustn't be less than 0")
 end
 
 if *number > 6

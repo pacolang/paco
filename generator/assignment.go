@@ -13,8 +13,14 @@ func generateAssignment(generator *Generator, node parser.Node) string {
 		cType = functions[node.Params[0].Value]
 	}
 
+	// If the function used returns nothing then returns the error
 	if cType == "void" {
-		log.Errorf("Using a function as a value but it returns nothing")
+		log.Errorf("using %s as a value but it returns nothing.", node.Value)
+	}
+
+	// The used function does not exists
+	if cType == "" {
+		log.Errorf("%s function call does not exists.", node.Value)
 	}
 
 	return fmt.Sprintf(cAssignment, cType, node.Value, generateInstruction(generator, node.Params[0]))
