@@ -19,9 +19,13 @@ const (
 	NumberLiteral
 	StringLiteral
 	Variable
+
 	Condition
+	ConditionIf
+	ConditionElse
 	Boolean
 	ConditionOperator
+
 	Assignment
 	EmptyAssignment
 	Function

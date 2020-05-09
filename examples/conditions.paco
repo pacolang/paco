@@ -1,4 +1,8 @@
-text = "hello"
-if *text == "hello"
-    console|println("bingo")
+console|println("Enter your name")
+name = console|getStringEntry()
+
+if *name == "Hugo"
+    console|println("a")
+else
+    console|println("b")
 end

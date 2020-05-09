@@ -34,8 +34,32 @@ func parseCondition(parser *Parser) (node Node) {
 	}
 
 	// Add body items
-	for item.Type != lexer.ItemEnd {
-		node.Body = append(node.Body, parseItem(parser, item))
+	node.Body = append(node.Body, Node{
+		Type: ConditionIf,
+		Body: parseBody(parser, item),
+	})
+
+	// Get the last item when parseBody stopped
+	item = parser.PreviousItems[len(parser.PreviousItems)-1]
+	// Return if there isn't an else
+	if item.Type != lexer.ItemElse {
+		return
+	}
+
+	// Parses the body of the else and returns the node
+	item = parser.next()
+	node.Body = append(node.Body, Node{
+		Type: ConditionElse,
+		Body: parseBody(parser, item),
+	})
+
+	return
+}
+
+// parseBody parses all items in the body of the condition and returns it
+func parseBody(parser *Parser, item lexer.Item) (body []Node) {
+	for item.Type != lexer.ItemEnd && item.Type != lexer.ItemElse {
+		body = append(body, parseItem(parser, item))
 		item = parser.next()
 
 		if item.Type == lexer.ItemEOF {
@@ -46,6 +70,7 @@ func parseCondition(parser *Parser) (node Node) {
 	return
 }
 
+// parseBoolean parses a boolean inside the condition
 func parseBoolean(parser *Parser) (node Node) {
 	node = Node{
 		Type: Boolean,
