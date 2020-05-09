@@ -1,3 +1,4 @@
+- returns a random number between 0 and 6
 fn rollDice() int
     random|randInt(6)
 end
@@ -13,11 +14,14 @@ console
     |println(*name)
     |println("Please enter a number")
 
+- asks the user to enter a number and prints the number given 
 number = console|getIntEntry()
 stdio|printf("You've entered: %d\n" *number)
 
+- check if the given number is in the 0-6 range
 if *number < 0 or *number > 6
     console|println("the number must be contained between 0 and 6")
+- roll the dice and check if the given number is the same as the computer    
 else
     computerNumber = rollDice()
     if *number == *computerNumber
