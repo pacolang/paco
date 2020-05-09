@@ -1,6 +1,8 @@
 package parser
 
-import "github.com/hugolgst/paco/lexer"
+import (
+	"github.com/hugolgst/paco/lexer"
+)
 
 // parseAssignment parses a variable assignment with the given identifier
 func parseAssignment(parser *Parser, identifier string) Node {

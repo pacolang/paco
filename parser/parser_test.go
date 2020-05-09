@@ -6,10 +6,15 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	code := `text = "hello"
-if *text == "hello"
-    console|println("bingo")
-end`
+	code := `fn getUserName() string
+    name string
+    stdio|scanf("%s" *name)
+
+    *name
+end
+
+console|println("Enter your name")
+name = getUserName()`
 
 	parser := Parse(code)
 	for {

@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"fmt"
 	"github.com/hugolgst/paco/generator"
 	"io"
 	"log"
@@ -8,16 +9,17 @@ import (
 	"os/exec"
 )
 
-// Run
+// Run creates an executable from the given code and the given executable name
 func Run(input, executableName string) {
 	code := generator.Generate(input)
+	fmt.Println(code)
 	writeCode(code)
 
 	// Generate the executable using gcc
 	cmd := exec.Command("gcc", "main.c", "-L.", "-lpaco", "-o", executableName)
 	cmd.Dir = "core"
 	if err := cmd.Run(); err != nil {
-		log.Fatalf("cmd.Run() failed with %s\n", err)
+		log.Fatalf("Run() failed with %s\n", err)
 	}
 
 	// Moves the executable and deletes the source file

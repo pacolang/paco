@@ -15,6 +15,13 @@ type Generator struct {
 	functions     []string
 }
 
+var functions = map[string]string{
+	"println":                "",
+	"print":                  "",
+	"random|randInt":         "int",
+	"console|getStringEntry": "char*",
+}
+
 // Generate takes the code and generates the matching C code
 func Generate(input string) string {
 	generator := &Generator{
@@ -47,7 +54,7 @@ func (generator *Generator) addFunction(function string) {
 func (generator *Generator) addImport(importName string) {
 	// Return if the import already exists
 	for _, imp := range generator.imports {
-		if imp != importName {
+		if !strings.Contains(imp, importName) {
 			continue
 		}
 
@@ -78,7 +85,7 @@ func (generator *Generator) run() {
 			generator.addFunction(generateFunction(generator, node))
 
 		case parser.Assignment:
-			generator.addMainCall(generateAssignment(node))
+			generator.addMainCall(generateAssignment(generator, node))
 
 		case parser.EmptyAssignment:
 			generator.addMainCall(generateEmptyAssignment(node))

@@ -1,4 +1,6 @@
-userEntry string
-console|println("enter something")
-stdio|scanf("%s" *userEntry)
-console|println(*userEntry)
+console|println("Enter your name")
+name = console|getStringEntry()
+
+console
+    |print("Hello, ")
+    |println(*name)

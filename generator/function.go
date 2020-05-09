@@ -10,10 +10,14 @@ import (
 func generateFunction(generator *Generator, node parser.Node) string {
 	params := generateFunctionParams(node.Params)
 	body := generateFunctionBody(generator, node)
+	functionType := generateFunctionType(node.ReturnType)
+
+	// Register function type
+	functions[node.Value] = functionType
 
 	return fmt.Sprintf(
 		cFunction,
-		generateFunctionType(node.ReturnType),
+		functionType,
 		node.Value,
 		strings.Join(params, ","),
 		body,

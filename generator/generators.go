@@ -15,7 +15,7 @@ func generateInstruction(generator *Generator, node parser.Node) string {
 		return node.Value
 
 	case parser.Assignment:
-		return generateAssignment(node)
+		return generateAssignment(generator, node)
 
 	case parser.EmptyAssignment:
 		return generateEmptyAssignment(node)
