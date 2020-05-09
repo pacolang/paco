@@ -2,9 +2,7 @@
 #include <time.h>
 #include "random.h"
 
-int randInt(int lower, int upper) {
-  srand(time(NULL));
-  int num = (rand() % (upper - lower + 1)) + lower;
-
-  return num;
+int randInt(int upper) {
+  srand(time(0));
+  return rand() % upper;
 }

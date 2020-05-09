@@ -11,8 +11,15 @@ void print(const char *message) {
 }
 
 char* getStringEntry() {
-  char* name = (char*) malloc(100);
-  scanf("%s",name);
+  char* entry = (char*) malloc(100);
+  scanf("%s", entry);
 
-  return name;
+  return entry;
+}
+
+int getIntEntry() {
+  int entry = 0;
+  scanf("%d", &entry);
+
+  return entry;
 }

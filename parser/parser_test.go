@@ -6,15 +6,9 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	code := `fn getUserName() string
-    name string
-    stdio|scanf("%s" *name)
-
-    *name
-end
-
-console|println("Enter your name")
-name = getUserName()`
+	code := `if *number < 0
+    console|println("the number must me less than 0")
+end`
 
 	parser := Parse(code)
 	for {

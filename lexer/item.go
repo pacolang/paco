@@ -32,6 +32,10 @@ const (
 	ItemEquality
 	ItemEqualityCheck
 	ItemNotEqualityCheck
+	ItemEqualOrGreaterCheck
+	ItemEqualOrLessCheck
+	ItemGreaterCheck
+	ItemLessCheck
 	// Delimit the keywords
 	ItemKeyword
 	ItemFunction

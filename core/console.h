@@ -4,5 +4,6 @@
 void println(const char *message);
 void print(const char *message);
 char* getStringEntry();
+int getIntEntry();
 
 #endif //PACO_CONSOLE_H

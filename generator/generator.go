@@ -20,6 +20,7 @@ var functions = map[string]string{
 	"print":                  "",
 	"random|randInt":         "int",
 	"console|getStringEntry": "char*",
+	"console|getIntEntry":    "int",
 }
 
 // Generate takes the code and generates the matching C code

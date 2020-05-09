@@ -1,6 +1,29 @@
+fn rollDice() int
+    random|randInt(6)
+end
+
+- gets the user entry
 console|println("Enter your name")
 name = console|getStringEntry()
 
+- uses pipe character to use multiple time built-in functions coming
+- from the same package
 console
     |print("Hello, ")
     |println(*name)
+    |println("Please enter a number")
+
+number = console|getIntEntry()
+stdio|printf("You've entered: %d\n" *number)
+
+if *number < 0
+    console|println("the number must me less than 0")
+end
+
+if *number > 6
+    console|println("the number mustn't be greater than 6")
+end
+
+if *number == rollDice()
+    console|print("same number as the computer!")
+end
