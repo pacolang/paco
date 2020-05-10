@@ -1,8 +1,8 @@
-<br>
-<img width="340" src="https://i.imgur.com/WmpRtQP.png" align="left"/>
+<img width="330" src="https://i.imgur.com/WmpRtQP.png" align="left"/>
 
 ### 👩🏼‍💻 A simple compiled programming language.
 The language is wrote in **Go** and the target language is **C**. The built-in library is wrote in **C** too.
+
 
 ## Example
 ```paco
