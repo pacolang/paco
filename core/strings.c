@@ -1,4 +1,6 @@
 #include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 #include "strings.h"
 
 // contains checks if a substr is contained inside the str
@@ -21,4 +23,16 @@ int endsWith(const char *str, const char *substr) {
   return
     (str_len >= substr_len) &&
     (0 == strcmp(str + (str_len-substr_len), substr));
+}
+
+// toLower returns the given string in lower case
+char* toLower(const char *str) {
+  char* new_str = (char*) malloc(strlen(str));
+  strcpy(new_str, str);
+
+  for (int i = 0; new_str[i]; i++) {
+    new_str[i] = tolower(new_str[i]);
+  }
+
+  return new_str;
 }
