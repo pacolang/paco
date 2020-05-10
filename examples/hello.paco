@@ -1,4 +1,3 @@
-token = true
-if *token == true
-  console|println("hello")
+if strings|startsWith("hello" "he") == true
+  console|println("ok")
 end
