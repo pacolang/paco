@@ -2,6 +2,7 @@ package generator
 
 import (
 	"fmt"
+
 	"github.com/hugolgst/paco/log"
 	"github.com/hugolgst/paco/parser"
 )
@@ -12,7 +13,7 @@ func generateAssignment(generator *Generator, node parser.Node) string {
 	if node.Params[0].Type == parser.CallExpression {
 		cType = functions[node.Params[0].Value]
 	} else if node.Params[0].Type == parser.Boolean {
-		cType = "bool"
+		cType = "int"
 	}
 
 	// If the function used returns nothing then returns the error

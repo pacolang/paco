@@ -16,9 +16,15 @@ func parseItem(parser *Parser, item lexer.Item) Node {
 		}
 
 	case item.Type == lexer.ItemBoolean:
+		// Convert the booleans expressions to integers
+		value := "0"
+		if item.Value == "true" {
+			value = "1"
+		}
+
 		return Node{
 			Type:  Boolean,
-			Value: item.Value,
+			Value: value,
 		}
 
 	case item.Type == lexer.ItemString:
