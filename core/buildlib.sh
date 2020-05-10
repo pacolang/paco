@@ -1,2 +1,2 @@
-gcc -c console.c random.c
-ar rs libpaco.a console.o random.o
+gcc -c console.c random.c strings.c
+ar rs libpaco.a console.o random.o strings.o
