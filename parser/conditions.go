@@ -25,7 +25,7 @@ func parseCondition(parser *Parser) (node Node) {
 		node.Params = append(
 			node.Params,
 			Node{
-				Type: ConditionOperator,
+				Type:  ConditionOperator,
 				Value: operator,
 			},
 			parseBoolean(parser),

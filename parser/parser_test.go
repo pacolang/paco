@@ -6,10 +6,9 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	code := `if *number >= 0 or *number <= 6
-    console|println("the number must me less than 0")
-else
-	console|print("hey")
+	code := `token = true
+if *token == true
+  console|println("hello")
 end`
 
 	parser := Parse(code)

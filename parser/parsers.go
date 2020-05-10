@@ -1,8 +1,9 @@
 package parser
 
 import (
-	"github.com/hugolgst/paco/lexer"
 	"strings"
+
+	"github.com/hugolgst/paco/lexer"
 )
 
 // parseItem returns the parsed node from the given Item
@@ -14,6 +15,12 @@ func parseItem(parser *Parser, item lexer.Item) Node {
 			Value: item.Value,
 		}
 
+	case item.Type == lexer.ItemBoolean:
+		return Node{
+			Type:  Boolean,
+			Value: item.Value,
+		}
+
 	case item.Type == lexer.ItemString:
 		return Node{
 			Type:  StringLiteral,
@@ -22,7 +29,7 @@ func parseItem(parser *Parser, item lexer.Item) Node {
 
 	case item.Type == lexer.ItemVariableValue:
 		return Node{
-			Type: Variable,
+			Type:  Variable,
 			Value: item.Value[1:],
 		}
 
@@ -67,7 +74,7 @@ func parseIdentifier(parser *Parser, identifier string) Node {
 
 	case item.Type == lexer.ItemIdentifier && strings.HasPrefix(item.Value, "|"):
 		parser.next()
-		return parseCall(parser, identifier + item.Value)
+		return parseCall(parser, identifier+item.Value)
 	}
 
 	return Node{}

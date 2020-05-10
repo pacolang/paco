@@ -12,7 +12,7 @@ var (
 	cParam           = "%s %s"
 	cFunction        = "%s %s(%s){%s}"
 	cReturn          = "return %s;"
-	cCode            = "%s\n%s\nint main(){%s;return 0;}"
+	cCode            = "%s\n%s\ntypedef enum{false=0,true=!false}bool;\nint main(){%s;return 0;}"
 	cAssignment      = "%s %s = %s;"
 	cCondition       = "if(%s){%s}"
 	cElseCondition   = "else{%s}"

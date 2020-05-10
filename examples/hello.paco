@@ -1,2 +1,4 @@
-token = random|randString(100)
-console|println(*token)
+token = true
+if *token == true
+  console|println("hello")
+end

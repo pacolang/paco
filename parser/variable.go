@@ -7,7 +7,7 @@ import (
 // parseAssignment parses a variable assignment with the given identifier
 func parseAssignment(parser *Parser, identifier string) Node {
 	return Node{
-		Type: Assignment,
+		Type:  Assignment,
 		Value: identifier,
 		Params: []Node{
 			parseItem(parser, parser.next()),
@@ -19,8 +19,8 @@ func parseAssignment(parser *Parser, identifier string) Node {
 // the given item type
 func parseEmptyAssignment(identifier string, itemType lexer.ItemType) Node {
 	return Node{
-		Type: EmptyAssignment,
-		Value: identifier,
+		Type:       EmptyAssignment,
+		Value:      identifier,
 		ReturnType: types[itemType],
 	}
 }

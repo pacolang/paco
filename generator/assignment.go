@@ -11,6 +11,8 @@ func generateAssignment(generator *Generator, node parser.Node) string {
 	cType := cTypes[node.Params[0].Type]
 	if node.Params[0].Type == parser.CallExpression {
 		cType = functions[node.Params[0].Value]
+	} else if node.Params[0].Type == parser.Boolean {
+		cType = "bool"
 	}
 
 	// If the function used returns nothing then returns the error

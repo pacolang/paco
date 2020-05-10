@@ -4,3 +4,4 @@ core/.idea
 core/*.o
 core/main.c
 core/libpaco.a
+./test
