@@ -2,8 +2,9 @@ package generator
 
 import (
 	"fmt"
-	"github.com/hugolgst/paco/parser"
 	"strings"
+
+	"github.com/hugolgst/paco/parser"
 )
 
 // The Generator will take the parsers's nodes to generate the C code with it
@@ -22,6 +23,9 @@ var functions = map[string]string{
 	"random|randString":      "char*",
 	"console|getStringEntry": "char*",
 	"console|getIntEntry":    "int",
+	"strings|contains":       "int",
+	"strings|startsWith":     "int",
+	"strings|endsWith":       "int",
 }
 
 // Generate takes the code and generates the matching C code

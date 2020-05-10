@@ -12,3 +12,13 @@ int startsWith(const char *str, const char *substr) {
            lenstr = strlen(str);
     return lenstr < lenpre ? 0 : memcmp(substr, str, lenpre) == 0;
 }
+
+// endsWith checks if a str ends with a substr
+int endsWith(const char *str, const char *substr) {
+  int str_len = strlen(str);
+  int substr_len = strlen(substr);
+
+  return
+    (str_len >= substr_len) &&
+    (0 == strcmp(str + (str_len-substr_len), substr));
+}
