@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/hugolgst/paco/log"
 	"strings"
 
 	"github.com/hugolgst/paco/lexer"
@@ -13,6 +14,7 @@ func parseItem(parser *Parser, item lexer.Item) Node {
 		return Node{
 			Type:  NumberLiteral,
 			Value: item.Value,
+			ReturnType: NumberLiteral,
 		}
 
 	case item.Type == lexer.ItemBoolean:
@@ -25,18 +27,27 @@ func parseItem(parser *Parser, item lexer.Item) Node {
 		return Node{
 			Type:  Boolean,
 			Value: value,
+			ReturnType: Boolean,
 		}
 
 	case item.Type == lexer.ItemString:
 		return Node{
 			Type:  StringLiteral,
 			Value: item.Value,
+			ReturnType: StringLiteral,
 		}
 
 	case item.Type == lexer.ItemVariableValue:
+		name := item.Value[1:]
+		variableType, ok := variables[name]
+		if !ok {
+			log.Errorf("Unable to find the %s variable")
+		}
+
 		return Node{
 			Type:  Variable,
-			Value: item.Value[1:],
+			Value: name,
+			ReturnType: variableType,
 		}
 
 	case item.Type == lexer.ItemIdentifier:

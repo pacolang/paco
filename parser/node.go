@@ -18,6 +18,7 @@ const (
 	EOF
 	NumberLiteral
 	StringLiteral
+	Generic
 	Variable
 
 	Condition
@@ -33,6 +34,8 @@ const (
 )
 
 var types = map[lexer.ItemType]NodeType{
-	lexer.ItemStringType: StringLiteral,
-	lexer.ItemIntType:    NumberLiteral,
+	lexer.ItemStringType:  StringLiteral,
+	lexer.ItemIntType:     NumberLiteral,
+	lexer.ItemBoolType:    Boolean,
+	lexer.ItemGenericType: Generic,
 }

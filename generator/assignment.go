@@ -9,21 +9,11 @@ import (
 
 // generateAssignment translates a variable assignment to C
 func generateAssignment(generator *Generator, node parser.Node) string {
-	cType := cTypes[node.Params[0].Type]
-	if node.Params[0].Type == parser.CallExpression {
-		cType = functions[node.Params[0].Value]
-	} else if node.Params[0].Type == parser.Boolean {
-		cType = "int"
-	}
-
-	// If the function used returns nothing then returns the error
-	if cType == "void" {
-		log.Errorf("using %s as a value but it returns nothing.", node.Value)
-	}
+	cType := cTypes[node.Params[0].ReturnType]
 
 	// The used function does not exists
 	if cType == "" {
-		log.Errorf("%s function call does not exists.", node.Value)
+		log.Errorf("%s function call does not exists or returns nothing.", node.Value)
 	}
 
 	return fmt.Sprintf(cAssignment, cType, node.Value, generateInstruction(generator, node.Params[0]))

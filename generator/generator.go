@@ -16,18 +16,6 @@ type Generator struct {
 	functions     []string
 }
 
-var functions = map[string]string{
-	"println":                "",
-	"print":                  "",
-	"random|randInt":         "int",
-	"random|randString":      "char*",
-	"console|getStringEntry": "char*",
-	"console|getIntEntry":    "int",
-	"strings|contains":       "int",
-	"strings|startsWith":     "int",
-	"strings|endsWith":       "int",
-}
-
 // Generate takes the code and generates the matching C code
 func Generate(input string) string {
 	generator := &Generator{

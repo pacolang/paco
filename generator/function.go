@@ -12,9 +12,6 @@ func generateFunction(generator *Generator, node parser.Node) string {
 	body := generateFunctionBody(generator, node)
 	functionType := generateFunctionType(node.ReturnType)
 
-	// Register function type
-	functions[node.Value] = functionType
-
 	return fmt.Sprintf(
 		cFunction,
 		functionType,

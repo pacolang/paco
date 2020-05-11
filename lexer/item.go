@@ -49,7 +49,9 @@ const (
 	// Delimit the types
 	ItemTypes
 	ItemStringType
+	ItemBoolType
 	ItemIntType
+	ItemGenericType
 )
 
 var keywords = map[string]ItemType{
@@ -57,12 +59,14 @@ var keywords = map[string]ItemType{
 	"includes": ItemIncludes,
 	"string":   ItemStringType,
 	"int":      ItemIntType,
+	"bool":     ItemBoolType,
 	"end":      ItemEnd,
 	"if":       ItemIf,
 	"or":       ItemOr,
 	"and":      ItemAnd,
 	"else":     ItemElse,
 	"mod":      ItemMod,
+	"T":        ItemGenericType,
 }
 
 var symbols = map[rune]ItemType{

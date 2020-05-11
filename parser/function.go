@@ -11,30 +11,42 @@ func parseCall(parser *Parser, identifier string) Node {
 	var params []Node
 
 	// Checks if the given function exists
-	functionExists := false
-	for _, function := range functions {
-		if !strings.HasSuffix(function.Name, identifier) {
+	var function FunctionRecorder
+	for _, fn := range functions {
+		if !strings.HasSuffix(fn.Name, identifier) {
 			continue
 		}
 
-		functionExists = true
+		function = fn
 	}
 
-	if !functionExists {
+	if function.Name == "" {
 		log.Errorf("%s function does not exists", identifier)
 	}
 
 	// While the item is a right parentheses parses the params
+	var i int
 	for item := parser.next(); item.Type != lexer.ItemRightParentheses; {
-		params = append(params, parseItem(parser, item))
+		if i >= len(function.Params) {
+			log.Errorf("too much parameters for %s", identifier)
+		}
+
+		node := parseItem(parser, item)
+		if node.ReturnType != function.Params[i] && function.Params[i] != Generic {
+			log.Errorf("type mismatch in %s call", identifier)
+		}
+
+		params = append(params, node)
 
 		item = parser.next()
+		i++
 	}
 
 	return Node{
 		Type:   CallExpression,
 		Value:  identifier,
 		Params: params,
+		ReturnType: function.ReturnType,
 	}
 }
 

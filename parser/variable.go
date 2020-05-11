@@ -4,14 +4,20 @@ import (
 	"github.com/hugolgst/paco/lexer"
 )
 
+var variables = map[string]NodeType{}
+
 // parseAssignment parses a variable assignment with the given identifier
 func parseAssignment(parser *Parser, identifier string) Node {
+	node := parseItem(parser, parser.next())
+	variables[identifier] = node.ReturnType
+
 	return Node{
 		Type:  Assignment,
 		Value: identifier,
 		Params: []Node{
-			parseItem(parser, parser.next()),
+			node,
 		},
+		ReturnType: node.ReturnType,
 	}
 }
 

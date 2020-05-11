@@ -6,6 +6,7 @@ var (
 	cTypes = map[parser.NodeType]string{
 		parser.StringLiteral: "char*",
 		parser.NumberLiteral: "int",
+		parser.Boolean:       "int",
 	}
 	cImports         = "#include \"%s.h\""
 	cCall            = "%s(%s)"
