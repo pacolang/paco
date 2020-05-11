@@ -3,11 +3,26 @@ package parser
 import (
 	"github.com/hugolgst/paco/lexer"
 	"github.com/hugolgst/paco/log"
+	"strings"
 )
 
 // parseCall parses a function call and returns its node
 func parseCall(parser *Parser, identifier string) Node {
 	var params []Node
+
+	// Checks if the given function exists
+	functionExists := false
+	for _, function := range functions {
+		if !strings.HasSuffix(function.Name, identifier) {
+			continue
+		}
+
+		functionExists = true
+	}
+
+	if !functionExists {
+		log.Errorf("%s function does not exists", identifier)
+	}
 
 	// While the item is a right parentheses parses the params
 	for item := parser.next(); item.Type != lexer.ItemRightParentheses; {

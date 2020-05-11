@@ -1,1 +1,3 @@
-console|println("hey")
+console
+    |println("hey")
+    |print("a")
