@@ -1,0 +1,4 @@
+mod "random"
+
+fn randInt(int) int
+fn randString(int) string

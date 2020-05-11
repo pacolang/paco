@@ -69,7 +69,7 @@ func (generator *Generator) addImport(importName string) {
 
 	generator.imports = append(
 		generator.imports,
-		fmt.Sprintf(cImports, importName+"/"+importName),
+		fmt.Sprintf(cImports, importName),
 	)
 }
 

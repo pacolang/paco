@@ -19,7 +19,10 @@ func generateCall(generator *Generator, node parser.Node) string {
 		checkCall(generator, node)
 
 		// Add import to the generator
-		addCallImport(generator, node.Value)
+		addCallImport(
+			generator,
+			node.Value,
+		)
 	} else {
 		identifier = node.Value
 	}
@@ -66,6 +69,13 @@ func addCallImport(generator *Generator, value string) {
 	importName := strings.Split(value, "|")[0]
 	if importName == "" {
 		return
+	}
+
+	// If the import begins with C then it is a C function
+	if !strings.HasPrefix(importName, "C") {
+		importName += "/"+importName
+	} else {
+		importName = importName[1:]
 	}
 
 	generator.addImport(importName)

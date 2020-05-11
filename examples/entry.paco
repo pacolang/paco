@@ -16,7 +16,7 @@ console
 
 - asks the user to enter a number and prints the number given 
 number = console|getIntEntry()
-stdio|printf("You've entered: %d\n" *number)
+Cstdio|printf("You've entered: %d\n" *number)
 
 - check if the given number is in the 0-6 range
 if *number < 0 or *number > 6
@@ -27,6 +27,6 @@ else
     if *number == *computerNumber
         console|println("you won! same number as the computer!")
     else
-        stdio|printf("you lost! the computer's number was %d" *computerNumber)
+        Cstdio|printf("you lost! the computer's number was %d" *computerNumber)
     end
 end

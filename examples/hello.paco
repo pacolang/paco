@@ -1,3 +1,2 @@
-console
-    |println("hey")
-    |print("a")
+a = random|randInt(10)
+Cstdio|printf("%d" *a)

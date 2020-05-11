@@ -2,4 +2,4 @@ fn random() int
     math|randInt(0 10)
 end
 
-stdio|printf("%d" random())
+Cstdio|printf("%d" random())
