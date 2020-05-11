@@ -7,6 +7,7 @@ The language is wrote in **Go** and the target language is **C**. The built-in l
 <br>
 
 ## Example
+### Code example
 ```paco
 - returns a random number between 0 and 6
 fn rollDice() int
@@ -40,6 +41,16 @@ else
         stdio|printf("you lost! the computer's number was %d" *computerNumber)
     end
 end
+```
+
+### Module file
+```paco
+mod "console"
+
+fn println(string)
+fn print(string)
+fn getStringEntry() string
+fn getIntEntry() int
 ```
 
 <p align="center">
