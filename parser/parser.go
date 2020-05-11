@@ -9,8 +9,10 @@ import (
 type Parser struct {
 	ItemsChannel  chan lexer.Item
 	PreviousItems []lexer.Item
+	Position      int
 	Item          lexer.Item
 	NodesChannel  chan Node
+	Module        bool
 }
 
 // Create the parser and run it
@@ -36,6 +38,7 @@ func (parser *Parser) emit(node Node) {
 func (parser *Parser) next() (item lexer.Item) {
 	item = <-parser.ItemsChannel
 	parser.PreviousItems = append(parser.PreviousItems, item)
+	parser.Position++
 
 	return
 }
@@ -52,6 +55,11 @@ func (parser *Parser) run() {
 				Type: EOF,
 			})
 			break
+		}
+
+		if item.Type == lexer.ItemMod && parser.Position == 1 {
+			parseModule(parser)
+			continue
 		}
 
 		// Parse the current item

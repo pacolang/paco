@@ -45,6 +45,7 @@ const (
 	ItemOr
 	ItemAnd
 	ItemElse
+	ItemMod
 	// Delimit the types
 	ItemTypes
 	ItemStringType
@@ -61,6 +62,7 @@ var keywords = map[string]ItemType{
 	"or":       ItemOr,
 	"and":      ItemAnd,
 	"else":     ItemElse,
+	"mod":      ItemMod,
 }
 
 var symbols = map[rune]ItemType{

@@ -6,10 +6,12 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	code := `token = true
-if *token == true
-  console|println("hello")
-end`
+	code := `mod "console"
+
+fn println(string)
+fn print(string)
+fn getStringEntry() string
+fn getIntEntry() int`
 
 	parser := Parse(code)
 	for {
