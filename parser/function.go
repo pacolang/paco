@@ -89,6 +89,11 @@ func parseFunction(parser *Parser) Node {
 		}
 	}
 
+	functions = append(functions, FunctionRecorder{
+		Name: identifier.Value,
+		ReturnType: node.ReturnType,
+	})
+
 	return node
 }
 
