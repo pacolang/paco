@@ -36,3 +36,15 @@ char* toLower(const char *str) {
 
   return new_str;
 }
+
+// toUpper returns the given string in upper case
+char* toUpper(const char *str) {
+  char* new_str = (char*) malloc(strlen(str));
+  strcpy(new_str, str);
+
+  for (int i = 0; new_str[i]; i++) {
+    new_str[i] = toupper(new_str[i]);
+  }
+
+  return new_str;
+}
