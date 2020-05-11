@@ -12,7 +12,6 @@ type Parser struct {
 	Position      int
 	Item          lexer.Item
 	NodesChannel  chan Node
-	Module        bool
 }
 
 // Create the parser and run it
@@ -23,6 +22,8 @@ func Parse(input string) Parser {
 		ItemsChannel: channel,
 		NodesChannel: make(chan Node),
 	}
+
+	functions = ReadModules()
 
 	go parser.run()
 
@@ -55,11 +56,6 @@ func (parser *Parser) run() {
 				Type: EOF,
 			})
 			break
-		}
-
-		if item.Type == lexer.ItemMod && parser.Position == 1 {
-			parseModule(parser)
-			continue
 		}
 
 		// Parse the current item

@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"fmt"
 	"github.com/hugolgst/paco/generator"
 	"io"
 	"log"
@@ -12,7 +11,6 @@ import (
 // Run creates an executable from the given code and the given executable name
 func Run(input, executableName string) {
 	code := generator.Generate(input)
-	fmt.Println(code)
 	writeCode(code)
 
 	// Generate the executable using gcc

@@ -18,8 +18,25 @@ type FunctionRecorder struct {
 	ReturnType NodeType
 }
 
-// parseModule parses a module file with its function records
-func parseModule(parser *Parser) {
+func ParseModules(input string) []FunctionRecorder {
+	_, channel := lexer.Lex(input)
+
+	parser := Parser{
+		ItemsChannel: channel,
+	}
+
+	parser.runModulesParser()
+
+	return functions
+}
+
+// runModulesParser parses a module file with its function records
+func (parser *Parser) runModulesParser() {
+	item = parser.next()
+	if item.Type != lexer.ItemMod {
+		log.Errorf("Module should begin with mod")
+	}
+
 	// Gets the module name
 	moduleName := strings.Replace(parser.next().Value, "\"", "", -1)
 
@@ -28,11 +45,6 @@ func parseModule(parser *Parser) {
 	for item.Type != lexer.ItemEOF {
 		parseFunctionRecord(parser, moduleName)
 	}
-
-	// Emits the end node
-	parser.emit(Node{
-		Type: EOF,
-	})
 }
 
 // parseFunctionRecord append the parsed function record to the functions slice

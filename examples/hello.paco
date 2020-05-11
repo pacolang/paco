@@ -1,3 +1,1 @@
-if strings|startsWith("hello" "he") == true
-  console|println("ok")
-end
+console|println("hey")
