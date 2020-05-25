@@ -3,6 +3,7 @@
 
 ### 👩🏼‍💻 A simple compiled programming language.
 The language is wrote in **Go** and the target language is **C**. The built-in library is wrote in **C** too.
+This project is a prototype ⚠️ Please consider it.
 
 <br>
 
