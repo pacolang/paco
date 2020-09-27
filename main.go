@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"github.com/hugolgst/paco/log"
-	"github.com/hugolgst/paco/runtime"
+	"github.com/pacolang/paco/log"
+	"github.com/pacolang/paco/runtime"
 	"io/ioutil"
 	"os"
 )
