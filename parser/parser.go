@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/hugolgst/paco/lexer"
+	"github.com/pacolang/paco/lexer"
 )
 
 // A Parser receives the items from the lexer, parses them to get nodes and push them

@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/hugolgst/paco/log"
+	"github.com/pacolang/paco/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"

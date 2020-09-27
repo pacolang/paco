@@ -2,8 +2,8 @@ package generator
 
 import (
 	"fmt"
-	"github.com/hugolgst/paco/log"
-	"github.com/hugolgst/paco/parser"
+	"github.com/pacolang/paco/log"
+	"github.com/pacolang/paco/parser"
 	"strings"
 )
 

@@ -1,7 +1,7 @@
 package runtime
 
 import (
-	"github.com/hugolgst/paco/generator"
+	"github.com/pacolang/paco/generator"
 	"io"
 	"log"
 	"os"

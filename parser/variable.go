@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/hugolgst/paco/lexer"
+	"github.com/pacolang/paco/lexer"
 )
 
 var variables = map[string]NodeType{}

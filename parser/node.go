@@ -1,6 +1,6 @@
 package parser
 
-import "github.com/hugolgst/paco/lexer"
+import "github.com/pacolang/paco/lexer"
 
 type NodeType int
 

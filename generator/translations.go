@@ -1,6 +1,6 @@
 package generator
 
-import "github.com/hugolgst/paco/parser"
+import "github.com/pacolang/paco/parser"
 
 var (
 	cTypes = map[parser.NodeType]string{

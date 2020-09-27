@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/hugolgst/paco/lexer"
-	"github.com/hugolgst/paco/log"
+	"github.com/pacolang/paco/lexer"
+	"github.com/pacolang/paco/log"
 )
 
 // parseCondition parses a condition and its body and returns the node

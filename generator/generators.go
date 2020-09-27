@@ -1,7 +1,7 @@
 package generator
 
 import (
-	"github.com/hugolgst/paco/parser"
+	"github.com/pacolang/paco/parser"
 )
 
 // generateInstruction returns the translated string for the given node

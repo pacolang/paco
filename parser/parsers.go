@@ -1,10 +1,10 @@
 package parser
 
 import (
-	"github.com/hugolgst/paco/log"
+	"github.com/pacolang/paco/log"
 	"strings"
 
-	"github.com/hugolgst/paco/lexer"
+	"github.com/pacolang/paco/lexer"
 )
 
 // parseItem returns the parsed node from the given Item

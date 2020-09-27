@@ -2,7 +2,7 @@ package generator
 
 import (
 	"fmt"
-	"github.com/hugolgst/paco/parser"
+	"github.com/pacolang/paco/parser"
 	"strings"
 )
 

@@ -2,7 +2,7 @@ package generator
 
 import (
 	"fmt"
-	"github.com/hugolgst/paco/parser"
+	"github.com/pacolang/paco/parser"
 )
 
 // generateCondition generates the differents booleans and put them together with the body

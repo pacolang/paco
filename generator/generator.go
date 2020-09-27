@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hugolgst/paco/parser"
+	"github.com/pacolang/paco/parser"
 )
 
 // The Generator will take the parsers's nodes to generate the C code with it
