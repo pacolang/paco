@@ -1,4 +1,4 @@
-module github.com/hugolgst/paco
+module github.com/pacolang/paco
 
 go 1.14
 
