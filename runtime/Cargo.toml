@@ -1,0 +1,6 @@
+[package]
+name = "paco-runtime"
+version = "0.0.0"
+edition = "2021"
+# M:N scheduler, channels, stack management. Embedded in every Paco binary.
+# Built in Phase 8. Context-switch routines may require asm.
