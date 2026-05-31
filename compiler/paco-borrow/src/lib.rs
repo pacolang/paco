@@ -154,6 +154,7 @@ struct BorrowBinding {
     mutable: bool,
     last_use: usize,
     local_escape: bool,
+    field_path: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug)]
@@ -161,6 +162,7 @@ struct OwnershipState {
     scopes: Vec<HashMap<String, BindingState>>,
     reachable: bool,
     current_statement: usize,
+    last_uses: Vec<HashMap<String, usize>>,
     temporary_borrows: Vec<BorrowBinding>,
 }
 
@@ -170,6 +172,7 @@ impl Default for OwnershipState {
             scopes: Vec::new(),
             reachable: true,
             current_statement: 0,
+            last_uses: Vec::new(),
             temporary_borrows: Vec::new(),
         }
     }
@@ -695,6 +698,7 @@ fn check_block(
 ) {
     state.push_scope();
     let last_uses = block_last_uses(block);
+    state.last_uses.push(last_uses.clone());
     for statement in &block.stmts {
         state.current_statement = statement_position(statement);
         if !state.reachable {
@@ -752,6 +756,7 @@ fn check_block(
         state.current_statement = expr_span(tail).start();
         check_expr(tail, program, state, reporter);
     }
+    state.last_uses.pop();
     state.pop_scope();
 }
 
@@ -815,17 +820,35 @@ fn check_expr(expr: &Expr, program: &Program, state: &mut OwnershipState, report
             value,
             span,
         } => {
+            let assigned_borrows = target_identifier(target).map(|name| {
+                borrow_bindings_for_name(value, current_last_use(name, state), program, state)
+            });
             consume_expr(value, program, state, reporter);
             match target.as_ref() {
                 Expr::Ident(name, span) => {
                     check_assignment_while_borrowed(name, *span, state, reporter);
                     if let Some(binding) = state.get_mut(name) {
                         binding.moved_at = None;
+                        binding.borrows = assigned_borrows.unwrap_or_default();
                     }
                 }
                 Expr::Field { .. } => {
                     if let Some(name) = root_place_name(target) {
                         check_assignment_while_borrowed(name, *span, state, reporter);
+                        if let Some(field_path) = place_field_path(target) {
+                            let last_use = current_last_use(name, state);
+                            let field_borrows =
+                                borrow_bindings_for_name(value, last_use, program, state)
+                                    .into_iter()
+                                    .map(|borrow| prefix_borrow_field_path(borrow, &field_path))
+                                    .collect::<Vec<_>>();
+                            if let Some(binding) = state.get_mut(name) {
+                                binding.borrows.retain(|borrow| {
+                                    !borrow_field_path_starts_with(borrow, &field_path)
+                                });
+                                binding.borrows.extend(field_borrows);
+                            }
+                        }
                     }
                     check_expr(target, program, state, reporter);
                 }
@@ -979,6 +1002,7 @@ fn check_method_call(
                     mutable,
                     last_use: state.current_statement,
                     local_escape: false,
+                    field_path: None,
                 })
                 .collect::<Vec<_>>()
         })
@@ -1118,6 +1142,7 @@ fn temporary_borrows_for_expr(
             mutable: origin.mutable,
             last_use: state.current_statement,
             local_escape: origin.local_escape,
+            field_path: origin.field_path,
         })
         .collect()
 }
@@ -1253,6 +1278,7 @@ fn consume_block(
 ) {
     state.push_scope();
     let last_uses = block_last_uses(block);
+    state.last_uses.push(last_uses.clone());
     for statement in &block.stmts {
         state.current_statement = statement_position(statement);
         if !state.reachable {
@@ -1310,6 +1336,7 @@ fn consume_block(
         state.current_statement = expr_span(tail).start();
         consume_expr(tail, program, state, reporter);
     }
+    state.last_uses.pop();
     state.pop_scope();
 }
 
@@ -1580,6 +1607,15 @@ fn borrow_bindings(
         return Vec::new();
     };
     let last_use = last_uses.get(binding_name).copied().unwrap_or(0);
+    borrow_bindings_for_name(value, last_use, program, state)
+}
+
+fn borrow_bindings_for_name(
+    value: &Expr,
+    last_use: usize,
+    program: &Program,
+    state: &OwnershipState,
+) -> Vec<BorrowBinding> {
     borrow_origins_from_expr(value, program, state)
         .into_iter()
         .map(|origin| BorrowBinding {
@@ -1587,6 +1623,7 @@ fn borrow_bindings(
             mutable: origin.mutable,
             last_use,
             local_escape: origin.local_escape,
+            field_path: origin.field_path,
         })
         .collect()
 }
@@ -1596,6 +1633,7 @@ struct BorrowOrigin {
     owner: String,
     mutable: bool,
     local_escape: bool,
+    field_path: Option<Vec<String>>,
 }
 
 fn borrow_origins_from_expr(
@@ -1610,6 +1648,7 @@ fn borrow_origins_from_expr(
                 owner,
                 mutable: *mutable,
                 local_escape: false,
+                field_path: None,
             })
             .collect(),
         Expr::Ident(name, _) => state
@@ -1622,6 +1661,7 @@ fn borrow_origins_from_expr(
                         owner: borrow.owner.clone(),
                         mutable: borrow.mutable,
                         local_escape: borrow.local_escape,
+                        field_path: borrow.field_path.clone(),
                     })
                     .collect()
             })
@@ -1679,6 +1719,21 @@ fn borrow_origins_from_expr(
             )
         }
         Expr::Block(block) => borrow_origins_from_block(block, program, state),
+        Expr::Field { .. } => {
+            if matches!(expr_ty(expr, program, state), Some(Ty::Borrow { .. })) {
+                field_borrow_origins(expr, state)
+            } else {
+                Vec::new()
+            }
+        }
+        Expr::StructLiteral { fields, .. } => fields
+            .iter()
+            .flat_map(|(field, value)| {
+                borrow_origins_from_expr(value, program, state)
+                    .into_iter()
+                    .map(|origin| prefix_origin_field_path(origin, std::slice::from_ref(field)))
+            })
+            .collect(),
         Expr::If {
             then_branch,
             else_branch,
@@ -1806,6 +1861,7 @@ fn borrow_origins_from_params(
                             owner,
                             mutable: returned_mutable,
                             local_escape: false,
+                            field_path: None,
                         })
                         .collect::<Vec<_>>()
                 })
@@ -1820,6 +1876,7 @@ fn borrow_origins_from_params(
                             owner: origin.owner,
                             mutable: returned_mutable,
                             local_escape: origin.local_escape,
+                            field_path: None,
                         })
                         .collect::<Vec<_>>()
                 })
@@ -1850,8 +1907,37 @@ fn temporary_borrow_bindings(
             mutable,
             last_use: current_statement,
             local_escape: false,
+            field_path: None,
         })
         .collect()
+}
+
+fn field_borrow_origins(expr: &Expr, state: &OwnershipState) -> Vec<BorrowOrigin> {
+    let Expr::Field { .. } = expr else {
+        return Vec::new();
+    };
+    let Some(root) = root_place_name(expr) else {
+        return Vec::new();
+    };
+    let Some(field_path) = place_field_path(expr) else {
+        return Vec::new();
+    };
+    state
+        .get(root)
+        .map(|binding| {
+            binding
+                .borrows
+                .iter()
+                .filter(|borrow| borrow.field_path.as_ref() == Some(&field_path))
+                .map(|borrow| BorrowOrigin {
+                    owner: borrow.owner.clone(),
+                    mutable: borrow.mutable,
+                    local_escape: borrow.local_escape,
+                    field_path: None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn borrow_owners_or_temporary(
@@ -1866,6 +1952,59 @@ fn borrow_owners_or_temporary(
         vec![TEMPORARY_BORROW_OWNER.to_string()]
     } else {
         Vec::new()
+    }
+}
+
+fn current_last_use(name: &str, state: &OwnershipState) -> usize {
+    state
+        .last_uses
+        .iter()
+        .rev()
+        .find_map(|uses| uses.get(name).copied())
+        .unwrap_or(0)
+}
+
+fn target_identifier(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Ident(name, _) => Some(name),
+        _ => None,
+    }
+}
+
+fn prefix_origin_field_path(mut origin: BorrowOrigin, prefix: &[String]) -> BorrowOrigin {
+    let mut field_path = prefix.to_vec();
+    if let Some(existing) = origin.field_path.take() {
+        field_path.extend(existing);
+    }
+    origin.field_path = Some(field_path);
+    origin
+}
+
+fn prefix_borrow_field_path(mut borrow: BorrowBinding, prefix: &[String]) -> BorrowBinding {
+    let mut field_path = prefix.to_vec();
+    if let Some(existing) = borrow.field_path.take() {
+        field_path.extend(existing);
+    }
+    borrow.field_path = Some(field_path);
+    borrow
+}
+
+fn borrow_field_path_starts_with(borrow: &BorrowBinding, prefix: &[String]) -> bool {
+    borrow
+        .field_path
+        .as_ref()
+        .is_some_and(|field_path| field_path.starts_with(prefix))
+}
+
+fn place_field_path(expr: &Expr) -> Option<Vec<String>> {
+    match expr {
+        Expr::Ident(_, _) => Some(Vec::new()),
+        Expr::Field { base, field, .. } => {
+            let mut path = place_field_path(base)?;
+            path.push(field.clone());
+            Some(path)
+        }
+        _ => None,
     }
 }
 

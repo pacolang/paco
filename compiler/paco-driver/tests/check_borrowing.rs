@@ -1802,6 +1802,179 @@ fn main() {
     assert!(error.contains("box"));
 }
 
+#[test]
+fn check_rejects_move_while_struct_reference_field_is_live() {
+    let source = r#"
+struct Box { value: int }
+struct Holder { item: &Box }
+
+fn consume(box: Box) {
+    print(box.value)
+}
+
+fn main() {
+    let box: Box = Box { value: 1 }
+    let holder: Holder = Holder { item: &box }
+    consume(box)
+    print(holder.item.value)
+}
+"#;
+    let file = write_temp_paco("struct_reference_field_live", source);
+    let cli = paco_driver::Cli::try_parse_from(["paco", "check", file.to_str().unwrap()]).unwrap();
+
+    let error = run(cli).unwrap_err();
+
+    assert!(error.contains("borrow") || error.contains("move"));
+    assert!(error.contains("box"));
+}
+
+#[test]
+fn check_rejects_move_while_reference_extracted_from_field_is_live() {
+    let source = r#"
+struct Box { value: int }
+struct Holder { item: &Box }
+
+fn consume(box: Box) {
+    print(box.value)
+}
+
+fn main() {
+    let box: Box = Box { value: 1 }
+    let holder: Holder = Holder { item: &box }
+    let borrowed: &Box = holder.item
+    consume(box)
+    print(borrowed.value)
+}
+"#;
+    let file = write_temp_paco("reference_extracted_from_field_live", source);
+    let cli = paco_driver::Cli::try_parse_from(["paco", "check", file.to_str().unwrap()]).unwrap();
+
+    let error = run(cli).unwrap_err();
+
+    assert!(error.contains("borrow") || error.contains("move"));
+    assert!(error.contains("box"));
+}
+
+#[test]
+fn check_rejects_move_after_reference_assignment_to_target() {
+    let source = r#"
+struct Box { value: int }
+
+fn consume(box: Box) {
+    print(box.value)
+}
+
+fn main() {
+    let box: Box = Box { value: 1 }
+    let other: Box = Box { value: 2 }
+    let mut borrowed: &Box = &other
+    borrowed = &box
+    consume(box)
+    print(borrowed.value)
+}
+"#;
+    let file = write_temp_paco("reference_assignment_to_target", source);
+    let cli = paco_driver::Cli::try_parse_from(["paco", "check", file.to_str().unwrap()]).unwrap();
+
+    let error = run(cli).unwrap_err();
+
+    assert!(error.contains("borrow") || error.contains("move"));
+    assert!(error.contains("box"));
+}
+
+#[test]
+fn check_allows_move_after_reference_assignment_replaces_old_target() {
+    let source = r#"
+struct Box { value: int }
+
+fn consume(box: Box) {
+    print(box.value)
+}
+
+fn main() {
+    let box: Box = Box { value: 1 }
+    let other: Box = Box { value: 2 }
+    let mut borrowed: &Box = &box
+    borrowed = &other
+    consume(box)
+    print(borrowed.value)
+}
+"#;
+    let file = write_temp_paco("reference_assignment_replaces_old_target", source);
+    let cli = paco_driver::Cli::try_parse_from(["paco", "check", file.to_str().unwrap()]).unwrap();
+
+    let output = run(cli).unwrap();
+
+    assert_eq!(
+        output,
+        DriverOutput {
+            stdout: String::new(),
+            stderr: String::new(),
+        }
+    );
+}
+
+#[test]
+fn check_rejects_move_after_reference_field_assignment_to_target() {
+    let source = r#"
+struct Box { value: int }
+struct Holder { item: &Box }
+
+fn consume(box: Box) {
+    print(box.value)
+}
+
+fn main() {
+    let box: Box = Box { value: 1 }
+    let other: Box = Box { value: 2 }
+    let mut holder: Holder = Holder { item: &other }
+    holder.item = &box
+    consume(box)
+    print(holder.item.value)
+}
+"#;
+    let file = write_temp_paco("reference_field_assignment_to_target", source);
+    let cli = paco_driver::Cli::try_parse_from(["paco", "check", file.to_str().unwrap()]).unwrap();
+
+    let error = run(cli).unwrap_err();
+
+    assert!(error.contains("borrow") || error.contains("move"));
+    assert!(error.contains("box"));
+}
+
+#[test]
+fn check_allows_move_after_reference_field_assignment_replaces_old_target() {
+    let source = r#"
+struct Box { value: int }
+struct Holder { item: &Box }
+
+fn consume(box: Box) {
+    print(box.value)
+}
+
+fn main() {
+    let box: Box = Box { value: 1 }
+    let other: Box = Box { value: 2 }
+    let mut holder: Holder = Holder { item: &box }
+    holder.item = &other
+    consume(box)
+    print(holder.item.value)
+}
+"#;
+    let file = write_temp_paco("reference_field_assignment_replaces_old_target", source);
+    let cli = paco_driver::Cli::try_parse_from(["paco", "check", file.to_str().unwrap()]).unwrap();
+
+    let output = run(cli).unwrap();
+
+    assert_eq!(
+        output,
+        DriverOutput {
+            stdout: String::new(),
+            stderr: String::new(),
+        }
+    );
+}
+
 fn write_temp_paco(name: &str, source: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     path.push(format!(
