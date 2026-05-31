@@ -246,7 +246,7 @@ impl Parser<'_, '_> {
             return Ok(params);
         }
         loop {
-            params.push(self.consume_identifier("expected generic parameter name")?);
+            params.push(self.consume_generic_parameter()?);
             if !self.matches(TokenKind::Comma) {
                 break;
             }
@@ -301,6 +301,23 @@ impl Parser<'_, '_> {
 
     fn ty(&mut self) -> ParseResult<Ty> {
         let start = self.peek().span.start();
+        if self.matches(TokenKind::Ampersand) {
+            let ampersand = self.previous().span;
+            let lifetime = if self.matches(TokenKind::Lifetime) {
+                Some(self.previous().lexeme.trim_start_matches('\'').to_string())
+            } else {
+                None
+            };
+            let mutable = self.matches(TokenKind::Mut);
+            let ty = self.ty()?;
+            let span = Span::new(ampersand.file_id(), start, ty_span(&ty).end());
+            return Ok(Ty::Borrow {
+                mutable,
+                lifetime,
+                ty: Box::new(ty),
+                span,
+            });
+        }
         let path = self.path()?;
         if self.matches(TokenKind::Less) {
             let mut args = Vec::new();
@@ -491,6 +508,17 @@ impl Parser<'_, '_> {
     }
 
     fn unary(&mut self) -> ParseResult<Expr> {
+        if self.matches(TokenKind::Ampersand) {
+            let operator = self.previous().span;
+            let mutable = self.matches(TokenKind::Mut);
+            let expr = self.unary()?;
+            let span = Span::new(operator.file_id(), operator.start(), expr_span(&expr).end());
+            return Ok(Expr::Borrow {
+                mutable,
+                expr: Box::new(expr),
+                span,
+            });
+        }
         if self.matches(TokenKind::Bang) {
             let operator = self.previous().span;
             let expr = self.unary()?;
@@ -1107,6 +1135,14 @@ impl Parser<'_, '_> {
     fn consume_identifier(&mut self, message: &str) -> ParseResult<String> {
         let token = self.consume(TokenKind::Identifier, message)?;
         Ok(token.lexeme.clone())
+    }
+
+    fn consume_generic_parameter(&mut self) -> ParseResult<String> {
+        if self.matches(TokenKind::Identifier) || self.matches(TokenKind::Lifetime) {
+            return Ok(self.previous().lexeme.trim_start_matches('\'').to_string());
+        }
+        self.error_here("PACO-E0112", "expected generic parameter name");
+        Err(ParseError)
     }
 
     fn matches(&mut self, kind: TokenKind) -> bool {

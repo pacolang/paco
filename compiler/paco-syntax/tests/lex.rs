@@ -3,7 +3,7 @@ use paco_span::SourceMap;
 use paco_syntax::lex::{TokenKind, lex};
 
 #[test]
-fn lexer_tokenizes_phase_one_program() {
+fn lexer_tokenizes_core_program() {
     let mut sources = SourceMap::new();
     let file = sources.add_file("main.paco", "fn main() { print(\"Hello, world!\") }");
     let mut reporter = Reporter::new();
@@ -44,7 +44,7 @@ fn lexer_reports_invalid_characters_without_aborting() {
 }
 
 #[test]
-fn lexer_tokenizes_phase_three_pattern_tokens() {
+fn lexer_tokenizes_pattern_matching_tokens() {
     let mut sources = SourceMap::new();
     let file = sources.add_file(
         "main.paco",

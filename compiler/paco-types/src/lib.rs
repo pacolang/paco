@@ -1,4 +1,4 @@
-//! Type checking for the executable frontend phases.
+//! Type checking for executable frontend features.
 
 use std::collections::{HashMap, HashSet, hash_map::Entry};
 
@@ -20,6 +20,7 @@ pub enum Type {
     Never,
     Struct(String, Vec<Type>),
     Enum(String, Vec<Type>),
+    Borrow { mutable: bool, ty: Box<Type> },
     Generic(String),
     Unknown,
     Error,
@@ -366,6 +367,10 @@ impl Program {
             Ty::Path(path, _) if path.as_slice() == ["float"] => Type::Float,
             Ty::Path(path, _) if path.as_slice() == ["bool"] => Type::Bool,
             Ty::Path(path, _) if path.as_slice() == ["string"] => Type::String,
+            Ty::Borrow { mutable, ty, .. } => Type::Borrow {
+                mutable: *mutable,
+                ty: Box::new(self.ty_from_ast(ty, generics, reporter)),
+            },
             Ty::Path(path, span) if path.len() == 1 => {
                 if let Some(ty) = generics.get(&path[0]) {
                     ty.clone()
@@ -379,7 +384,7 @@ impl Program {
                     reporter.push(Diagnostic::error(
                         "PACO-E0306",
                         ty_span(ty),
-                        format!("type is not supported in Phase 2: {}", path.join("::")),
+                        format!("type is not supported yet: {}", path.join("::")),
                     ));
                     Type::Error
                 }
@@ -411,7 +416,7 @@ impl Program {
                     reporter.push(Diagnostic::error(
                         "PACO-E0306",
                         ty_span(ty),
-                        format!("type is not supported in Phase 2: {}", path.join("::")),
+                        format!("type is not supported yet: {}", path.join("::")),
                     ));
                     Type::Error
                 }
@@ -420,7 +425,7 @@ impl Program {
                 reporter.push(Diagnostic::error(
                     "PACO-E0306",
                     ty_span(ty),
-                    "type is not supported in Phase 2",
+                    "type is not supported yet",
                 ));
                 Type::Error
             }
@@ -812,7 +817,26 @@ fn infer_expr(
         Expr::Select { span, .. } => unsupported_expr("select expressions", *span, reporter),
         Expr::Comptime { span, .. } => unsupported_expr("comptime expressions", *span, reporter),
         Expr::Yield(_, span) => unsupported_expr("yield expressions", *span, reporter),
-        Expr::Borrow { span, .. } => unsupported_expr("borrow expressions", *span, reporter),
+        Expr::Borrow {
+            mutable,
+            expr,
+            span,
+        } => {
+            if *mutable && !is_mutable_place(expr, context) {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0307",
+                    *span,
+                    format!(
+                        "cannot take a mutable borrow of immutable `{}`",
+                        place_name(expr).unwrap_or("place")
+                    ),
+                ));
+            }
+            Type::Borrow {
+                mutable: *mutable,
+                ty: Box::new(infer_expr(expr, program, context, reporter)),
+            }
+        }
     }
 }
 
@@ -1024,7 +1048,7 @@ fn bind_pattern_types(
             reporter.push(Diagnostic::error(
                 "PACO-E0306",
                 *span,
-                "pattern form is not supported in Phase 3 type checking",
+                "pattern form is not supported by pattern type checking",
             ));
         }
     }
@@ -1137,7 +1161,7 @@ fn variant_field_types(
             reporter.push(Diagnostic::error(
                 "PACO-E0306",
                 variant.span,
-                "named enum variant patterns are not supported in Phase 3",
+                "named enum variant patterns are not supported yet",
             ));
             Vec::new()
         }
@@ -1366,7 +1390,10 @@ fn infer_field(
     context: &mut FunctionContext<'_>,
     reporter: &mut Reporter,
 ) -> Type {
-    let base_ty = infer_expr(base, program, context, reporter);
+    let base_ty = match infer_expr(base, program, context, reporter) {
+        Type::Borrow { ty, .. } => *ty,
+        ty => ty,
+    };
     let Some(fields) = instantiated_struct_fields(&base_ty, program, reporter) else {
         reporter.push(Diagnostic::error(
             "PACO-E0311",
@@ -1409,11 +1436,11 @@ fn infer_assign(
             binding.map(|binding| binding.ty).unwrap_or(Type::Unknown)
         }
         Expr::Field { base, field, .. } => {
-            if !is_mutable_place(base, context) {
+            if !is_assignable_field_base(base, context) {
                 reporter.push(Diagnostic::error(
                     "PACO-E0307",
                     span,
-                    "cannot assign through immutable binding",
+                    "cannot assign through immutable binding or shared borrow",
                 ));
             }
             infer_field(base, field, span, program, context, reporter)
@@ -1602,7 +1629,7 @@ fn check_variant_args(
             reporter.push(Diagnostic::error(
                 "PACO-E0306",
                 variant.span,
-                "named enum variant construction is not supported in Phase 2",
+                "named enum variant construction is not supported yet",
             ));
             Vec::new()
         }
@@ -1713,6 +1740,16 @@ fn unify_type(expected: &Type, actual: &Type, substitutions: &mut HashMap<String
                     .zip(actual_args)
                     .all(|(expected, actual)| unify_type(expected, actual, substitutions))
         }
+        (
+            Type::Borrow {
+                mutable: expected_mutable,
+                ty: expected,
+            },
+            Type::Borrow {
+                mutable: actual_mutable,
+                ty: actual,
+            },
+        ) => expected_mutable == actual_mutable && unify_type(expected, actual, substitutions),
         _ => compatible(actual, expected),
     }
 }
@@ -1735,6 +1772,10 @@ fn substitute_generics(ty: &Type, substitutions: &HashMap<String, Type>) -> Type
                 .map(|arg| substitute_generics(arg, substitutions))
                 .collect(),
         ),
+        Type::Borrow { mutable, ty } => Type::Borrow {
+            mutable: *mutable,
+            ty: Box::new(substitute_generics(ty, substitutions)),
+        },
         other => other.clone(),
     }
 }
@@ -1765,8 +1806,27 @@ fn is_mutable_place(expr: &Expr, context: &FunctionContext<'_>) -> bool {
         Expr::Ident(name, _) => {
             lookup(&context.scopes, name).is_some_and(|binding| binding.mutable)
         }
-        Expr::Field { base, .. } => is_mutable_place(base, context),
+        Expr::Field { base, .. } => is_assignable_field_base(base, context),
         _ => false,
+    }
+}
+
+fn is_assignable_field_base(expr: &Expr, context: &FunctionContext<'_>) -> bool {
+    match expr {
+        Expr::Ident(name, _) => lookup(&context.scopes, name).is_some_and(|binding| {
+            matches!(binding.ty, Type::Borrow { mutable: true, .. })
+                || (binding.mutable && !matches!(binding.ty, Type::Borrow { mutable: false, .. }))
+        }),
+        Expr::Field { base, .. } => is_assignable_field_base(base, context),
+        _ => false,
+    }
+}
+
+fn place_name(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Ident(name, _) => Some(name),
+        Expr::Field { base, .. } => place_name(base),
+        _ => None,
     }
 }
 
@@ -1811,7 +1871,7 @@ fn unsupported_expr(feature: &str, span: Span, reporter: &mut Reporter) -> Type 
     reporter.push(Diagnostic::error(
         "PACO-E0306",
         span,
-        format!("expression is not supported in Phase 2: {feature}"),
+        format!("expression is not supported yet: {feature}"),
     ));
     Type::Error
 }
@@ -1855,6 +1915,8 @@ impl Type {
                 let args = args.iter().map(Type::name).collect::<Vec<_>>().join(", ");
                 format!("{name}<{args}>")
             }
+            Type::Borrow { mutable, ty } if *mutable => format!("&mut {}", ty.name()),
+            Type::Borrow { ty, .. } => format!("&{}", ty.name()),
             Type::Generic(name) => name.clone(),
             Type::Unknown => "unknown".to_string(),
             Type::Error => "error".to_string(),

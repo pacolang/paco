@@ -1,1 +1,1 @@
-//! Paco runtime: M:N task scheduler, channels (Phase 8).
+//! Paco runtime: M:N task scheduler and channels.

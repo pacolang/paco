@@ -1,4 +1,4 @@
-//! Minimal HIR surface for Phase 2 name and type-shape lowering.
+//! Minimal HIR surface for data type name and type-shape lowering.
 
 use std::collections::HashMap;
 

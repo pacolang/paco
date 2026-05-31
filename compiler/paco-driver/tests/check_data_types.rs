@@ -65,7 +65,7 @@ fn check_reports_undeclared_name_inside_struct_method() {
 fn write_temp_paco(name: &str, source: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     path.push(format!(
-        "paco_phase_two_{}_{}_{}.paco",
+        "paco_data_types_{}_{}_{}.paco",
         name,
         std::process::id(),
         monotonic_suffix()

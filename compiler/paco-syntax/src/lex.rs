@@ -1,4 +1,4 @@
-//! Hand-written lexer for the initial Paco compiler phases.
+//! Hand-written lexer for Paco compiler features.
 
 use paco_diag::{Diagnostic, Reporter};
 use paco_span::{FileId, Span};
@@ -26,6 +26,7 @@ pub enum TokenKind {
     True,
     False,
     Identifier,
+    Lifetime,
     Integer,
     Float,
     String,
@@ -163,6 +164,7 @@ impl Lexer<'_, '_> {
             '/' if self.match_char('*') => self.skip_block_comment(start),
             '/' => self.push(TokenKind::Slash, start),
             '"' => self.string(start),
+            '\'' if self.peek().is_some_and(is_identifier_start) => self.lifetime(start),
             ch if ch.is_ascii_whitespace() => {}
             ch if ch.is_ascii_digit() => self.number(start),
             ch if is_identifier_start(ch) => self.identifier(start),
@@ -266,6 +268,13 @@ impl Lexer<'_, '_> {
             _ => TokenKind::Identifier,
         };
         self.push(kind, start);
+    }
+
+    fn lifetime(&mut self, start: usize) {
+        while matches!(self.peek(), Some(ch) if is_identifier_continue(ch)) {
+            self.advance();
+        }
+        self.push(TokenKind::Lifetime, start);
     }
 
     fn skip_line_comment(&mut self) {

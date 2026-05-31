@@ -1,3 +1,3 @@
-//! Linking placeholder for Phase 0.
+//! Linking placeholder.
 
 pub const CRATE_NAME: &str = "paco-link";

@@ -1,4 +1,4 @@
-//! Tree-walking evaluator for the executable frontend phases.
+//! Tree-walking evaluator for executable frontend features.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -332,7 +332,7 @@ impl Evaluator {
             | Expr::Select { .. }
             | Expr::Comptime { .. }
             | Expr::Yield(_, _)
-            | Expr::Borrow { .. } => Err("expression is not executable in Phase 1".to_string()),
+            | Expr::Borrow { .. } => Err("expression is not executable yet".to_string()),
         }
     }
 

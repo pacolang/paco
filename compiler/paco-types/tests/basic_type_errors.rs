@@ -4,7 +4,7 @@ use paco_syntax::ast::{Block, Expr, FnDecl, Item, Module, Ty};
 use paco_types::check_module;
 
 #[test]
-fn type_checker_reports_unsupported_phase_one_expressions() {
+fn type_checker_reports_unsupported_index_expressions() {
     let span = Span::new_root(0, 1);
     let module = Module {
         items: vec![Item::Fn(FnDecl {
@@ -14,9 +14,9 @@ fn type_checker_reports_unsupported_phase_one_expressions() {
             return_ty: None,
             body: Block {
                 stmts: Vec::new(),
-                tail: Some(Box::new(Expr::Borrow {
-                    mutable: false,
-                    expr: Box::new(Expr::Ident("value".to_string(), span)),
+                tail: Some(Box::new(Expr::Index {
+                    base: Box::new(Expr::Ident("value".to_string(), span)),
+                    index: Box::new(Expr::Ident("index".to_string(), span)),
                     span,
                 })),
                 span,
@@ -34,7 +34,7 @@ fn type_checker_reports_unsupported_phase_one_expressions() {
 }
 
 #[test]
-fn type_checker_reports_unknown_phase_one_types() {
+fn type_checker_reports_unknown_path_types() {
     let span = Span::new_root(0, 1);
     let module = Module {
         items: vec![Item::Fn(FnDecl {

@@ -1,15 +1,17 @@
-//! Ownership and move analysis for the executable frontend phases.
+//! Ownership and move analysis for executable frontend features.
 
 use std::collections::HashMap;
 
 use paco_diag::{Diagnostic, Reporter};
 use paco_span::Span;
 use paco_syntax::ast::{
-    Block, Expr, FnDecl, Item, Literal, MatchArm, Module, Pat, Stmt, Ty, VariantFields,
+    Block, Expr, FnDecl, Item, LetStmt, Literal, MatchArm, Module, Pat, Stmt, Ty, VariantFields,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BorrowError;
+
+const TEMPORARY_BORROW_OWNER: &str = "<temporary>";
 
 pub fn check_module(module: &Module, reporter: &mut Reporter) -> Result<(), BorrowError> {
     let program = Program::from_module(module);
@@ -143,12 +145,23 @@ struct BindingState {
     ty: Option<Ty>,
     moved_at: Option<Span>,
     move_count: usize,
+    borrows: Vec<BorrowBinding>,
+}
+
+#[derive(Clone, Debug)]
+struct BorrowBinding {
+    owner: String,
+    mutable: bool,
+    last_use: usize,
+    local_escape: bool,
 }
 
 #[derive(Clone, Debug)]
 struct OwnershipState {
     scopes: Vec<HashMap<String, BindingState>>,
     reachable: bool,
+    current_statement: usize,
+    temporary_borrows: Vec<BorrowBinding>,
 }
 
 impl Default for OwnershipState {
@@ -156,6 +169,8 @@ impl Default for OwnershipState {
         Self {
             scopes: Vec::new(),
             reachable: true,
+            current_statement: 0,
+            temporary_borrows: Vec::new(),
         }
     }
 }
@@ -170,6 +185,16 @@ impl OwnershipState {
     }
 
     fn define(&mut self, name: String, copy: bool, ty: Option<Ty>) {
+        self.define_with_borrows(name, copy, ty, Vec::new());
+    }
+
+    fn define_with_borrows(
+        &mut self,
+        name: String,
+        copy: bool,
+        ty: Option<Ty>,
+        borrows: Vec<BorrowBinding>,
+    ) {
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(
                 name,
@@ -178,6 +203,7 @@ impl OwnershipState {
                     ty,
                     moved_at: None,
                     move_count: 0,
+                    borrows,
                 },
             );
         }
@@ -203,7 +229,462 @@ fn check_function(function: &FnDecl, program: &Program, reporter: &mut Reporter)
             state.define(name.clone(), ty_is_copy(&param.ty), Some(param.ty.clone()));
         }
     }
+    check_lifetime_signature(function, program, reporter);
     check_block(&function.body, program, &mut state, reporter);
+}
+
+fn check_lifetime_signature(function: &FnDecl, program: &Program, reporter: &mut Reporter) {
+    let Some(Ty::Borrow { lifetime, span, .. }) = &function.return_ty else {
+        return;
+    };
+    let local_owner_types = owned_param_types(function);
+    let local_owners: std::collections::HashSet<String> =
+        local_owner_types.keys().cloned().collect();
+    if let Some(name) =
+        returned_local_borrow_name(&function.body, program, &local_owners, &local_owner_types)
+    {
+        reporter.push(Diagnostic::error(
+            "lifetime-error",
+            *span,
+            borrow_outlives_owner_message(&name),
+        ));
+        return;
+    }
+    if lifetime.is_some() {
+        return;
+    }
+    let borrowed_params = function
+        .params
+        .iter()
+        .filter(|param| matches!(param.ty, Ty::Borrow { .. }))
+        .count();
+    if borrowed_params > 1 {
+        reporter.push(Diagnostic::error(
+            "ambiguous-lifetime",
+            *span,
+            format!(
+                "ambiguous returned reference lifetime in `{}`; add an explicit `'a` lifetime annotation",
+                function.name
+            ),
+        ));
+    }
+}
+
+fn owned_param_types(function: &FnDecl) -> HashMap<String, Ty> {
+    function
+        .params
+        .iter()
+        .filter(|param| !matches!(param.ty, Ty::Borrow { .. }))
+        .filter_map(|param| match &param.pattern {
+            Pat::Ident(name, _) => Some((name.clone(), param.ty.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+fn returned_local_borrow_name(
+    block: &Block,
+    program: &Program,
+    outer_local_names: &std::collections::HashSet<String>,
+    outer_local_types: &HashMap<String, Ty>,
+) -> Option<String> {
+    let mut local_names = outer_local_names.clone();
+    let mut local_types = outer_local_types.clone();
+    for statement in &block.stmts {
+        let Stmt::Let(statement) = statement else {
+            continue;
+        };
+        let Pat::Ident(name, _) = &statement.pattern else {
+            continue;
+        };
+        local_names.insert(name.clone());
+        if let Some(ty) = local_binding_ty(statement, &local_types, program) {
+            local_types.insert(name.clone(), ty);
+        }
+    }
+    let borrow_origins = local_borrow_origins(block, &local_names, &local_types, program);
+    block.tail.as_deref().and_then(|tail| {
+        local_borrow_name_from_expr(tail, &local_names, &local_types, &borrow_origins, program)
+    })
+}
+
+fn local_binding_ty(
+    statement: &LetStmt,
+    local_types: &HashMap<String, Ty>,
+    program: &Program,
+) -> Option<Ty> {
+    statement
+        .ty
+        .clone()
+        .or_else(|| escape_expr_ty(statement.value.as_ref()?, local_types, program))
+}
+
+fn escape_expr_ty(expr: &Expr, local_types: &HashMap<String, Ty>, program: &Program) -> Option<Ty> {
+    match expr {
+        Expr::Ident(name, _) => local_types.get(name).cloned(),
+        Expr::StructLiteral { ty, .. } => Some(ty.clone()),
+        Expr::Borrow {
+            mutable,
+            expr,
+            span,
+        } => Some(Ty::Borrow {
+            mutable: *mutable,
+            lifetime: None,
+            ty: Box::new(escape_expr_ty(expr, local_types, program)?),
+            span: *span,
+        }),
+        Expr::Call { callee, .. } => {
+            let Expr::Ident(function_name, _) = callee.as_ref() else {
+                return None;
+            };
+            program
+                .functions
+                .get(function_name)
+                .and_then(|signature| signature.return_ty.clone())
+        }
+        Expr::AssociatedCall { ty, function, .. } => type_name(ty)
+            .and_then(|name| program.methods.get(&(name, function.clone())))
+            .and_then(|signature| signature.return_ty.clone())
+            .or_else(|| Some(ty.clone())),
+        Expr::MethodCall {
+            receiver, method, ..
+        } => {
+            let receiver_ty = receiver_type_name_from_expr(receiver, local_types, program)?;
+            program
+                .methods
+                .get(&(receiver_ty, method.clone()))
+                .and_then(|signature| signature.return_ty.clone())
+        }
+        Expr::Block(block) => block
+            .tail
+            .as_deref()
+            .and_then(|tail| escape_expr_ty(tail, local_types, program)),
+        _ => None,
+    }
+}
+
+fn receiver_type_name_from_expr(
+    receiver: &Expr,
+    local_types: &HashMap<String, Ty>,
+    program: &Program,
+) -> Option<String> {
+    if let Expr::Ident(name, _) = receiver {
+        return local_types.get(name).and_then(method_receiver_type_name);
+    }
+    let receiver_ty = escape_expr_ty(receiver, local_types, program)?;
+    method_receiver_type_name(&receiver_ty)
+}
+
+fn local_borrow_origins(
+    block: &Block,
+    local_names: &std::collections::HashSet<String>,
+    local_types: &HashMap<String, Ty>,
+    program: &Program,
+) -> HashMap<String, String> {
+    let mut origins = HashMap::new();
+    for statement in &block.stmts {
+        let Stmt::Let(statement) = statement else {
+            continue;
+        };
+        let Pat::Ident(binding_name, _) = &statement.pattern else {
+            continue;
+        };
+        let Some(value) = &statement.value else {
+            continue;
+        };
+        if let Some(owner) =
+            local_borrow_name_from_expr(value, local_names, local_types, &origins, program)
+        {
+            origins.insert(binding_name.clone(), owner);
+        }
+    }
+    origins
+}
+
+fn local_borrow_name_from_expr(
+    expr: &Expr,
+    local_names: &std::collections::HashSet<String>,
+    local_types: &HashMap<String, Ty>,
+    borrow_origins: &HashMap<String, String>,
+    program: &Program,
+) -> Option<String> {
+    match expr {
+        Expr::Borrow { expr, .. } => {
+            local_borrow_name_from_place(expr, local_names, borrow_origins).or_else(|| {
+                escape_expr_ty(expr, local_types, program)
+                    .map(|_| TEMPORARY_BORROW_OWNER.to_string())
+            })
+        }
+        Expr::Ident(name, _) => borrow_origins.get(name).cloned(),
+        Expr::Call { callee, args, .. } => {
+            let Expr::Ident(function_name, _) = callee.as_ref() else {
+                return None;
+            };
+            let signature = program.functions.get(function_name)?;
+            let Some(Ty::Borrow {
+                lifetime: return_lifetime,
+                ..
+            }) = &signature.return_ty
+            else {
+                return None;
+            };
+            local_borrow_name_from_call_args(
+                &signature.params,
+                args,
+                return_lifetime.as_ref(),
+                local_names,
+                local_types,
+                borrow_origins,
+                program,
+            )
+        }
+        Expr::MethodCall {
+            receiver,
+            method,
+            args,
+            ..
+        } => local_borrow_name_from_method_call(
+            receiver,
+            method,
+            args,
+            local_names,
+            local_types,
+            borrow_origins,
+            program,
+        ),
+        Expr::Block(block) => returned_local_borrow_name(block, program, local_names, local_types),
+        Expr::If {
+            then_branch,
+            else_branch,
+            ..
+        } => returned_local_borrow_name(then_branch, program, local_names, local_types).or_else(
+            || {
+                else_branch.as_deref().and_then(|expr| {
+                    local_borrow_name_from_expr(
+                        expr,
+                        local_names,
+                        local_types,
+                        borrow_origins,
+                        program,
+                    )
+                })
+            },
+        ),
+        Expr::Match { arms, .. } => arms.iter().find_map(|arm| {
+            local_borrow_name_from_expr(
+                &arm.body,
+                local_names,
+                local_types,
+                borrow_origins,
+                program,
+            )
+        }),
+        _ => None,
+    }
+}
+
+fn local_borrow_name_from_call_args(
+    params: &[Ty],
+    args: &[Expr],
+    return_lifetime: Option<&String>,
+    local_names: &std::collections::HashSet<String>,
+    local_types: &HashMap<String, Ty>,
+    borrow_origins: &HashMap<String, String>,
+    program: &Program,
+) -> Option<String> {
+    let mut origins = Vec::new();
+    for (param, arg) in params.iter().zip(args) {
+        let Ty::Borrow {
+            lifetime: param_lifetime,
+            ..
+        } = param
+        else {
+            continue;
+        };
+        if let Some(return_lifetime) = return_lifetime
+            && param_lifetime.as_ref() != Some(return_lifetime)
+        {
+            continue;
+        }
+        if let Some(origin) =
+            local_borrow_name_from_expr(arg, local_names, local_types, borrow_origins, program)
+        {
+            origins.push(origin);
+        }
+    }
+    if return_lifetime.is_some() || origins.len() == 1 {
+        origins.into_iter().next()
+    } else {
+        None
+    }
+}
+
+fn local_borrow_name_from_method_call(
+    receiver: &Expr,
+    method: &str,
+    args: &[Expr],
+    local_names: &std::collections::HashSet<String>,
+    local_types: &HashMap<String, Ty>,
+    borrow_origins: &HashMap<String, String>,
+    program: &Program,
+) -> Option<String> {
+    let signature = local_method_signature(receiver, method, local_types, borrow_origins, program)?;
+    let Some(Ty::Borrow {
+        lifetime: return_lifetime,
+        ..
+    }) = &signature.return_ty
+    else {
+        return None;
+    };
+    let mut origins = Vec::new();
+    for (index, param_ty) in signature.params.iter().enumerate() {
+        let Ty::Borrow {
+            lifetime: param_lifetime,
+            ..
+        } = param_ty
+        else {
+            continue;
+        };
+        if let Some(return_lifetime) = return_lifetime
+            && param_lifetime.as_ref() != Some(return_lifetime)
+        {
+            continue;
+        }
+        let origin = if index == 0 {
+            local_borrow_name_from_receiver(
+                receiver,
+                local_names,
+                local_types,
+                borrow_origins,
+                program,
+            )
+        } else {
+            args.get(index - 1).and_then(|arg| {
+                local_borrow_name_from_expr(arg, local_names, local_types, borrow_origins, program)
+            })
+        };
+        if let Some(origin) = origin {
+            origins.push(origin);
+        }
+    }
+    if return_lifetime.is_some() || origins.len() == 1 {
+        origins.into_iter().next()
+    } else {
+        None
+    }
+}
+
+fn local_borrow_name_from_receiver(
+    receiver: &Expr,
+    local_names: &std::collections::HashSet<String>,
+    local_types: &HashMap<String, Ty>,
+    borrow_origins: &HashMap<String, String>,
+    program: &Program,
+) -> Option<String> {
+    local_borrow_name_from_place(receiver, local_names, borrow_origins).or_else(|| {
+        receiver_type_name_for_escape(receiver, local_types, borrow_origins, program)
+            .map(|_| TEMPORARY_BORROW_OWNER.to_string())
+    })
+}
+
+fn local_method_signature<'a>(
+    receiver: &Expr,
+    method: &str,
+    local_types: &HashMap<String, Ty>,
+    borrow_origins: &HashMap<String, String>,
+    program: &'a Program,
+) -> Option<&'a FunctionSignature> {
+    let receiver_ty =
+        receiver_type_name_for_escape(receiver, local_types, borrow_origins, program)?;
+    program.methods.get(&(receiver_ty, method.to_string()))
+}
+
+fn receiver_type_name_for_escape(
+    receiver: &Expr,
+    local_types: &HashMap<String, Ty>,
+    borrow_origins: &HashMap<String, String>,
+    program: &Program,
+) -> Option<String> {
+    if let Expr::Ident(name, _) = receiver
+        && let Some(receiver_ty) = local_types
+            .get(name)
+            .or_else(|| {
+                borrow_origins
+                    .get(name)
+                    .and_then(|origin| local_types.get(origin))
+            })
+            .and_then(method_receiver_type_name)
+    {
+        return Some(receiver_ty);
+    }
+    receiver_type_name_from_expr(receiver, local_types, program)
+}
+
+fn method_receiver_type_name(ty: &Ty) -> Option<String> {
+    match ty {
+        Ty::Borrow { ty, .. } => method_receiver_type_name(ty),
+        _ => type_name(ty),
+    }
+}
+
+fn local_borrow_name_from_place(
+    expr: &Expr,
+    local_names: &std::collections::HashSet<String>,
+    borrow_origins: &HashMap<String, String>,
+) -> Option<String> {
+    match expr {
+        Expr::Ident(name, _) if local_names.contains(name) => Some(name.clone()),
+        Expr::Ident(name, _) => borrow_origins.get(name).cloned(),
+        Expr::Field { base, .. } => local_borrow_name_from_place(base, local_names, borrow_origins),
+        _ => None,
+    }
+}
+
+fn check_block_borrow_escape(expr: &Expr, program: &Program, reporter: &mut Reporter) {
+    let Expr::Block(block) = expr else {
+        return;
+    };
+    if let Some(name) = returned_local_borrow_name(
+        block,
+        program,
+        &std::collections::HashSet::new(),
+        &HashMap::new(),
+    ) {
+        reporter.push(Diagnostic::error(
+            "lifetime-error",
+            block.span,
+            borrow_outlives_owner_message(&name),
+        ));
+    }
+}
+
+fn borrow_outlives_owner_message(name: &str) -> String {
+    if name == TEMPORARY_BORROW_OWNER {
+        "borrow of temporary value cannot outlive its owner".to_string()
+    } else {
+        format!("borrow of local `{name}` cannot outlive its owner")
+    }
+}
+
+fn check_return_borrow_escape(
+    value: &Expr,
+    program: &Program,
+    state: &OwnershipState,
+    reporter: &mut Reporter,
+) {
+    for origin in borrow_origins_from_expr(value, program, state) {
+        if origin.local_escape
+            || origin.owner == TEMPORARY_BORROW_OWNER
+            || state.get(&origin.owner).is_some()
+        {
+            reporter.push(Diagnostic::error(
+                "lifetime-error",
+                expr_span(value),
+                borrow_outlives_owner_message(&origin.owner),
+            ));
+            return;
+        }
+    }
 }
 
 fn check_block(
@@ -213,7 +694,9 @@ fn check_block(
     reporter: &mut Reporter,
 ) {
     state.push_scope();
+    let last_uses = block_last_uses(block);
     for statement in &block.stmts {
+        state.current_statement = statement_position(statement);
         if !state.reachable {
             break;
         }
@@ -240,8 +723,24 @@ fn check_block(
                     } else {
                         consume_expr(value, program, state, reporter);
                     }
+                    check_block_borrow_escape(value, program, reporter);
                 }
-                bind_pattern(&statement.pattern, copy, binding_ty, program, state);
+                let borrows = borrow_bindings(
+                    statement.value.as_ref(),
+                    &statement.pattern,
+                    &last_uses,
+                    program,
+                    state,
+                );
+                define_let_pattern(
+                    &statement.pattern,
+                    copy,
+                    binding_ty,
+                    borrows,
+                    program,
+                    state,
+                    reporter,
+                );
             }
             Stmt::Expr(expr) => check_discarded_expr(expr, program, state, reporter),
             Stmt::Item(_) => {}
@@ -250,6 +749,7 @@ fn check_block(
     if state.reachable
         && let Some(tail) = &block.tail
     {
+        state.current_statement = expr_span(tail).start();
         check_expr(tail, program, state, reporter);
     }
     state.pop_scope();
@@ -299,8 +799,10 @@ fn check_expr(expr: &Expr, program: &Program, state: &mut OwnershipState, report
             ..
         } => check_method_call(receiver, method, args, program, state, reporter),
         Expr::AssociatedCall { args, .. } => {
+            let temporaries =
+                check_argument_temporary_borrow_conflicts(args, program, state, reporter);
             for arg in args {
-                consume_expr(arg, program, state, reporter);
+                consume_expr_with_temporary_borrows(arg, &temporaries, program, state, reporter);
             }
         }
         Expr::Binary { left, right, .. } => {
@@ -308,13 +810,24 @@ fn check_expr(expr: &Expr, program: &Program, state: &mut OwnershipState, report
             check_expr(right, program, state, reporter);
         }
         Expr::Unary { expr, .. } => check_expr(expr, program, state, reporter),
-        Expr::Assign { target, value, .. } => {
+        Expr::Assign {
+            target,
+            value,
+            span,
+        } => {
             consume_expr(value, program, state, reporter);
             match target.as_ref() {
-                Expr::Ident(name, _) => {
+                Expr::Ident(name, span) => {
+                    check_assignment_while_borrowed(name, *span, state, reporter);
                     if let Some(binding) = state.get_mut(name) {
                         binding.moved_at = None;
                     }
+                }
+                Expr::Field { .. } => {
+                    if let Some(name) = root_place_name(target) {
+                        check_assignment_while_borrowed(name, *span, state, reporter);
+                    }
+                    check_expr(target, program, state, reporter);
                 }
                 _ => check_expr(target, program, state, reporter),
             }
@@ -324,7 +837,14 @@ fn check_expr(expr: &Expr, program: &Program, state: &mut OwnershipState, report
             check_expr(base, program, state, reporter);
             check_expr(index, program, state, reporter);
         }
-        Expr::Return(value, _) | Expr::Break(value, _) => {
+        Expr::Return(value, _) => {
+            if let Some(value) = value {
+                check_return_borrow_escape(value, program, state, reporter);
+                consume_expr(value, program, state, reporter);
+            }
+            state.reachable = false;
+        }
+        Expr::Break(value, _) => {
             if let Some(value) = value {
                 consume_expr(value, program, state, reporter);
             }
@@ -333,7 +853,18 @@ fn check_expr(expr: &Expr, program: &Program, state: &mut OwnershipState, report
         Expr::Continue(_) => {
             state.reachable = false;
         }
-        Expr::Spawn { expr, .. } | Expr::Comptime { expr, .. } | Expr::Borrow { expr, .. } => {
+        Expr::Spawn { expr, .. } | Expr::Comptime { expr, .. } => {
+            check_expr(expr, program, state, reporter);
+        }
+        Expr::Borrow {
+            mutable,
+            expr,
+            span,
+        } => {
+            for borrow in temporary_borrow_bindings(*mutable, expr, state.current_statement, state)
+            {
+                check_borrow_conflict("<temporary>", *span, &borrow, state, reporter);
+            }
             check_expr(expr, program, state, reporter);
         }
         Expr::Select { arms, default, .. } => {
@@ -394,14 +925,16 @@ fn check_call(
 ) {
     let Expr::Ident(name, _) = callee else {
         check_expr(callee, program, state, reporter);
+        let temporaries = check_argument_temporary_borrow_conflicts(args, program, state, reporter);
         for arg in args {
-            consume_expr(arg, program, state, reporter);
+            consume_expr_with_temporary_borrows(arg, &temporaries, program, state, reporter);
         }
         return;
     };
+    let temporaries = check_argument_temporary_borrow_conflicts(args, program, state, reporter);
     if name == "print" {
         for arg in args {
-            check_expr(arg, program, state, reporter);
+            check_expr_with_temporary_borrows(arg, &temporaries, program, state, reporter);
         }
         return;
     }
@@ -411,9 +944,9 @@ fn check_call(
             .and_then(|signature| signature.params.get(index))
             .is_some_and(ty_is_copy)
         {
-            check_expr(arg, program, state, reporter);
+            check_expr_with_temporary_borrows(arg, &temporaries, program, state, reporter);
         } else {
-            consume_expr(arg, program, state, reporter);
+            consume_expr_with_temporary_borrows(arg, &temporaries, program, state, reporter);
         }
     }
 }
@@ -432,20 +965,193 @@ fn check_method_call(
     let receiver_is_borrowed = signature
         .and_then(|signature| signature.params.first())
         .is_some_and(|ty| matches!(ty, Ty::Borrow { .. }));
+    let receiver_borrows = signature
+        .and_then(|signature| signature.params.first())
+        .and_then(|ty| match ty {
+            Ty::Borrow { mutable, .. } => Some(*mutable),
+            _ => None,
+        })
+        .map(|mutable| {
+            borrow_owners(receiver, state)
+                .into_iter()
+                .map(|owner| BorrowBinding {
+                    owner,
+                    mutable,
+                    last_use: state.current_statement,
+                    local_escape: false,
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    for receiver_borrow in &receiver_borrows {
+        check_borrow_conflict(
+            "<receiver>",
+            expr_span(receiver),
+            receiver_borrow,
+            state,
+            reporter,
+        );
+    }
+    let temporaries = check_argument_temporary_borrow_conflicts_with(
+        args,
+        receiver_borrows,
+        program,
+        state,
+        reporter,
+    );
     if receiver_is_copy || receiver_is_borrowed {
-        check_expr(receiver, program, state, reporter);
+        check_expr_with_temporary_borrows(receiver, &temporaries, program, state, reporter);
     } else {
-        consume_expr(receiver, program, state, reporter);
+        consume_expr_with_temporary_borrows(receiver, &temporaries, program, state, reporter);
     }
     for (index, arg) in args.iter().enumerate() {
         if signature
             .and_then(|signature| signature.params.get(index + 1))
             .is_some_and(ty_is_copy)
         {
-            check_expr(arg, program, state, reporter);
+            check_expr_with_temporary_borrows(arg, &temporaries, program, state, reporter);
         } else {
-            consume_expr(arg, program, state, reporter);
+            consume_expr_with_temporary_borrows(arg, &temporaries, program, state, reporter);
         }
+    }
+}
+
+fn check_argument_temporary_borrow_conflicts(
+    args: &[Expr],
+    program: &Program,
+    state: &OwnershipState,
+    reporter: &mut Reporter,
+) -> Vec<BorrowBinding> {
+    check_argument_temporary_borrow_conflicts_with(args, Vec::new(), program, state, reporter)
+}
+
+fn check_argument_temporary_borrow_conflicts_with(
+    args: &[Expr],
+    initial: Vec<BorrowBinding>,
+    program: &Program,
+    state: &OwnershipState,
+    reporter: &mut Reporter,
+) -> Vec<BorrowBinding> {
+    let mut temporaries = initial;
+    for arg in args {
+        for borrow in temporary_borrows_for_expr(arg, program, state) {
+            if temporaries.iter().any(|existing| {
+                existing.owner == borrow.owner && (existing.mutable || borrow.mutable)
+            }) {
+                reporter.push(Diagnostic::error(
+                    "borrow-conflict",
+                    expr_span(arg),
+                    format!(
+                        "cannot borrow `{}` because another call argument already borrows it",
+                        borrow.owner
+                    ),
+                ));
+                return temporaries;
+            }
+            temporaries.push(borrow);
+        }
+    }
+    temporaries
+}
+
+fn check_expr_with_temporary_borrows(
+    expr: &Expr,
+    borrows: &[BorrowBinding],
+    program: &Program,
+    state: &mut OwnershipState,
+    reporter: &mut Reporter,
+) {
+    let current = temporary_borrows_for_expr(expr, program, state);
+    let original_len = push_temporary_borrows_except(state, borrows, &current);
+    check_expr(expr, program, state, reporter);
+    state.temporary_borrows.truncate(original_len);
+}
+
+fn consume_expr_with_temporary_borrows(
+    expr: &Expr,
+    borrows: &[BorrowBinding],
+    program: &Program,
+    state: &mut OwnershipState,
+    reporter: &mut Reporter,
+) {
+    let original_len = push_temporary_borrows(state, borrows);
+    consume_expr(expr, program, state, reporter);
+    state.temporary_borrows.truncate(original_len);
+}
+
+fn push_temporary_borrows(state: &mut OwnershipState, borrows: &[BorrowBinding]) -> usize {
+    push_temporary_borrows_except(state, borrows, &[])
+}
+
+fn push_temporary_borrows_except(
+    state: &mut OwnershipState,
+    borrows: &[BorrowBinding],
+    excluded: &[BorrowBinding],
+) -> usize {
+    let original_len = state.temporary_borrows.len();
+    state.temporary_borrows.extend(
+        borrows
+            .iter()
+            .filter(|borrow| {
+                !excluded
+                    .iter()
+                    .any(|excluded| same_borrow(borrow, excluded))
+            })
+            .cloned()
+            .map(|mut borrow| {
+                borrow.last_use = usize::MAX;
+                borrow
+            }),
+    );
+    original_len
+}
+
+fn temporary_borrows_for_expr(
+    expr: &Expr,
+    program: &Program,
+    state: &OwnershipState,
+) -> Vec<BorrowBinding> {
+    borrow_origins_from_expr(expr, program, state)
+        .into_iter()
+        .map(|origin| BorrowBinding {
+            owner: origin.owner,
+            mutable: origin.mutable,
+            last_use: state.current_statement,
+            local_escape: origin.local_escape,
+        })
+        .collect()
+}
+
+fn same_borrow(left: &BorrowBinding, right: &BorrowBinding) -> bool {
+    left.owner == right.owner && left.mutable == right.mutable
+}
+
+fn expr_span(expr: &Expr) -> Span {
+    match expr {
+        Expr::Literal(_, span)
+        | Expr::Ident(_, span)
+        | Expr::Return(_, span)
+        | Expr::Break(_, span)
+        | Expr::Continue(span)
+        | Expr::Yield(_, span) => *span,
+        Expr::Block(block) => block.span,
+        Expr::If { span, .. }
+        | Expr::Loop { span, .. }
+        | Expr::While { span, .. }
+        | Expr::Match { span, .. }
+        | Expr::Call { span, .. }
+        | Expr::MethodCall { span, .. }
+        | Expr::AssociatedCall { span, .. }
+        | Expr::Binary { span, .. }
+        | Expr::Unary { span, .. }
+        | Expr::Assign { span, .. }
+        | Expr::Field { span, .. }
+        | Expr::Index { span, .. }
+        | Expr::Spawn { span, .. }
+        | Expr::Select { span, .. }
+        | Expr::Comptime { span, .. }
+        | Expr::StructLiteral { span, .. }
+        | Expr::Borrow { span, .. } => *span,
     }
 }
 
@@ -496,6 +1202,7 @@ fn consume_expr(
     match expr {
         Expr::Ident(name, span) => {
             check_ident_use(name, *span, state, reporter);
+            check_move_while_borrowed(name, *span, state, reporter);
             if let Some(binding) = state.get_mut(name)
                 && !binding.copy
             {
@@ -508,7 +1215,7 @@ fn consume_expr(
             reporter.push(Diagnostic::error(
                 "use-after-move",
                 *span,
-                "field moves are not supported in Phase 4",
+                "field moves are not supported by ownership analysis",
             ));
         }
         Expr::Block(block) => consume_block(block, program, state, reporter),
@@ -545,7 +1252,9 @@ fn consume_block(
     reporter: &mut Reporter,
 ) {
     state.push_scope();
+    let last_uses = block_last_uses(block);
     for statement in &block.stmts {
+        state.current_statement = statement_position(statement);
         if !state.reachable {
             break;
         }
@@ -572,8 +1281,24 @@ fn consume_block(
                     } else {
                         consume_expr(value, program, state, reporter);
                     }
+                    check_block_borrow_escape(value, program, reporter);
                 }
-                bind_pattern(&statement.pattern, copy, binding_ty, program, state);
+                let borrows = borrow_bindings(
+                    statement.value.as_ref(),
+                    &statement.pattern,
+                    &last_uses,
+                    program,
+                    state,
+                );
+                define_let_pattern(
+                    &statement.pattern,
+                    copy,
+                    binding_ty,
+                    borrows,
+                    program,
+                    state,
+                    reporter,
+                );
             }
             Stmt::Expr(expr) => check_discarded_expr(expr, program, state, reporter),
             Stmt::Item(_) => {}
@@ -582,6 +1307,7 @@ fn consume_block(
     if state.reachable
         && let Some(tail) = &block.tail
     {
+        state.current_statement = expr_span(tail).start();
         consume_expr(tail, program, state, reporter);
     }
     state.pop_scope();
@@ -810,6 +1536,587 @@ fn bind_pattern(
             }
         }
         Pat::Range { .. } | Pat::Wildcard(_) | Pat::Literal(_, _) => {}
+    }
+}
+
+fn define_let_pattern(
+    pattern: &Pat,
+    copy: bool,
+    ty: Option<Ty>,
+    borrows: Vec<BorrowBinding>,
+    program: &Program,
+    state: &mut OwnershipState,
+    reporter: &mut Reporter,
+) {
+    if let Pat::Ident(name, span) = pattern {
+        for borrow in &borrows {
+            if borrow.owner == TEMPORARY_BORROW_OWNER || borrow.local_escape {
+                reporter.push(Diagnostic::error(
+                    "lifetime-error",
+                    *span,
+                    borrow_outlives_owner_message(&borrow.owner),
+                ));
+            } else {
+                check_borrow_conflict(name, *span, borrow, state, reporter);
+            }
+        }
+        state.define_with_borrows(name.clone(), copy, ty, borrows);
+    } else {
+        bind_pattern(pattern, copy, ty, program, state);
+    }
+}
+
+fn borrow_bindings(
+    value: Option<&Expr>,
+    pattern: &Pat,
+    last_uses: &HashMap<String, usize>,
+    program: &Program,
+    state: &OwnershipState,
+) -> Vec<BorrowBinding> {
+    let Pat::Ident(binding_name, _) = pattern else {
+        return Vec::new();
+    };
+    let Some(value) = value else {
+        return Vec::new();
+    };
+    let last_use = last_uses.get(binding_name).copied().unwrap_or(0);
+    borrow_origins_from_expr(value, program, state)
+        .into_iter()
+        .map(|origin| BorrowBinding {
+            owner: origin.owner,
+            mutable: origin.mutable,
+            last_use,
+            local_escape: origin.local_escape,
+        })
+        .collect()
+}
+
+#[derive(Clone, Debug)]
+struct BorrowOrigin {
+    owner: String,
+    mutable: bool,
+    local_escape: bool,
+}
+
+fn borrow_origins_from_expr(
+    expr: &Expr,
+    program: &Program,
+    state: &OwnershipState,
+) -> Vec<BorrowOrigin> {
+    match expr {
+        Expr::Borrow { mutable, expr, .. } => borrow_owners_or_temporary(expr, program, state)
+            .into_iter()
+            .map(|owner| BorrowOrigin {
+                owner,
+                mutable: *mutable,
+                local_escape: false,
+            })
+            .collect(),
+        Expr::Ident(name, _) => state
+            .get(name)
+            .map(|binding| {
+                binding
+                    .borrows
+                    .iter()
+                    .map(|borrow| BorrowOrigin {
+                        owner: borrow.owner.clone(),
+                        mutable: borrow.mutable,
+                        local_escape: borrow.local_escape,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        Expr::Call { callee, args, .. } => {
+            let Expr::Ident(function_name, _) = callee.as_ref() else {
+                return Vec::new();
+            };
+            let Some(signature) = program.functions.get(function_name) else {
+                return Vec::new();
+            };
+            let Some(Ty::Borrow {
+                mutable,
+                lifetime: return_lifetime,
+                ..
+            }) = &signature.return_ty
+            else {
+                return Vec::new();
+            };
+            borrow_origins_from_params(
+                &signature.params,
+                args,
+                None,
+                *mutable,
+                return_lifetime.as_ref(),
+                program,
+                state,
+            )
+        }
+        Expr::MethodCall {
+            receiver,
+            method,
+            args,
+            ..
+        } => {
+            let Some(signature) = method_signature(receiver, method, program, state) else {
+                return Vec::new();
+            };
+            let Some(Ty::Borrow {
+                mutable,
+                lifetime: return_lifetime,
+                ..
+            }) = &signature.return_ty
+            else {
+                return Vec::new();
+            };
+            borrow_origins_from_params(
+                &signature.params,
+                args,
+                Some(receiver),
+                *mutable,
+                return_lifetime.as_ref(),
+                program,
+                state,
+            )
+        }
+        Expr::Block(block) => borrow_origins_from_block(block, program, state),
+        Expr::If {
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            let mut origins = borrow_origins_from_block(then_branch, program, state);
+            if let Some(else_branch) = else_branch.as_deref() {
+                origins.extend(borrow_origins_from_expr(else_branch, program, state));
+            }
+            origins
+        }
+        Expr::Match { arms, .. } => arms
+            .iter()
+            .flat_map(|arm| borrow_origins_from_expr(&arm.body, program, state))
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn borrow_origins_from_block(
+    block: &Block,
+    program: &Program,
+    state: &OwnershipState,
+) -> Vec<BorrowOrigin> {
+    let mut local_state = state.clone();
+    local_state.push_scope();
+    let last_uses = block_last_uses(block);
+    for statement in &block.stmts {
+        local_state.current_statement = statement_position(statement);
+        let Stmt::Let(statement) = statement else {
+            continue;
+        };
+        let binding_ty = statement.ty.clone().or_else(|| {
+            statement
+                .value
+                .as_ref()
+                .and_then(|expr| expr_ty(expr, program, &local_state))
+        });
+        let copy = binding_ty.as_ref().map_or_else(
+            || {
+                statement
+                    .value
+                    .as_ref()
+                    .is_some_and(|expr| expr_is_copy(expr, program, &local_state))
+            },
+            ty_is_copy,
+        );
+        let borrows = borrow_bindings(
+            statement.value.as_ref(),
+            &statement.pattern,
+            &last_uses,
+            program,
+            &local_state,
+        );
+        define_pattern_for_origin(
+            &statement.pattern,
+            copy,
+            binding_ty,
+            borrows,
+            program,
+            &mut local_state,
+        );
+    }
+    let mut origins = block
+        .tail
+        .as_deref()
+        .map(|tail| borrow_origins_from_expr(tail, program, &local_state))
+        .unwrap_or_default();
+    for origin in &mut origins {
+        if origin.owner != TEMPORARY_BORROW_OWNER
+            && state.get(&origin.owner).is_none()
+            && local_state.get(&origin.owner).is_some()
+        {
+            origin.local_escape = true;
+        }
+    }
+    origins
+}
+
+fn define_pattern_for_origin(
+    pattern: &Pat,
+    copy: bool,
+    ty: Option<Ty>,
+    borrows: Vec<BorrowBinding>,
+    program: &Program,
+    state: &mut OwnershipState,
+) {
+    if let Pat::Ident(name, _) = pattern {
+        state.define_with_borrows(name.clone(), copy, ty, borrows);
+    } else {
+        bind_pattern(pattern, copy, ty, program, state);
+    }
+}
+
+fn borrow_origins_from_params(
+    params: &[Ty],
+    args: &[Expr],
+    receiver: Option<&Expr>,
+    returned_mutable: bool,
+    return_lifetime: Option<&String>,
+    program: &Program,
+    state: &OwnershipState,
+) -> Vec<BorrowOrigin> {
+    let mut origins = Vec::new();
+    let mut contributing_params = 0;
+    for (index, param_ty) in params.iter().enumerate() {
+        let Ty::Borrow {
+            lifetime: param_lifetime,
+            ..
+        } = param_ty
+        else {
+            continue;
+        };
+        if let Some(return_lifetime) = return_lifetime
+            && param_lifetime.as_ref() != Some(return_lifetime)
+        {
+            continue;
+        }
+        let param_origins = if index == 0 && receiver.is_some() {
+            receiver
+                .map(|receiver| {
+                    borrow_owners_or_temporary(receiver, program, state)
+                        .into_iter()
+                        .map(|owner| BorrowOrigin {
+                            owner,
+                            mutable: returned_mutable,
+                            local_escape: false,
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        } else {
+            let arg_index = if receiver.is_some() { index - 1 } else { index };
+            args.get(arg_index)
+                .map(|arg| {
+                    borrow_origins_from_expr(arg, program, state)
+                        .into_iter()
+                        .map(|origin| BorrowOrigin {
+                            owner: origin.owner,
+                            mutable: returned_mutable,
+                            local_escape: origin.local_escape,
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        };
+        if !param_origins.is_empty() {
+            contributing_params += 1;
+            origins.extend(param_origins);
+        }
+    }
+    if return_lifetime.is_some() || contributing_params == 1 {
+        origins
+    } else {
+        Vec::new()
+    }
+}
+
+fn temporary_borrow_bindings(
+    mutable: bool,
+    expr: &Expr,
+    current_statement: usize,
+    state: &OwnershipState,
+) -> Vec<BorrowBinding> {
+    borrow_owners(expr, state)
+        .into_iter()
+        .map(|owner| BorrowBinding {
+            owner,
+            mutable,
+            last_use: current_statement,
+            local_escape: false,
+        })
+        .collect()
+}
+
+fn borrow_owners_or_temporary(
+    expr: &Expr,
+    program: &Program,
+    state: &OwnershipState,
+) -> Vec<String> {
+    let owners = borrow_owners(expr, state);
+    if !owners.is_empty() {
+        owners
+    } else if expr_ty(expr, program, state).is_some() {
+        vec![TEMPORARY_BORROW_OWNER.to_string()]
+    } else {
+        Vec::new()
+    }
+}
+
+fn borrow_owners(expr: &Expr, state: &OwnershipState) -> Vec<String> {
+    let Some(root) = root_place_name(expr) else {
+        return Vec::new();
+    };
+    let Some(binding) = state.get(root) else {
+        return vec![root.to_string()];
+    };
+    if binding.borrows.is_empty() {
+        vec![root.to_string()]
+    } else {
+        binding
+            .borrows
+            .iter()
+            .map(|borrow| borrow.owner.clone())
+            .collect()
+    }
+}
+
+fn check_borrow_conflict(
+    name: &str,
+    span: Span,
+    new_borrow: &BorrowBinding,
+    state: &OwnershipState,
+    reporter: &mut Reporter,
+) {
+    for existing in active_borrows_of(&new_borrow.owner, state) {
+        if new_borrow.mutable || existing.mutable {
+            reporter.push(Diagnostic::error(
+                "borrow-conflict",
+                span,
+                format!(
+                    "cannot borrow `{}` as {} because it is already borrowed by `{}`",
+                    new_borrow.owner,
+                    if new_borrow.mutable {
+                        "mutable"
+                    } else {
+                        "shared"
+                    },
+                    name
+                ),
+            ));
+            return;
+        }
+    }
+}
+
+fn check_move_while_borrowed(
+    name: &str,
+    span: Span,
+    state: &OwnershipState,
+    reporter: &mut Reporter,
+) {
+    if active_borrows_of(name, state).next().is_some() {
+        reporter.push(Diagnostic::error(
+            "borrow-conflict",
+            span,
+            format!("cannot move `{name}` while it is borrowed"),
+        ));
+    }
+}
+
+fn check_assignment_while_borrowed(
+    name: &str,
+    span: Span,
+    state: &OwnershipState,
+    reporter: &mut Reporter,
+) {
+    if active_borrows_of(name, state).next().is_some() {
+        reporter.push(Diagnostic::error(
+            "borrow-conflict",
+            span,
+            format!("cannot assign to `{name}` while it is borrowed"),
+        ));
+    }
+}
+
+fn root_place_name(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Ident(name, _) => Some(name),
+        Expr::Field { base, .. } => root_place_name(base),
+        _ => None,
+    }
+}
+
+fn active_borrows_of<'a>(
+    owner: &'a str,
+    state: &'a OwnershipState,
+) -> impl Iterator<Item = &'a BorrowBinding> {
+    state
+        .scopes
+        .iter()
+        .flat_map(|scope| scope.values())
+        .flat_map(|binding| binding.borrows.iter())
+        .chain(state.temporary_borrows.iter())
+        .filter(move |borrow| borrow.owner == owner && borrow.last_use >= state.current_statement)
+}
+
+fn block_last_uses(block: &Block) -> HashMap<String, usize> {
+    let mut uses = HashMap::new();
+    for statement in &block.stmts {
+        collect_statement_uses(statement, &mut uses);
+    }
+    if let Some(tail) = &block.tail {
+        collect_expr_uses(tail, &mut uses);
+    }
+    uses
+}
+
+fn statement_position(statement: &Stmt) -> usize {
+    match statement {
+        Stmt::Let(statement) => statement.span.start(),
+        Stmt::Expr(expr) => expr_span(expr).start(),
+        Stmt::Item(_) => 0,
+    }
+}
+
+fn collect_statement_uses(statement: &Stmt, uses: &mut HashMap<String, usize>) {
+    match statement {
+        Stmt::Let(statement) => {
+            if let Some(value) = &statement.value {
+                collect_expr_uses(value, uses);
+            }
+        }
+        Stmt::Expr(expr) => collect_expr_uses(expr, uses),
+        Stmt::Item(_) => {}
+    }
+}
+
+fn collect_expr_uses(expr: &Expr, uses: &mut HashMap<String, usize>) {
+    match expr {
+        Expr::Ident(name, span) => {
+            uses.insert(name.clone(), span.start());
+        }
+        Expr::Block(block) => {
+            for statement in &block.stmts {
+                collect_statement_uses(statement, uses);
+            }
+            if let Some(tail) = &block.tail {
+                collect_expr_uses(tail, uses);
+            }
+        }
+        Expr::Loop { body, .. } => {
+            for statement in &body.stmts {
+                collect_statement_uses(statement, uses);
+            }
+            if let Some(tail) = &body.tail {
+                collect_expr_uses(tail, uses);
+            }
+        }
+        Expr::If {
+            condition,
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            collect_expr_uses(condition, uses);
+            for statement in &then_branch.stmts {
+                collect_statement_uses(statement, uses);
+            }
+            if let Some(tail) = &then_branch.tail {
+                collect_expr_uses(tail, uses);
+            }
+            if let Some(else_branch) = else_branch {
+                collect_expr_uses(else_branch, uses);
+            }
+        }
+        Expr::While {
+            condition, body, ..
+        } => {
+            collect_expr_uses(condition, uses);
+            for statement in &body.stmts {
+                collect_statement_uses(statement, uses);
+            }
+            if let Some(tail) = &body.tail {
+                collect_expr_uses(tail, uses);
+            }
+        }
+        Expr::Match {
+            scrutinee, arms, ..
+        } => {
+            collect_expr_uses(scrutinee, uses);
+            for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    collect_expr_uses(guard, uses);
+                }
+                collect_expr_uses(&arm.body, uses);
+            }
+        }
+        Expr::Call { callee, args, .. } => {
+            collect_expr_uses(callee, uses);
+            for arg in args {
+                collect_expr_uses(arg, uses);
+            }
+        }
+        Expr::MethodCall { receiver, args, .. } => {
+            collect_expr_uses(receiver, uses);
+            for arg in args {
+                collect_expr_uses(arg, uses);
+            }
+        }
+        Expr::AssociatedCall { args, .. } => {
+            for arg in args {
+                collect_expr_uses(arg, uses);
+            }
+        }
+        Expr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                collect_expr_uses(value, uses);
+            }
+        }
+        Expr::Binary { left, right, .. } => {
+            collect_expr_uses(left, uses);
+            collect_expr_uses(right, uses);
+        }
+        Expr::Unary { expr, .. }
+        | Expr::Return(Some(expr), _)
+        | Expr::Break(Some(expr), _)
+        | Expr::Spawn { expr, .. }
+        | Expr::Comptime { expr, .. }
+        | Expr::Yield(expr, _)
+        | Expr::Borrow { expr, .. } => collect_expr_uses(expr, uses),
+        Expr::Assign { target, value, .. } => {
+            collect_expr_uses(target, uses);
+            collect_expr_uses(value, uses);
+        }
+        Expr::Field { base, .. } => collect_expr_uses(base, uses),
+        Expr::Index {
+            base,
+            index: subscript,
+            ..
+        } => {
+            collect_expr_uses(base, uses);
+            collect_expr_uses(subscript, uses);
+        }
+        Expr::Select { arms, default, .. } => {
+            for arm in arms {
+                collect_expr_uses(&arm.operation, uses);
+                for statement in &arm.body.stmts {
+                    collect_statement_uses(statement, uses);
+                }
+            }
+            if let Some(default) = default {
+                for statement in &default.stmts {
+                    collect_statement_uses(statement, uses);
+                }
+            }
+        }
+        Expr::Literal(_, _) | Expr::Return(None, _) | Expr::Break(None, _) | Expr::Continue(_) => {}
     }
 }
 
@@ -1285,7 +2592,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn primitive_copy_classification_matches_phase_four_rules() {
+    fn primitive_copy_classification_matches_ownership_rules() {
         for name in ["int", "float", "bool", "char", "byte"] {
             assert!(ty_is_copy(&path_ty(name)), "{name} should be Copy");
         }

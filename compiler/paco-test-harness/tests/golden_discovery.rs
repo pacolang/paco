@@ -3,15 +3,15 @@ use std::fs;
 use paco_test_harness::{GoldenStatus, TestKind, discover_golden_tests};
 
 #[test]
-fn discovers_and_skips_tests_above_current_phase() {
+fn discovers_and_skips_tests_above_current_feature_level() {
     let temp = tempfile::tempdir().unwrap();
-    let test_dir = temp.path().join("phase_01").join("future");
+    let test_dir = temp.path().join("core").join("future");
     fs::create_dir_all(&test_dir).unwrap();
     fs::write(test_dir.join("input.paco"), "fn main() {}\n").unwrap();
     fs::write(test_dir.join("expected.stdout"), "").unwrap();
     fs::write(
         test_dir.join("flags.toml"),
-        "kind = \"run\"\nphase_min = 2\n",
+        "kind = \"run\"\nfeature_min = 2\n",
     )
     .unwrap();
 
@@ -19,7 +19,7 @@ fn discovers_and_skips_tests_above_current_phase() {
 
     assert_eq!(tests.len(), 1);
     assert_eq!(tests[0].kind, TestKind::Run);
-    assert_eq!(tests[0].status, GoldenStatus::Skipped { phase_min: 2 });
+    assert_eq!(tests[0].status, GoldenStatus::Skipped { feature_min: 2 });
 }
 
 #[test]

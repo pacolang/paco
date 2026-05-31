@@ -201,7 +201,7 @@ fn main() {
 fn write_temp_paco(name: &str, source: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     path.push(format!(
-        "paco_phase_one_{}_{}_{}.paco",
+        "paco_core_programs_{}_{}_{}.paco",
         name,
         std::process::id(),
         monotonic_suffix()

@@ -19,7 +19,7 @@ pub enum TestKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GoldenStatus {
     Active,
-    Skipped { phase_min: u32 },
+    Skipped { feature_min: u32 },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -28,13 +28,13 @@ pub struct GoldenTest {
     pub input: PathBuf,
     pub expected: PathBuf,
     pub kind: TestKind,
-    pub phase_min: u32,
+    pub feature_min: u32,
     pub status: GoldenStatus,
 }
 
 pub fn discover_golden_tests(
     root: impl AsRef<Path>,
-    current_phase: u32,
+    current_feature_level: u32,
 ) -> HarnessResult<Vec<GoldenTest>> {
     let root = root.as_ref();
     if !root.exists() {
@@ -46,14 +46,14 @@ pub fn discover_golden_tests(
         if !entry.file_type().is_file() || entry.file_name() != "flags.toml" {
             continue;
         }
-        tests.push(read_golden_test(entry.path(), current_phase)?);
+        tests.push(read_golden_test(entry.path(), current_feature_level)?);
     }
 
     tests.sort_by(|left, right| left.path.cmp(&right.path));
     Ok(tests)
 }
 
-fn read_golden_test(flags_path: &Path, current_phase: u32) -> HarnessResult<GoldenTest> {
+fn read_golden_test(flags_path: &Path, current_feature_level: u32) -> HarnessResult<GoldenTest> {
     let dir = flags_path
         .parent()
         .ok_or_else(|| format!("flags file has no parent: {}", flags_path.display()))?;
@@ -65,8 +65,8 @@ fn read_golden_test(flags_path: &Path, current_phase: u32) -> HarnessResult<Gold
         Some(other) => return Err(format!("unknown golden test kind `{other}`").into()),
         None => return Err("golden test flags.toml is missing `kind`".into()),
     };
-    let phase_min = flags
-        .get("phase_min")
+    let feature_min = flags
+        .get("feature_min")
         .and_then(toml::Value::as_integer)
         .unwrap_or(0)
         .try_into()?;
@@ -75,8 +75,8 @@ fn read_golden_test(flags_path: &Path, current_phase: u32) -> HarnessResult<Gold
         TestKind::Fail => dir.join("expected.stderr"),
         TestKind::Run => dir.join("expected.stdout"),
     };
-    let status = if phase_min > current_phase {
-        GoldenStatus::Skipped { phase_min }
+    let status = if feature_min > current_feature_level {
+        GoldenStatus::Skipped { feature_min }
     } else {
         GoldenStatus::Active
     };
@@ -86,7 +86,7 @@ fn read_golden_test(flags_path: &Path, current_phase: u32) -> HarnessResult<Gold
         input: dir.join("input.paco"),
         expected,
         kind,
-        phase_min,
+        feature_min,
         status,
     })
 }

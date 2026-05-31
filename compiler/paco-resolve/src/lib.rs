@@ -1,4 +1,4 @@
-//! Minimal name resolution for the Phase 1 executable subset.
+//! Minimal name resolution for the core executable subset.
 
 use std::collections::HashSet;
 

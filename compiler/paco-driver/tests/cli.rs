@@ -3,7 +3,7 @@ use clap::Parser;
 use paco_driver::{Cli, Commands};
 
 #[test]
-fn cli_exposes_phase_zero_subcommands() {
+fn cli_exposes_core_subcommands() {
     let command = Cli::command();
     let names: Vec<_> = command
         .get_subcommands()

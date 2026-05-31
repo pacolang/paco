@@ -1,3 +1,3 @@
-//! Paco IR placeholder for Phase 0.
+//! Paco IR placeholder.
 
 pub const CRATE_NAME: &str = "paco-mir";
