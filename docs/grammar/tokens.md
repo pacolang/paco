@@ -1,45 +1,107 @@
 # Paco lexical grammar (tokens)
 
-> Stable enough to implement the lexer. The syntactic grammar (EBNF) waits on the
-> resolution of the open syntax frictions (see spec).
+> Status: **stable** — all design decisions settled. This file is the normative
+> lexical reference. The syntactic grammar lives in `docs/grammar/grammar.ebnf`.
 
 ## Keywords
-let, mut, fn, struct, enum, trait, methods, match, if, else, for, while, loop,
-return, spawn, iter, yield, comptime, use, dyn, true, false, self
+
+```
+as        break     comptime  continue  default   dyn
+else      enum      false     fn        for       if
+in        iter      let       loop      match     methods
+mut       return    self      select    spawn     struct
+trait     true      type      use       where     while
+yield
+```
 
 ## Primitive types (reserved identifiers)
-i8 i16 i32 i64  u8 u16 u32 u64  int uint  f32 f64  bool  char  string  byte
+
+```
+i8   i16  i32  i64
+u8   u16  u32  u64
+int  uint
+f32  f64
+bool  char  string  byte
+```
 
 ## Literals
-- integer: `42`, `1_000`, `0xFF`, `0b1010`
-- float: `3.14`, `1.0e9`
-- string: `"UTF-8 text"`, with escapes `\n \t \r \" \\`
-- char: `'a'`, `'\n'`
-- bool: `true`, `false`
+
+| Kind | Examples |
+|------|---------|
+| Integer (decimal) | `42`, `1_000`, `1_000_000` |
+| Integer (hex) | `0xFF`, `0xDEAD_BEEF` |
+| Integer (binary) | `0b1010`, `0b1111_0000` |
+| Float | `3.14`, `1.0e9`, `2.5e-3` |
+| String | `"UTF-8 text"` — escapes: `\n \t \r \" \\` |
+| Char | `'a'`, `'\n'`, `'\\'` |
+| Bool | `true`, `false` |
 
 ## Identifiers
-[A-Za-z_][A-Za-z0-9_]*  (UTF-8 in identifiers: to be decided)
+
+Pattern: `[A-Za-z_][A-Za-z0-9_]*`
+
+An identifier that matches a keyword is a keyword, not an identifier. Primitive
+type names (`int`, `string`, etc.) are reserved and may not be used as
+identifiers.
+
+UTF-8 identifiers (non-ASCII letters): to be decided in a future revision.
 
 ## Lifetimes
-`'` followed by an identifier: `'a`, `'static`
+
+A `'` followed immediately by an identifier: `'a`, `'static`.
 
 ## Operators
-+  -  *  /  %       arithmetic
-== != < <= > >=     comparison
-&& || !             logical
-& | ^ << >> ~       bitwise
-=  += -= *= /= %=   assignment
-&  &mut             borrow
-?                   error/absence propagation
-.  ..  ..=          access / range
-->  =>              return arrow / match arm
-::                  module/associated path
+
+```
++   -   *   /   %           arithmetic
+==  !=  <   <=  >   >=      comparison
+&&  ||  !                   logical
+&   |   ^   <<  >>  ~       bitwise
+=   +=  -=  *=  /=  %=      assignment
+&   &mut                    borrow (& is shared, &mut is mutable)
+?                           error / absence propagation
+.   ..   ..=                field access / range
+->  =>                      return type arrow / match arm arrow
+::                          module path / associated item separator
+as                          type cast (also a keyword)
+@                           attribute prefix / pattern binding (@test, n @ pat)
+```
+
+### Compound tokens
+
+`&mut` is lexed as a single compound token distinct from `&` followed by `mut`.
+The lexer produces `&mut` whenever `&` is immediately followed by `mut` with no
+intervening whitespace or comment. This avoids ambiguity in borrow expressions
+and receiver declarations.
 
 ## Delimiters
-( )  { }  [ ]  ,  ;  :
+
+```
+(  )    parentheses
+{  }    braces
+[  ]    brackets
+,       comma
+;       semicolon (optional terminator)
+:       colon (type annotation)
+```
 
 ## Comments
-`// line`    `/* block */`
+
+```
+// Line comment — extends to end of line
+/* Block comment — may span multiple lines, does NOT nest */
+/// Doc comment — above a declaration; content is Markdown
+```
 
 ## Attributes
-`@` followed by an identifier: `@test`, `@bench`, `@derive(...)`, `@allow("...")`
+
+`@` followed by an identifier, optionally with a parenthesised argument list:
+
+```
+@test
+@bench
+@should_panic
+@derive(Display, Clone, Eq)
+@allow("lint-code")
+@repr(C)
+```

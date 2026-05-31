@@ -40,6 +40,12 @@ Three principles guide the design:
 | Strings | UTF-8 guaranteed. |
 | Methods | Defined inside the `struct`/`enum`; `methods T {}` to extend a type from elsewhere. No inheritance. |
 | Packages | Decentralized, URL + version-control tag (no central registry); manifest `paco.mod`. |
+| Collection construction | `Vec::new()`, `Map::new()`, etc. — associated functions only, no shorthand literal syntax. |
+| Error conversion | `?` calls `From::from(e)` automatically; `From<T>` lives in the prelude; implicit satisfaction. |
+| Struct mutability | Controlled by the binding (`let mut`); the whole struct is mutable or immutable — no per-field modifiers. |
+| Syntax macros | `comptime` is the sole metaprogramming mechanism; no syntax macros (deferred post-Phase 6). |
+| String slicing | No `s[n..m]` on strings. Use `s.get(0..n) -> Option<&string>` for safe slicing; `s.as_bytes()[0..n]` for raw bytes. |
+| Data analysis | Standard library (`src/math/`) built on `comptime` + traits. No language-core types. `DataFrame<Schema>`, `Matrix<T>` are library types. |
 | Name | Paco. |
 
 ---
@@ -123,6 +129,63 @@ let node = Rc::new(Node { value: 1 })
 let another_ref = node.clone()   // bumps the counter, doesn't copy the data
 ```
 
+### Collection construction
+
+All standard-library collection types are constructed through an *associated
+function* called `new`, following the same convention as `Rc::new`:
+
+```paco
+let v = Vec::new()
+v.push(1)
+v.push(2)
+
+let m = Map::new()
+m.insert("host", "localhost")
+
+// Idiomatic alternative — build from an iterator:
+let squares = (1..=5).map(|n| n * n).collect<Vec<int>>()
+```
+
+There is no shorthand literal syntax for constructing collections. This keeps the
+grammar uniform: every type, whether from the standard library or user-defined,
+follows the same `Type::new(...)` pattern. Heap allocation is always a visible
+function call.
+
+`new` is an *associated function* (no receiver) defined inside the type's block,
+consistent with the method-placement convention in ADR 0002.
+
+> See ADR 0006 for the full rationale.
+
+### Struct mutability
+
+Mutability is a property of the **binding**, not of the type or its fields.
+A struct is entirely mutable or entirely immutable depending on how it is bound:
+
+```paco
+let cfg = Config { host: "localhost", port: 8080 }
+cfg.port = 9090    // ERROR: `cfg` is an immutable binding
+
+let mut cfg2 = Config { host: "localhost", port: 8080 }
+cfg2.port = 9090   // OK
+cfg2.host = "prod" // OK — the whole struct is mutable
+```
+
+There are no per-field `mut` modifiers. One rule covers everything: bind with
+`let mut` to mutate. Method receivers follow the same logic — `self&mut` is the
+explicit request for mutable access; the compiler requires the caller to hold a
+mutable binding or borrow.
+
+For the pattern of "one field that changes while the rest stays constant," the
+idiomatic solution is explicit interior mutability (`Rc<T>`, `Arc<T>`), which
+makes the cost visible rather than hiding it in a field declaration. Since `Rc`
+and `Arc` enforce immutability of shared contents, developers wrap the target
+data inside standard library interior mutability containers:
+- `Cell<T>`: For simple, copyable types (no runtime check).
+- `RefCell<T>`: For general types under single-threaded `Rc` (monitored via compile-time/runtime borrow checking).
+- `Mutex<T>` / `RwLock<T>`: For multi-threaded `Arc` access, ensuring synchronization.
+
+> See ADR 0008 for the full rationale.
+
 ---
 
 ## 4. Explicit errors and absence (feature 7)
@@ -166,6 +229,41 @@ fn first_admin(us: &[User]) -> Option<&User> {
 
 Decision: **no implicit panics.** `panic` exists, but only for unrecoverable bugs
 (invariant violations), never for normal control flow.
+
+### Automatic error conversion (`From<T>`)
+
+When the `?` operator needs to convert an error from one type to another, Paco
+calls `From::from(e)` automatically. A `From<T>` trait lives in the prelude:
+
+```paco
+trait From<Src> {
+    fn from(e: Src) -> Self
+}
+```
+
+Implement it by defining a `from` associated function inside your error enum or
+struct. Implicit trait satisfaction applies — no `implements` clause is needed:
+
+```paco
+enum AppError {
+    Io(IoError),
+    Parse(ParseError),
+
+    fn from(e: IoError) -> Self    { AppError::Io(e) }
+    fn from(e: ParseError) -> Self { AppError::Parse(e) }
+}
+
+fn load() -> Result<Config, AppError> {
+    let text = read_file("config.toml")?   // IoError → AppError::Io automatically
+    let cfg  = parse(text)?                // ParseError → AppError::Parse automatically
+    Ok(cfg)
+}
+```
+
+No `.map_err(...)` needed. If no `From` implementation covers the required
+conversion, the compiler reports a type error at the `?` site.
+
+> See ADR 0007 for the full rationale.
 
 ---
 
@@ -246,6 +344,8 @@ Syntax notes:
 - Slices are `[]byte`, `[]int`.
 - Defining methods **inside** the struct is the canonical form; a separate
   `methods T { ... }` block is **only** for extending a type from another module.
+  If extending a generic type, generic parameters must be explicitly declared:
+  `methods<T> Vec<T> where T: Display { ... }`.
 
 Important decision: interfaces are **implicitly satisfied** but **statically
 checked**. You get decoupling without runtime duck-typing cost. For dynamic
@@ -298,6 +398,19 @@ struct User {
 
 `comptime` is what gives "data-analysis" power: code generation for parsing, ORM,
 serialization — all resolved at compile time. No runtime cost, no unpredictability.
+
+### No syntax macros
+
+There are no syntax macros (no `macro_rules!` or procedural macros that operate
+on token streams). `comptime` is the sole metaprogramming mechanism. This keeps
+a single, learnable model: all code generation is written in Paco itself, runs
+during compilation, and is type-checked like any other code.
+
+This decision is explicitly provisional and will be revisited after Phase 6
+(traits and dispatch), once there is practical evidence of what `comptime` cannot
+cover in Paco's target use cases.
+
+> See ADR 0009 for the full rationale.
 
 ---
 
@@ -369,11 +482,21 @@ select {
     v = rx2.recv() => handle(v),
     timeout(1s)    => print("took too long"),
 }
+
+// Non-blocking select using the `default` fallback
+select {
+    v = rx1.recv() => handle(v),
+    default        => print("no data available"),
+}
 ```
 
 Safety decision: the ownership system guarantees that data sent over a channel is
 **moved** (not accidentally shared), eliminating data races at compile time.
 Types shared across threads must be `Arc` + explicit synchronization.
+
+> [!NOTE]
+> **Compiler select mechanics:** While `rx.recv()` looks like a standard function call, the compiler recognizes it specially inside `select` arms. Instead of executing it immediately (which would block execution before `select` multiplexes), the compiler desugars `select` into calls to the runtime scheduling API (`paco_rt_select` registration), passing the channel references.
+> Non-blocking behavior is achieved via the `default` branch, which runs immediately if no registered channel has pending data.
 
 ### Lightweight synchronous generators (`iter`) — secondary tool
 
@@ -431,8 +554,12 @@ Specific decisions to make the language strong with numbers:
   notation on vectors and matrices with no runtime cost.
 - **Overflow checked in debug, defined in release**: bugs show up early,
   performance at the end.
-- **`comptime`** (§7) generates specialized computation kernels at compile time —
-  the basis for performant DataFrames/linear algebra in a library.
+- **`comptime`** (§7) generates specialized computation kernels at compile time.
+  This is the mechanism behind `DataFrame<Schema>` and `Matrix<T>` in the
+  standard library (`src/math/`) — types whose column layout and access patterns
+  are fully resolved at compile time, with no runtime type lookup. The language
+  core provides only the mechanisms (traits, `comptime`, `@repr`); the concrete
+  data-analysis types live in the standard library. See ADR 0011.
 
 ---
 
@@ -453,11 +580,28 @@ for b in s.bytes() { ... }       // iterate by byte
 Decisions:
 
 - `string` is immutable and UTF-8; `StringBuf` (or `[]byte`) for mutable building.
-- Byte indexing (`s[0..3]`) **validates character boundaries** and errors if it
-  cuts in the middle of a code point — no silent malformed string.
+- **No direct range indexing on strings.** Use `s.get(0..n) -> Option<&string>`
+  for UTF-8-safe slicing (returns `None` if the range cuts mid-codepoint), and
+  `s.as_bytes()[0..n]` for raw byte access. No implicit panic — boundary failures
+  are values, not crashes:
+
+```paco
+// Safe slicing — returns Option, never panics
+match s.get(0..3) {
+    Some(sub) => print(sub),    // "caf"
+    None      => handle_error(),
+}
+
+// Raw byte access — no UTF-8 concern, explicit intent
+let raw: []byte = s.as_bytes()
+let slice = raw[0..3]   // []byte, always valid
+```
+
 - `==` on strings compares by **value** (contents), not by pointer.
 - Separate types keep the cost visible: you always know whether you're dealing
   with bytes, code points, or graphemes (the latter via a library).
+
+> See ADR 0010 for the full rationale on string slicing.
 
 ---
 
@@ -620,19 +764,25 @@ See `docs/design/decisions/` for the full ADRs. Summary:
   debug (§9).
 - Packages: decentralized, URL + version-control tag, no central registry
   (§13, ADR 0005).
+- Collection construction: `Vec::new()`, `Map::new()`, etc. — associated
+  functions inside the type block, no literal shorthand (§3, ADR 0006).
+- Error conversion: `?` calls `From::from(e)` automatically; `From<T>` trait in
+  the prelude; implicit satisfaction (§4, ADR 0007).
+- Struct mutability: binding-level only (`let mut`); no per-field modifiers
+  (§3, ADR 0008).
+- Syntax macros: `comptime` is the sole metaprogramming mechanism; no syntax
+  macros at this stage (§7, ADR 0009).
+- String slicing: `s.get(0..n) -> Option<&string>` for safe slicing;
+  `s.as_bytes()[0..n]` for raw bytes; no `s[n..m]` on strings (§10, ADR 0010).
+- Data analysis: standard library (`src/math/`) built on `comptime` + traits;
+  no language-core types; `DataFrame<Schema>` and `Matrix<T>` are library types
+  (§9, ADR 0011).
 
 ---
 
-## 18. Open decisions (next conversations)
+## 18. Open decisions
 
-1. **Data analysis**: how far to take it? DataFrames/linear algebra in the
-   language core or in a standard library built on `comptime`?
-2. **Struct mutability**: per-field granular or only at the binding (`let mut`)?
-3. **String slicing**: does the character-boundary validation error at runtime, or
-   require an explicit API (`s.get(0..3) -> Option`)?
-4. **Syntactic macros**: beyond `comptime`, will there be syntax macros, or does
-   `comptime` cover everything?
-5. **Error conversion**: an automatic error-conversion mechanism (a `From`-style
-   trait used by `?`) to remove the repeated `.map_err(...)` seen in the examples.
-6. **Collection construction syntax**: clarify how nested collection types are
-   constructed (the `[][]Cell` / `[]f64::new()` friction from the CSV example).
+There are no open design decisions at this time. All foundational questions have
+been resolved and recorded as ADRs in `docs/design/decisions/`. The next step is
+formalizing the syntactic grammar (EBNF) and beginning compiler implementation
+(Phase 0).

@@ -24,13 +24,14 @@ doesn't compile or that contradicts the design.
   control flow.
 - **Memory**: ownership + move by default. Borrows `&` (shared/immutable) and
   `&mut` (mutable); aliasing rule: N `&` XOR one `&mut`. Lifetimes are inferred —
-  only annotate `'a` when the compiler asks. Escape hatch: `Rc<T>` (single
-  thread) / `Arc<T>` (multi-thread). Deterministic cleanup (RAII) at scope exit.
+  only annotate `'a` when the compiler asks. Escape hatch: `Rc<T>` / `Arc<T>`
+  using `Cell`, `RefCell`, `Mutex`, or `RwLock` for interior mutability.
+  Deterministic cleanup (RAII) at scope exit.
 - **Concurrency**: lightweight M:N tasks via `spawn f(args)`. No `async`/`await` —
   the runtime suspends on I/O automatically. `spawn` returns a handle;
   `h.join() -> Result` recovers the value or the task's isolated panic (a panic
   in a task does NOT bring down the process). Channels: `channel<T>(capacity: n)`,
-  `tx.send(x)?`, `rx.recv()`, `tx.close()`, and `select { ... }`.
+  `tx.send(x)?, rx.recv(), tx.close(), and `select { ... }` (with optional `default =>`).
 - **Synchronous generators**: `iter fn name() -> T { ... yield x ... }`. Pulled by
   the consumer (`for x in name()`), with no task cost. `yield` only appears here.
 - **Methods**: defined **inside** the `struct`/`enum` block. Receivers:

@@ -1,0 +1,474 @@
+# Paco Syntactic Grammar (EBNF)
+
+> Status: **complete** — all foundational design decisions settled (see
+> `docs/design/decisions/`). This grammar is the normative syntactic reference;
+> `docs/grammar/tokens.md` is the normative lexical reference.
+
+## EBNF Notation
+
+| Form | Meaning |
+|------|---------|
+| `Production = Expression ;` | Definition of a production rule |
+| `a \| b` | Alternation — either `a` or `b` |
+| `a b` | Concatenation — `a` followed by `b` |
+| `[ a ]` | Option — 0 or 1 occurrence of `a` |
+| `{ a }` | Repetition — 0 or more occurrences of `a` |
+| `( a )` | Grouping |
+| `"terminal"` | Literal terminal string |
+| `(* comment *)` | Informal comment |
+
+Terminals written in **CamelCase** (e.g., `Identifier`, `Literal`) are defined
+in `docs/grammar/tokens.md`. All other terminals are quoted strings.
+
+---
+
+## 1. Program and Top-Level Items
+
+A source file is a sequence of *attributed items*. An outer attribute applies to
+the item that immediately follows it.
+
+```ebnf
+Program = { AttributedItem } ;
+
+AttributedItem = { OuterAttribute } Item ;
+
+Item = FunctionDecl
+     | StructDecl
+     | EnumDecl
+     | TraitDecl
+     | MethodsBlock
+     | UseDecl ;
+
+(* @test  @derive(Display, Clone)  @allow("lint-code") *)
+OuterAttribute = "@" Identifier [ "(" [ AttributeArgList ] ")" ] ;
+
+AttributeArgList = AttributeArg { "," AttributeArg } [ "," ] ;
+
+AttributeArg = Literal | Path | Identifier | OuterAttribute ;
+
+(* use std::io  |  use "github.com/user/json" *)
+UseDecl = "use" ( Path | StringLiteral ) [ ";" ] ;
+```
+
+---
+
+## 2. Declarations and Signatures
+
+```ebnf
+(* Covers: fn, iter fn, comptime fn *)
+FunctionDecl = [ "comptime" | "iter" ] "fn" Identifier
+               [ GenericParams ] Signature [ BlockExpr ] ;
+
+Signature = "(" [ ParameterList ] ")" [ "->" Type ] ;
+
+ParameterList = Receiver [ "," ]
+              | Receiver "," Parameter { "," Parameter } [ "," ]
+              | Parameter { "," Parameter } [ "," ] ;
+
+(* self     → move (consumes the value)
+   self&    → shared borrow (read-only, the common case)
+   self&mut → mutable borrow *)
+Receiver = "self" [ "&" | "&mut" ] ;
+
+Parameter = Identifier ":" Type ;
+```
+
+### Struct and enum
+
+```ebnf
+StructDecl = "struct" Identifier [ GenericParams ] [ WhereClause ]
+             "{" { StructMember } "}" ;
+
+(* Methods defined inside the struct block (ADR 0002) *)
+StructMember = { OuterAttribute } ( StructField | FunctionDecl ) ;
+
+StructField = Identifier ":" Type [ "," ] ;
+
+EnumDecl = "enum" Identifier [ GenericParams ] [ WhereClause ]
+           "{" { EnumMember } "}" ;
+
+(* Methods may also be defined inside the enum block (ADR 0002) *)
+EnumMember = { OuterAttribute } ( EnumVariant | FunctionDecl ) ;
+
+EnumVariant = Identifier [ "(" [ VariantFieldList ] ")" ] [ "," ] ;
+
+VariantFieldList = VariantField { "," VariantField } [ "," ] ;
+
+(* Named: Circle(radius: f64)   Unnamed: Pair(f64, f64) *)
+VariantField = [ Identifier ":" ] Type ;
+```
+
+### Trait and extension block
+
+```ebnf
+TraitDecl = "trait" Identifier [ GenericParams ] [ WhereClause ]
+            "{" { TraitMember } "}" ;
+
+TraitMember = { OuterAttribute } TraitFunctionDecl ;
+
+(* Trait methods may omit the body (abstract) or include a default body *)
+TraitFunctionDecl = "fn" Identifier [ GenericParams ] Signature
+                    ( BlockExpr | ";" ) ;
+
+(* Extend a type defined in another module (ADR 0002).
+   Example:  methods String { fn trim(self&) -> &string { ... } } *)
+MethodsBlock = "methods" [ GenericParams ] Type [ WhereClause ]
+               "{" { { OuterAttribute } FunctionDecl } "}" ;
+```
+
+### Generics and bounds
+
+```ebnf
+GenericParams = "<" GenericParam { "," GenericParam } [ "," ] ">" ;
+
+(* Type parameter with optional trait bound:  T  |  T: Display + Clone *)
+GenericParam = Lifetime | Identifier [ ":" TraitBoundList ] ;
+
+WhereClause = "where" WhereBound { "," WhereBound } [ "," ] ;
+
+WhereBound = ( Lifetime | Type ) ":" TraitBoundList ;
+
+TraitBoundList = TraitBound { "+" TraitBound } ;
+
+TraitBound = [ "?" ] ( Path | GenericType ) ;
+```
+
+---
+
+## 3. Type System
+
+```ebnf
+Type = PrimitiveType
+     | BorrowType
+     | ArrayType
+     | SliceType
+     | TupleType
+     | DynType
+     | FnType
+     | GenericType
+     | Path ;          (* user-defined or imported type *)
+
+PrimitiveType = "i8"  | "i16" | "i32" | "i64"
+              | "u8"  | "u16" | "u32" | "u64"
+              | "int" | "uint"
+              | "f32" | "f64"
+              | "bool" | "char" | "string" | "byte" | "type" ;
+
+(* &T   &mut T   &'a T   &'a mut T *)
+BorrowType = "&" [ Lifetime [ "mut" ] ] Type | "&mut" Type ;
+
+(* [Type; Size] — e.g. [int; 64] *)
+ArrayType = "[" Type ";" IntegerLiteral "]" ;
+
+(* []byte   []int   []string *)
+SliceType = "[" "]" Type ;
+
+(* (int, string)   (f64, f64, f64) *)
+TupleType = "(" Type "," Type { "," Type } [ "," ] ")" ;
+
+(* dyn Sink   dyn Iterator<Item = int> — dynamic dispatch, visible vtable cost *)
+DynType = "dyn" ( Path | GenericType ) ;
+
+(* fn(int, string) -> bool — function type for higher-order parameters *)
+FnType = "fn" "(" [ TypeList ] ")" [ "->" Type ] ;
+
+(* Vec<T>   Result<T, E>   Map<string, int> *)
+GenericType = Path "<" TypeList ">" ;
+
+TypeList = TypeOrBinding { "," TypeOrBinding } [ "," ] ;
+
+TypeOrBinding = [ Identifier "=" ] Type ;
+
+(* Module-qualified paths:  std::io::Error   Option   Vec *)
+Path = Identifier { "::" Identifier } ;
+```
+
+---
+
+## 4. Statements
+
+Semicolons are optional terminators (not mandatory separators).
+
+```ebnf
+Statement = LetStmt
+          | ExprStmt
+          | ";" ;
+
+(* let x = 10       let mut y: int = 20
+   let (a, b) = pair    let Some(v) = opt *)
+LetStmt = "let" [ "mut" ] Pattern [ ":" Type ] [ "=" Expr ] [ ";" ] ;
+
+ExprStmt = Expr [ ";" ] ;
+```
+
+---
+
+## 5. Expressions and Control Flow
+
+Operator precedence is encoded in the grammar hierarchy, from lowest (top) to
+highest (bottom). Each level passes through to the next.
+
+```ebnf
+Expr = AssignmentExpr ;
+
+(* Right-associative: x = y = z *)
+AssignmentExpr = LogicalOrExpr
+               [ ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) Expr ] ;
+
+LogicalOrExpr  = LogicalAndExpr  { "||"  LogicalAndExpr  } ;
+LogicalAndExpr = BitwiseOrExpr   { "&&"  BitwiseOrExpr   } ;
+BitwiseOrExpr  = BitwiseXorExpr  { "|"   BitwiseXorExpr  } ;
+BitwiseXorExpr = BitwiseAndExpr  { "^"   BitwiseAndExpr  } ;
+BitwiseAndExpr = ComparisonExpr  { "&"   ComparisonExpr  } ;
+
+(* Non-associative: a == b == c is a parse error *)
+ComparisonExpr = ShiftExpr
+               [ ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) ShiftExpr ] ;
+
+ShiftExpr      = RangeExpr       { ( "<<" | ">>" ) RangeExpr      } ;
+
+(* Non-associative: 1..10..20 is a parse error *)
+RangeExpr      = AdditiveExpr    [ ( ".." | "..=" ) AdditiveExpr  ] ;
+
+AdditiveExpr       = MultiplicativeExpr { ( "+" | "-" ) MultiplicativeExpr } ;
+MultiplicativeExpr = CastExpr           { ( "*" | "/" | "%" ) CastExpr     } ;
+
+(* expr as Type — left-associative, higher precedence than arithmetic *)
+CastExpr = UnaryExpr { "as" Type } ;
+
+(* Prefix unary operators and borrow.
+   Note: & here is borrow, not bitwise-and (which is infix in BitwiseAndExpr). *)
+UnaryExpr = ( "-" | "!" | "~" | "&" [ "mut" ] | "&mut" | "*" ) UnaryExpr
+          | SpawnExpr
+          | PostfixExpr ;
+
+(* spawn expr    spawn { ... }    let h = spawn risky() *)
+SpawnExpr = "spawn" ( BlockExpr | UnaryExpr ) ;
+
+(* Postfix operators: method call, field access, index, call, propagation *)
+PostfixExpr = AtomExpr { PostfixOp } ;
+
+PostfixOp =
+    (* Generic method call: expr.collect<Vec<int>>()
+       Note: parser disambiguates "<" from less-than by lookahead. *)
+    "." Identifier "<" TypeList ">" "(" [ ArgList ] ")"
+    (* Plain method call: expr.push(x) *)
+  | "." Identifier "(" [ ArgList ] ")"
+    (* Field access: point.x *)
+  | "." Identifier
+    (* Index on slices and arrays. NOT valid on strings (ADR 0010). *)
+  | "[" Expr "]"
+    (* Free call: f(x, y) *)
+  | "(" [ ArgList ] ")"
+    (* Error/absence propagation: result?  option? *)
+  | "?" ;
+
+AtomExpr = Literal
+         | ClosureExpr
+         | StructInitExpr
+         | PathExpr
+         | TupleExpr
+         | SliceExpr
+         | BlockExpr
+         | ControlFlowExpr
+         | "(" Expr ")" ;
+
+(* Type-qualified path with optional generic turbofish:
+   Vec::new()    Option::Some(1)    path::to::fn::<T>() *)
+PathExpr = Path [ "::" "<" TypeList ">" ] ;
+
+(* Struct initializer: Config { host: "x", port: 8080 }
+   Note: not allowed as the expression of `if`/`while`/`for` to avoid
+   ambiguity with block expressions — resolved in the parser, not here. *)
+StructInitExpr = Path "{" [ StructInitFieldList ] "}" ;
+
+StructInitFieldList = StructInitField { "," StructInitField } [ "," ] ;
+
+(* field: expr  — or shorthand  field  (when variable name matches field name) *)
+StructInitField = Identifier [ ":" Expr ] ;
+
+(* (a, b, c)   ()  — also used for grouping when containing a single expression *)
+TupleExpr = "(" [ ExprList ] ")" ;
+
+(* [1, 2, 3]   []   [0; 64] — the last form fills 64 elements with 0 *)
+SliceExpr = "[" [ ExprList ] "]"
+          | "[" Expr ";" Expr "]" ;
+
+ExprList = Expr { "," Expr } [ "," ] ;
+
+ArgList = Arg { "," Arg } [ "," ] ;
+
+(* Named argument:  capacity: 8    — or positional *)
+Arg = [ Identifier ":" ] Expr ;
+
+(* Closures: |x| x + 1   |x: int, y: int| { x + y }   || { ... } *)
+ClosureExpr = "|" [ ClosureParamList ] "|" ( BlockExpr | Expr ) ;
+
+ClosureParamList = ClosureParam { "," ClosureParam } [ "," ] ;
+
+ClosureParam = Pattern [ ":" Type ] ;
+
+(* Block: { stmts... [tail_expr] }
+   The optional trailing expression is the block's value (no semicolon). *)
+BlockExpr = "{" { Statement } [ Expr ] "}" ;
+```
+
+### Control flow
+
+```ebnf
+ControlFlowExpr = IfExpr
+                | MatchExpr
+                | WhileExpr
+                | ForExpr
+                | LoopExpr
+                | SelectExpr
+                | YieldExpr
+                | ReturnExpr
+                | BreakExpr
+                | ContinueExpr
+                | ComptimeExpr ;
+
+(* if cond { }   if cond { } else { }   if let pat = expr { } *)
+IfExpr = "if" [ "let" Pattern "=" ] Expr BlockExpr
+         [ "else" ( BlockExpr | IfExpr ) ] ;
+
+(* Exhaustive: the compiler rejects non-exhaustive match arms *)
+MatchExpr = "match" Expr "{" { MatchArm } "}" ;
+
+MatchArm = Pattern [ "if" Expr ] "=>" Expr [ "," ] ;
+
+WhileExpr = "while" [ "let" Pattern "=" ] Expr BlockExpr ;
+
+ForExpr = "for" Pattern "in" Expr BlockExpr ;
+
+LoopExpr = "loop" BlockExpr ;
+
+(* select {
+       v = rx1.recv() => handle(v),
+       timeout(1s)    => log("timeout"),
+   } *)
+SelectExpr = "select" "{" { SelectArm } "}" ;
+
+(* Binding form: identifier = channel_expr => handler
+   Plain form:   timeout_expr => handler             *)
+SelectArm = [ Identifier "=" ] Expr "=>" Expr [ "," ]
+          | "default" "=>" Expr [ "," ] ;
+
+(* Only valid inside `iter fn` blocks — see ADR 0004 / spec §8 *)
+YieldExpr = "yield" Expr ;
+
+ReturnExpr = "return" [ Expr ] ;
+
+(* break with an optional value (for loop-as-expression) *)
+BreakExpr = "break" [ Expr ] ;
+
+ContinueExpr = "continue" ;
+
+(* comptime { ... }   or   comptime expr *)
+ComptimeExpr = "comptime" ( BlockExpr | Expr ) ;
+```
+
+---
+
+## 6. Patterns
+
+Patterns appear in `match` arms, `let` bindings, `if let`, `while let`, and
+closure/function parameters. They are matched top-to-bottom; the first
+alternative that fits the syntactic context is used. Semantic disambiguation
+(e.g., identifier-as-binding vs. unit enum variant) is done by the resolver.
+
+```ebnf
+Pattern = WildcardPattern
+        | LiteralPattern
+        | BindingPattern
+        | ReferencePattern
+        | TuplePattern
+        | SlicePattern
+        | RangePattern
+        | NamedPattern ;
+```
+
+### Individual pattern forms
+
+```ebnf
+(* _ — matches anything and discards the value *)
+WildcardPattern = "_" ;
+
+(* -42   3.14   "hello"   true   'x' *)
+LiteralPattern = [ "-" ] Literal ;
+
+(* [mut] name @ sub_pattern — bind the matched value to `name`.
+   Example:  n @ 1..=9 => ...   |   c @ Shape::Circle(_) => ...
+   Parser tries this before NamedPattern when `@` follows the identifier. *)
+BindingPattern = [ "mut" ] Identifier "@" Pattern ;
+
+(* &pat   &mut pat — match through a reference *)
+ReferencePattern = ( "&" [ "mut" ] | "&mut" ) Pattern ;
+
+(* (a, b)   (x, _, z) *)
+TuplePattern = "(" [ PatternList ] ")" ;
+
+(* [head, tail @ ..]   [a, b, c] *)
+SlicePattern = "[" [ PatternList ] "]" ;
+
+(* 1..=9   'a'..='z'   ..=100 *)
+RangePattern = [ LiteralPattern ] ( ".." | "..=" ) [ LiteralPattern ] ;
+
+(* Covers four overlapping forms resolved by the resolver:
+     - Bare identifier binding:     x          (no "::", no parens)
+     - Mutable binding:             mut x
+     - Unit variant:                Option::None
+     - Tuple variant:               Some(x)   Shape::Circle(r)
+     - Struct variant:              Point { x, y }
+   When the path contains "::", it is always a type path, not a local binding. *)
+NamedPattern = [ "mut" ] Path
+               [ "(" [ PatternList ] ")"
+               | "{" [ StructPatternFieldList ] [ ".." ] "}" ] ;
+
+PatternList = Pattern { "," Pattern } [ "," ] ;
+
+StructPatternFieldList = StructPatternField { "," StructPatternField } [ "," ] ;
+
+(* field: pat  — or shorthand  field  (binds field name as variable) *)
+StructPatternField = Identifier [ ":" Pattern ] ;
+```
+
+---
+
+## 7. Lexical Terminals
+
+The terminals below are defined in `docs/grammar/tokens.md`. This section
+summarizes them for cross-reference only.
+
+```ebnf
+Identifier = (* [A-Za-z_][A-Za-z0-9_]*  — not a keyword *) ;
+
+Lifetime   = (* "'" Identifier  — e.g. 'a  'static *) ;
+
+Literal    = IntegerLiteral
+           | FloatLiteral
+           | StringLiteral
+           | CharLiteral
+           | BoolLiteral ;
+
+IntegerLiteral = (* 42  1_000  0xFF  0b1010 *) ;
+FloatLiteral   = (* 3.14  1.0e9 *) ;
+StringLiteral  = (* "UTF-8 text" with \n \t \r \" \\ escapes *) ;
+CharLiteral    = (* 'a'  '\n' *) ;
+BoolLiteral    = "true" | "false" ;
+```
+
+---
+
+## 8. Known Ambiguities and Parser Notes
+
+The following ambiguities are real; they are resolved by the parser using
+lookahead, not by restructuring the grammar:
+
+| Ambiguity | Resolution |
+|-----------|------------|
+| `f < g > h` — comparison vs. generic call | If `f` names a known type/function with generic params, treat `<` as opening a type list; otherwise treat as less-than. |
+| `expr.method<T>(args)` — generic method vs. comparison | After `.identifier`, if `<` is followed by a type-list then `)`, treat as generic call. |
+| `Foo { ... }` — struct init vs. block | Struct initializers are disallowed as the direct expression of `if`/`while`/`for` conditions; a parenthesized form `(Foo { ... })` is used instead. |
+| `Identifier` in pattern — binding vs. unit variant | Resolved by the name resolver: if the path resolves to a value in the type namespace, it is a variant; otherwise it is a new binding. |
+| `{ }` — block expression vs. struct init | Struct init requires a preceding `Path`; a bare `{` always opens a block. |
