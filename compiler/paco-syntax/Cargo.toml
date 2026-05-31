@@ -1,0 +1,13 @@
+[package]
+name = "paco-syntax"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+paco-diag.workspace = true
+paco-span.workspace = true
+
+[lib]
+path = "src/lib.rs"

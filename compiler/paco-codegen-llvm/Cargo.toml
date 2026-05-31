@@ -1,0 +1,18 @@
+[package]
+name = "paco-codegen-llvm"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+paco-diag.workspace = true
+paco-mir.workspace = true
+paco-span.workspace = true
+
+[features]
+default = []
+llvm = []
+
+[lib]
+path = "src/lib.rs"

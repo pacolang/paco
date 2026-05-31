@@ -1,0 +1,30 @@
+[package]
+name = "paco-driver"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+clap.workspace = true
+paco-borrow.workspace = true
+paco-codegen-cranelift.workspace = true
+paco-codegen-llvm.workspace = true
+paco-diag.workspace = true
+paco-eval.workspace = true
+paco-hir.workspace = true
+paco-link.workspace = true
+paco-match.workspace = true
+paco-mir.workspace = true
+paco-resolve.workspace = true
+paco-span.workspace = true
+paco-syntax.workspace = true
+paco-test-harness.workspace = true
+paco-types.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "paco"
+path = "src/main.rs"

@@ -4,3 +4,12 @@
 *.o
 *.a
 .tmp
+
+compiler/target/
+runtime/target/
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

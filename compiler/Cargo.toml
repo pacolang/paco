@@ -1,0 +1,47 @@
+[workspace]
+resolver = "3"
+members = [
+    "paco-span",
+    "paco-diag",
+    "paco-syntax",
+    "paco-hir",
+    "paco-resolve",
+    "paco-types",
+    "paco-match",
+    "paco-borrow",
+    "paco-mir",
+    "paco-eval",
+    "paco-codegen-cranelift",
+    "paco-codegen-llvm",
+    "paco-link",
+    "paco-driver",
+    "paco-test-harness",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+repository = "https://github.com/pacolang/paco"
+license = "UNLICENSED"
+
+[workspace.dependencies]
+ariadne = "0.5"
+clap = { version = "4.5", features = ["derive"] }
+tempfile = "3.10"
+toml = "0.8"
+walkdir = "2.5"
+
+paco-span = { path = "paco-span" }
+paco-diag = { path = "paco-diag" }
+paco-syntax = { path = "paco-syntax" }
+paco-hir = { path = "paco-hir" }
+paco-resolve = { path = "paco-resolve" }
+paco-types = { path = "paco-types" }
+paco-match = { path = "paco-match" }
+paco-borrow = { path = "paco-borrow" }
+paco-mir = { path = "paco-mir" }
+paco-eval = { path = "paco-eval" }
+paco-codegen-cranelift = { path = "paco-codegen-cranelift" }
+paco-codegen-llvm = { path = "paco-codegen-llvm" }
+paco-link = { path = "paco-link" }
+paco-test-harness = { path = "paco-test-harness" }

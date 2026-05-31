@@ -1,0 +1,13 @@
+[package]
+name = "paco-diag"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+ariadne.workspace = true
+paco-span.workspace = true
+
+[lib]
+path = "src/lib.rs"
