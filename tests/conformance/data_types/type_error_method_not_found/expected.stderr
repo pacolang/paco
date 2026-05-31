@@ -1,0 +1,1 @@
+error[PACO-E0314] input.paco:8:5: method `translate` not found for `Point`

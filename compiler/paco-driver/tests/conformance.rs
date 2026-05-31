@@ -14,7 +14,7 @@ fn conformance_tests() {
         .join("tests")
         .join("conformance");
 
-    let tests = discover_golden_tests(&conformance_dir, 1)
+    let tests = discover_golden_tests(&conformance_dir, 2)
         .expect("failed to discover conformance tests");
 
     for test in tests {
