@@ -13,9 +13,12 @@ pub enum TokenKind {
     Use,
     Let,
     Mut,
+    Match,
     If,
     Else,
     While,
+    For,
+    In,
     Loop,
     Break,
     Continue,
@@ -46,8 +49,14 @@ pub enum TokenKind {
     ColonColon,
     Comma,
     Dot,
+    DotDot,
+    DotDotEqual,
     Semicolon,
+    FatArrow,
+    At,
     Ampersand,
+    Pipe,
+    Underscore,
     LeftParen,
     RightParen,
     LeftBrace,
@@ -117,7 +126,17 @@ impl Lexer<'_, '_> {
             '{' => self.push(TokenKind::LeftBrace, start),
             '}' => self.push(TokenKind::RightBrace, start),
             ',' => self.push(TokenKind::Comma, start),
-            '.' => self.push(TokenKind::Dot, start),
+            '.' => {
+                if self.match_char('.') {
+                    if self.match_char('=') {
+                        self.push(TokenKind::DotDotEqual, start);
+                    } else {
+                        self.push(TokenKind::DotDot, start);
+                    }
+                } else {
+                    self.push(TokenKind::Dot, start);
+                }
+            }
             ':' if self.match_char(':') => self.push(TokenKind::ColonColon, start),
             ':' => self.push(TokenKind::Colon, start),
             ';' => self.push(TokenKind::Semicolon, start),
@@ -129,6 +148,7 @@ impl Lexer<'_, '_> {
             '!' if self.match_char('=') => self.push(TokenKind::BangEqual, start),
             '!' => self.push(TokenKind::Bang, start),
             '=' if self.match_char('=') => self.push(TokenKind::EqualEqual, start),
+            '=' if self.match_char('>') => self.push(TokenKind::FatArrow, start),
             '=' => self.push(TokenKind::Equal, start),
             '<' if self.match_char('=') => self.push(TokenKind::LessEqual, start),
             '<' => self.push(TokenKind::Less, start),
@@ -137,6 +157,8 @@ impl Lexer<'_, '_> {
             '&' if self.match_char('&') => self.push(TokenKind::AndAnd, start),
             '&' => self.push(TokenKind::Ampersand, start),
             '|' if self.match_char('|') => self.push(TokenKind::OrOr, start),
+            '|' => self.push(TokenKind::Pipe, start),
+            '@' => self.push(TokenKind::At, start),
             '/' if self.match_char('/') => self.skip_line_comment(),
             '/' if self.match_char('*') => self.skip_block_comment(start),
             '/' => self.push(TokenKind::Slash, start),
@@ -228,15 +250,19 @@ impl Lexer<'_, '_> {
             "use" => TokenKind::Use,
             "let" => TokenKind::Let,
             "mut" => TokenKind::Mut,
+            "match" => TokenKind::Match,
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
             "while" => TokenKind::While,
+            "for" => TokenKind::For,
+            "in" => TokenKind::In,
             "loop" => TokenKind::Loop,
             "break" => TokenKind::Break,
             "continue" => TokenKind::Continue,
             "return" => TokenKind::Return,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
+            "_" => TokenKind::Underscore,
             _ => TokenKind::Identifier,
         };
         self.push(kind, start);

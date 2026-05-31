@@ -6,7 +6,8 @@ use paco_span::Span;
 use crate::{
     ast::{
         BinaryOp, Block, EnumDecl, EnumVariant, Expr, FieldDecl, FnDecl, Item, LetStmt, Literal,
-        MethodsBlock, Module, Param, Pat, Stmt, StructDecl, Ty, UnaryOp, UseDecl, VariantFields,
+        MatchArm, MethodsBlock, Module, Param, Pat, Stmt, StructDecl, Ty, UnaryOp, UseDecl,
+        VariantFields,
     },
     lex::{Token, TokenKind},
 };
@@ -603,6 +604,9 @@ impl Parser<'_, '_> {
         if self.matches(TokenKind::False) {
             return Ok(Expr::Literal(Literal::Bool(false), self.previous().span));
         }
+        if self.matches(TokenKind::Match) {
+            return self.match_expr();
+        }
         if self.matches(TokenKind::Identifier) {
             let token = self.previous().clone();
             let ty = self.expr_type_path(&token)?;
@@ -641,6 +645,9 @@ impl Parser<'_, '_> {
         }
         if self.matches(TokenKind::While) {
             return self.while_expr();
+        }
+        if self.matches(TokenKind::For) {
+            return self.for_expr();
         }
         if self.matches(TokenKind::Loop) {
             let start = self.previous().span;
@@ -681,6 +688,177 @@ impl Parser<'_, '_> {
         }
 
         self.error_here("PACO-E0111", "expected expression");
+        Err(ParseError)
+    }
+
+    fn match_expr(&mut self) -> ParseResult<Expr> {
+        let start = self.previous().span;
+        let scrutinee = self.expr_without_struct_literals()?;
+        self.consume(TokenKind::LeftBrace, "expected `{` before match arms")?;
+        let mut arms = Vec::new();
+        while !self.check(TokenKind::RightBrace) && !self.check(TokenKind::Eof) {
+            arms.push(self.match_arm()?);
+            self.matches(TokenKind::Comma);
+        }
+        let right = self.consume(TokenKind::RightBrace, "expected `}` after match arms")?;
+        Ok(Expr::Match {
+            scrutinee: Box::new(scrutinee),
+            arms,
+            span: Span::new(start.file_id(), start.start(), right.span.end()),
+        })
+    }
+
+    fn match_arm(&mut self) -> ParseResult<MatchArm> {
+        let start = self.peek().span.start();
+        let pattern = self.pattern()?;
+        let guard = if self.matches(TokenKind::If) {
+            Some(self.expr_without_struct_literals()?)
+        } else {
+            None
+        };
+        self.consume(TokenKind::FatArrow, "expected `=>` after match arm pattern")?;
+        let body = self.expr()?;
+        let end = expr_span(&body).end();
+        Ok(MatchArm {
+            pattern,
+            guard,
+            body,
+            span: Span::new(self.previous().span.file_id(), start, end),
+        })
+    }
+
+    fn pattern(&mut self) -> ParseResult<Pat> {
+        let mut patterns = vec![self.binding_pattern()?];
+        while self.matches(TokenKind::Pipe) {
+            patterns.push(self.binding_pattern()?);
+        }
+        if patterns.len() == 1 {
+            Ok(patterns.remove(0))
+        } else {
+            let start = pat_span(&patterns[0]).start();
+            let end = pat_span(patterns.last().unwrap()).end();
+            Ok(Pat::Or(
+                patterns,
+                Span::new(self.previous().span.file_id(), start, end),
+            ))
+        }
+    }
+
+    fn binding_pattern(&mut self) -> ParseResult<Pat> {
+        if self.check(TokenKind::Identifier)
+            && self
+                .tokens
+                .get(self.current + 1)
+                .is_some_and(|token| token.kind == TokenKind::At)
+        {
+            let token = self.advance().clone();
+            self.consume(TokenKind::At, "expected `@` after binding name")?;
+            let pattern = self.binding_pattern()?;
+            let span = Span::new(
+                token.span.file_id(),
+                token.span.start(),
+                pat_span(&pattern).end(),
+            );
+            return Ok(Pat::Binding {
+                name: token.lexeme,
+                pattern: Box::new(pattern),
+                span,
+            });
+        }
+        self.range_pattern()
+    }
+
+    fn range_pattern(&mut self) -> ParseResult<Pat> {
+        let start = self.pattern_atom()?;
+        if self.matches(TokenKind::DotDot) || self.matches(TokenKind::DotDotEqual) {
+            let inclusive = self.previous().kind == TokenKind::DotDotEqual;
+            let end = self.pattern_atom()?;
+            let span = Span::new(
+                pat_span(&start).file_id(),
+                pat_span(&start).start(),
+                pat_span(&end).end(),
+            );
+            return Ok(Pat::Range {
+                start: Box::new(start),
+                end: Box::new(end),
+                inclusive,
+                span,
+            });
+        }
+        Ok(start)
+    }
+
+    fn pattern_atom(&mut self) -> ParseResult<Pat> {
+        if self.matches(TokenKind::Underscore) {
+            return Ok(Pat::Wildcard(self.previous().span));
+        }
+        if self.matches(TokenKind::Integer) {
+            let token = self.previous();
+            let value = token.lexeme.replace('_', "").parse().unwrap_or(0);
+            return Ok(Pat::Literal(Literal::Int(value), token.span));
+        }
+        if self.matches(TokenKind::String) {
+            let token = self.previous();
+            return Ok(Pat::Literal(
+                Literal::String(decode_string(&token.lexeme)),
+                token.span,
+            ));
+        }
+        if self.matches(TokenKind::True) {
+            return Ok(Pat::Literal(Literal::Bool(true), self.previous().span));
+        }
+        if self.matches(TokenKind::False) {
+            return Ok(Pat::Literal(Literal::Bool(false), self.previous().span));
+        }
+        if self.check(TokenKind::Identifier) {
+            let start = self.peek().span.start();
+            let path = self.path()?;
+            let mut fields = Vec::new();
+            if self.matches(TokenKind::LeftParen) {
+                if !self.check(TokenKind::RightParen) {
+                    loop {
+                        fields.push(self.pattern()?);
+                        if !self.matches(TokenKind::Comma) {
+                            break;
+                        }
+                    }
+                }
+                let right =
+                    self.consume(TokenKind::RightParen, "expected `)` after pattern fields")?;
+                return Ok(Pat::Enum {
+                    path,
+                    fields,
+                    span: Span::new(right.span.file_id(), start, right.span.end()),
+                });
+            }
+            let span = Span::new(
+                self.previous().span.file_id(),
+                start,
+                self.previous().span.end(),
+            );
+            if path.len() == 1 {
+                return Ok(Pat::Ident(path[0].clone(), span));
+            }
+            return Ok(Pat::Enum { path, fields, span });
+        }
+        if self.matches(TokenKind::LeftParen) {
+            let left = self.previous().span;
+            let mut fields = Vec::new();
+            if !self.check(TokenKind::RightParen) {
+                loop {
+                    fields.push(self.pattern()?);
+                    if !self.matches(TokenKind::Comma) {
+                        break;
+                    }
+                }
+            }
+            let right = self.consume(TokenKind::RightParen, "expected `)` after tuple pattern")?;
+            return Ok(Pat::Tuple(
+                fields,
+                Span::new(left.file_id(), left.start(), right.span.end()),
+            ));
+        }
+        self.error_here("PACO-E0113", "expected pattern");
         Err(ParseError)
     }
 
@@ -768,17 +946,12 @@ impl Parser<'_, '_> {
 
     fn if_expr(&mut self) -> ParseResult<Expr> {
         let start = self.previous().span;
+        if self.matches(TokenKind::Let) {
+            return self.if_let_expr(start);
+        }
         let condition = self.expr_without_struct_literals()?;
         let then_branch = self.block()?;
-        let else_branch = if self.matches(TokenKind::Else) {
-            if self.matches(TokenKind::If) {
-                Some(Box::new(self.if_expr()?))
-            } else {
-                Some(Box::new(Expr::Block(Box::new(self.block()?))))
-            }
-        } else {
-            None
-        };
+        let else_branch = self.else_branch()?;
         let end = else_branch
             .as_ref()
             .map_or(then_branch.span.end(), |expr| expr_span(expr).end());
@@ -790,8 +963,46 @@ impl Parser<'_, '_> {
         })
     }
 
+    fn if_let_expr(&mut self, start: Span) -> ParseResult<Expr> {
+        let pattern = self.pattern()?;
+        self.consume(TokenKind::Equal, "expected `=` after if let pattern")?;
+        let scrutinee = self.expr_without_struct_literals()?;
+        let then_branch = self.block()?;
+        let else_branch = self.else_branch()?;
+        let then_body = Expr::Block(Box::new(then_branch));
+        let else_body = else_branch
+            .map(|expr| *expr)
+            .unwrap_or_else(|| empty_block_expr(start));
+        let pattern_span = pat_span(&pattern);
+        let then_end = expr_span(&then_body).end();
+        let else_span = expr_span(&else_body);
+        let end = else_span.end().max(then_end);
+
+        Ok(Expr::Match {
+            scrutinee: Box::new(scrutinee),
+            arms: vec![
+                MatchArm {
+                    pattern,
+                    guard: None,
+                    body: then_body,
+                    span: Span::new(start.file_id(), pattern_span.start(), then_end),
+                },
+                MatchArm {
+                    pattern: Pat::Wildcard(else_span),
+                    guard: None,
+                    body: else_body,
+                    span: else_span,
+                },
+            ],
+            span: Span::new(start.file_id(), start.start(), end),
+        })
+    }
+
     fn while_expr(&mut self) -> ParseResult<Expr> {
         let start = self.previous().span;
+        if self.matches(TokenKind::Let) {
+            return self.while_let_expr(start);
+        }
         let condition = self.expr_without_struct_literals()?;
         let body = self.block()?;
         let span = Span::new(start.file_id(), start.start(), body.span.end());
@@ -800,6 +1011,81 @@ impl Parser<'_, '_> {
             body,
             span,
         })
+    }
+
+    fn while_let_expr(&mut self, start: Span) -> ParseResult<Expr> {
+        let pattern = self.pattern()?;
+        self.consume(TokenKind::Equal, "expected `=` after while let pattern")?;
+        let scrutinee = self.expr_without_struct_literals()?;
+        let body = self.block()?;
+        let body_expr = Expr::Block(Box::new(body));
+        let pattern_span = pat_span(&pattern);
+        let body_end = expr_span(&body_expr).end();
+        let fallback_span = Span::new(start.file_id(), body_end, body_end);
+        let match_expr = Expr::Match {
+            scrutinee: Box::new(scrutinee),
+            arms: vec![
+                MatchArm {
+                    pattern,
+                    guard: None,
+                    body: body_expr,
+                    span: Span::new(start.file_id(), pattern_span.start(), body_end),
+                },
+                MatchArm {
+                    pattern: Pat::Wildcard(fallback_span),
+                    guard: None,
+                    body: Expr::Break(None, fallback_span),
+                    span: fallback_span,
+                },
+            ],
+            span: Span::new(start.file_id(), start.start(), body_end),
+        };
+        let loop_body = Block {
+            stmts: vec![Stmt::Expr(match_expr)],
+            tail: None,
+            span: Span::new(start.file_id(), start.start(), body_end),
+        };
+        Ok(Expr::Loop {
+            body: loop_body,
+            span: Span::new(start.file_id(), start.start(), body_end),
+        })
+    }
+
+    fn for_expr(&mut self) -> ParseResult<Expr> {
+        let start = self.previous().span;
+        let name = self.consume(TokenKind::Identifier, "expected loop binding name")?;
+        let name = (name.lexeme.clone(), name.span);
+        self.consume(TokenKind::In, "expected `in` after loop binding")?;
+        let range_start = self.expr_without_struct_literals()?;
+        let inclusive = if self.matches(TokenKind::DotDotEqual) {
+            true
+        } else if self.matches(TokenKind::DotDot) {
+            false
+        } else {
+            self.error_here("PACO-E0112", "expected range operator after loop start");
+            return Err(ParseError);
+        };
+        let range_end = self.expr_without_struct_literals()?;
+        let body = self.block()?;
+        Ok(for_range_expr(
+            start,
+            name,
+            range_start,
+            range_end,
+            inclusive,
+            body,
+        ))
+    }
+
+    fn else_branch(&mut self) -> ParseResult<Option<Box<Expr>>> {
+        if !self.matches(TokenKind::Else) {
+            return Ok(None);
+        }
+        if self.matches(TokenKind::If) {
+            Ok(Some(Box::new(self.if_expr()?)))
+        } else {
+            Ok(Some(Box::new(Expr::Block(Box::new(self.block()?)))))
+        }
     }
 
     fn expr_without_struct_literals(&mut self) -> ParseResult<Expr> {
@@ -899,6 +1185,211 @@ pub fn expr_span(expr: &Expr) -> Span {
         | Expr::StructLiteral { span, .. }
         | Expr::Borrow { span, .. } => *span,
     }
+}
+
+fn pat_span(pattern: &Pat) -> Span {
+    match pattern {
+        Pat::Ident(_, span)
+        | Pat::Wildcard(span)
+        | Pat::Literal(_, span)
+        | Pat::Tuple(_, span)
+        | Pat::Struct { span, .. }
+        | Pat::Enum { span, .. }
+        | Pat::Range { span, .. }
+        | Pat::Or(_, span)
+        | Pat::Binding { span, .. } => *span,
+    }
+}
+
+fn empty_block_expr(span: Span) -> Expr {
+    Expr::Block(Box::new(Block {
+        stmts: Vec::new(),
+        tail: None,
+        span,
+    }))
+}
+
+fn for_range_expr(
+    start: Span,
+    name: (String, Span),
+    range_start: Expr,
+    range_end: Expr,
+    inclusive: bool,
+    body: Block,
+) -> Expr {
+    let (name, name_span) = name;
+    let cursor_name = format!("$paco_for_cursor_{}", start.start());
+    let end = body.span.end();
+    let condition = Expr::Binary {
+        op: if inclusive {
+            BinaryOp::Le
+        } else {
+            BinaryOp::Lt
+        },
+        left: Box::new(Expr::Ident(cursor_name.clone(), name_span)),
+        right: Box::new(range_end),
+        span: Span::new(start.file_id(), name_span.start(), end),
+    };
+    let increment = for_increment_expr(
+        &cursor_name,
+        name_span,
+        Span::new(start.file_id(), start.start(), end),
+    );
+    let mut body = body;
+    rewrite_continue_in_block(&mut body, &increment);
+    let body = prepend_statement(
+        body,
+        Stmt::Let(LetStmt {
+            mutable: false,
+            pattern: Pat::Ident(name, name_span),
+            ty: None,
+            value: Some(Expr::Ident(cursor_name.clone(), name_span)),
+            span: Span::new(start.file_id(), start.start(), end),
+        }),
+    );
+    let then_branch = append_statement(body, Stmt::Expr(increment));
+    let break_span = Span::new(start.file_id(), end, end);
+    let if_expr = Expr::If {
+        condition: Box::new(condition),
+        then_branch,
+        else_branch: Some(Box::new(Expr::Break(None, break_span))),
+        span: Span::new(start.file_id(), start.start(), end),
+    };
+    let loop_body = Block {
+        stmts: vec![Stmt::Expr(if_expr)],
+        tail: None,
+        span: Span::new(start.file_id(), start.start(), end),
+    };
+    let loop_expr = Expr::Loop {
+        body: loop_body,
+        span: Span::new(start.file_id(), start.start(), end),
+    };
+    Expr::Block(Box::new(Block {
+        stmts: vec![
+            Stmt::Let(LetStmt {
+                mutable: true,
+                pattern: Pat::Ident(cursor_name, name_span),
+                ty: None,
+                value: Some(range_start),
+                span: Span::new(start.file_id(), start.start(), end),
+            }),
+            Stmt::Expr(loop_expr),
+        ],
+        tail: None,
+        span: Span::new(start.file_id(), start.start(), end),
+    }))
+}
+
+fn for_increment_expr(name: &str, name_span: Span, span: Span) -> Expr {
+    Expr::Assign {
+        target: Box::new(Expr::Ident(name.to_string(), name_span)),
+        value: Box::new(Expr::Binary {
+            op: BinaryOp::Add,
+            left: Box::new(Expr::Ident(name.to_string(), name_span)),
+            right: Box::new(Expr::Literal(Literal::Int(1), name_span)),
+            span,
+        }),
+        span,
+    }
+}
+
+fn rewrite_continue_in_block(block: &mut Block, increment: &Expr) {
+    for statement in &mut block.stmts {
+        match statement {
+            Stmt::Expr(expr) => rewrite_continue_in_expr(expr, increment),
+            Stmt::Let(statement) => {
+                if let Some(value) = &mut statement.value {
+                    rewrite_continue_in_expr(value, increment);
+                }
+            }
+            Stmt::Item(_) => {}
+        }
+    }
+    if let Some(tail) = &mut block.tail {
+        rewrite_continue_in_expr(tail, increment);
+    }
+}
+
+fn rewrite_continue_in_expr(expr: &mut Expr, increment: &Expr) {
+    match expr {
+        Expr::Continue(span) => {
+            *expr = Expr::Block(Box::new(Block {
+                stmts: vec![
+                    Stmt::Expr(increment.clone()),
+                    Stmt::Expr(Expr::Continue(*span)),
+                ],
+                tail: None,
+                span: *span,
+            }));
+        }
+        Expr::Block(block) => rewrite_continue_in_block(block, increment),
+        Expr::If {
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            rewrite_continue_in_block(then_branch, increment);
+            if let Some(else_branch) = else_branch {
+                rewrite_continue_in_expr(else_branch, increment);
+            }
+        }
+        Expr::Match { arms, .. } => {
+            for arm in arms {
+                rewrite_continue_in_expr(&mut arm.body, increment);
+            }
+        }
+        Expr::Assign { value, .. }
+        | Expr::Return(Some(value), _)
+        | Expr::Break(Some(value), _)
+        | Expr::Yield(value, _)
+        | Expr::Borrow { expr: value, .. } => rewrite_continue_in_expr(value, increment),
+        Expr::Call { args, .. }
+        | Expr::MethodCall { args, .. }
+        | Expr::AssociatedCall { args, .. } => {
+            for arg in args {
+                rewrite_continue_in_expr(arg, increment);
+            }
+        }
+        Expr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                rewrite_continue_in_expr(value, increment);
+            }
+        }
+        Expr::Binary { left, right, .. }
+        | Expr::Index {
+            base: left,
+            index: right,
+            ..
+        } => {
+            rewrite_continue_in_expr(left, increment);
+            rewrite_continue_in_expr(right, increment);
+        }
+        Expr::Unary { expr, .. } | Expr::Field { base: expr, .. } => {
+            rewrite_continue_in_expr(expr, increment);
+        }
+        Expr::Loop { .. }
+        | Expr::While { .. }
+        | Expr::Literal(_, _)
+        | Expr::Ident(_, _)
+        | Expr::Return(None, _)
+        | Expr::Break(None, _)
+        | Expr::Spawn { .. }
+        | Expr::Select { .. }
+        | Expr::Comptime { .. } => {}
+    }
+}
+
+fn prepend_statement(mut block: Block, statement: Stmt) -> Block {
+    block.stmts.insert(0, statement);
+    block
+}
+
+fn append_statement(mut block: Block, statement: Stmt) -> Block {
+    if let Some(tail) = block.tail.take() {
+        block.stmts.push(Stmt::Expr(*tail));
+    }
+    block.stmts.push(statement);
+    block
 }
 
 fn join_expr_span(left: &Expr, right: &Expr, fallback: Span) -> Span {

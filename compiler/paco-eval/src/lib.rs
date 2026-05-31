@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use paco_syntax::ast::{
-    BinaryOp, Block, Expr, FnDecl, Item, Literal, Module, Pat, Stmt, Ty, UnaryOp,
+    BinaryOp, Block, Expr, FnDecl, Item, Literal, MatchArm, Module, Pat, Stmt, Ty, UnaryOp,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -324,8 +324,10 @@ impl Evaluator {
             }
             Expr::Continue(_) => Ok(Flow::Continue),
             Expr::StructLiteral { ty, fields, .. } => self.eval_struct_literal(ty, fields),
-            Expr::Match { .. }
-            | Expr::Index { .. }
+            Expr::Match {
+                scrutinee, arms, ..
+            } => self.eval_match(scrutinee, arms),
+            Expr::Index { .. }
             | Expr::Spawn { .. }
             | Expr::Select { .. }
             | Expr::Comptime { .. }
@@ -444,6 +446,44 @@ impl Evaluator {
             name,
             fields: values,
         }))
+    }
+
+    fn eval_match(&mut self, scrutinee: &Expr, arms: &[MatchArm]) -> Result<Flow, String> {
+        let value = match self.eval_value(scrutinee)? {
+            Ok(value) => value,
+            Err(flow) => return Ok(flow),
+        };
+
+        for arm in arms {
+            let Some(bindings) = pattern_bindings(&arm.pattern, &value)? else {
+                continue;
+            };
+
+            self.scopes.push(bindings);
+            let guard_matches = match &arm.guard {
+                Some(guard) => match self.eval_value(guard)? {
+                    Ok(Value::Bool(value)) => value,
+                    Ok(_) => {
+                        self.scopes.pop();
+                        return Err("match guard must evaluate to bool".to_string());
+                    }
+                    Err(flow) => {
+                        self.scopes.pop();
+                        return Ok(flow);
+                    }
+                },
+                None => true,
+            };
+
+            if guard_matches {
+                let result = self.eval_expr(&arm.body);
+                self.scopes.pop();
+                return result;
+            }
+            self.scopes.pop();
+        }
+
+        Err("non-exhaustive match reached at runtime".to_string())
     }
 
     fn eval_field(&mut self, base: &Expr, field: &str) -> Result<Flow, String> {
@@ -582,6 +622,138 @@ fn eval_unary(op: UnaryOp, value: Value) -> Result<Value, String> {
         (UnaryOp::Neg, Value::Int(value)) => checked_int(value.checked_neg()),
         (UnaryOp::Neg, Value::Float(value)) => Ok(Value::Float(-value)),
         _ => Err("unary operator received an unsupported operand".to_string()),
+    }
+}
+
+fn pattern_bindings(
+    pattern: &Pat,
+    value: &Value,
+) -> Result<Option<HashMap<String, Value>>, String> {
+    let mut bindings = HashMap::new();
+    if match_pattern(pattern, value, &mut bindings)? {
+        Ok(Some(bindings))
+    } else {
+        Ok(None)
+    }
+}
+
+fn match_pattern(
+    pattern: &Pat,
+    value: &Value,
+    bindings: &mut HashMap<String, Value>,
+) -> Result<bool, String> {
+    let mut candidate = bindings.clone();
+    if match_pattern_inner(pattern, value, &mut candidate)? {
+        *bindings = candidate;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+fn match_pattern_inner(
+    pattern: &Pat,
+    value: &Value,
+    bindings: &mut HashMap<String, Value>,
+) -> Result<bool, String> {
+    match pattern {
+        Pat::Ident(name, _) => {
+            bindings.insert(name.clone(), value.clone());
+            Ok(true)
+        }
+        Pat::Wildcard(_) => Ok(true),
+        Pat::Literal(literal, _) => Ok(value_matches_literal(literal, value)),
+        Pat::Binding { name, pattern, .. } => {
+            bindings.insert(name.clone(), value.clone());
+            match_pattern(pattern, value, bindings)
+        }
+        Pat::Range {
+            start,
+            end,
+            inclusive,
+            ..
+        } => {
+            let Value::Int(value) = value else {
+                return Ok(false);
+            };
+            let start = range_bound(start)?;
+            let end = range_bound(end)?;
+            if *inclusive {
+                Ok(start <= *value && *value <= end)
+            } else {
+                Ok(start <= *value && *value < end)
+            }
+        }
+        Pat::Enum { path, fields, .. } => {
+            let Value::Enum {
+                name,
+                variant,
+                values,
+            } = value
+            else {
+                return Ok(false);
+            };
+            if path.first() != Some(name) || path.last() != Some(variant) {
+                return Ok(false);
+            }
+            if fields.len() != values.len() {
+                return Ok(false);
+            }
+            for (pattern, value) in fields.iter().zip(values) {
+                if !match_pattern(pattern, value, bindings)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        Pat::Struct { path, fields, .. } => {
+            let Value::Struct {
+                name,
+                fields: values,
+            } = value
+            else {
+                return Ok(false);
+            };
+            if path.first() != Some(name) {
+                return Ok(false);
+            }
+            for (field, pattern) in fields {
+                let Some(value) = values.get(field) else {
+                    return Ok(false);
+                };
+                if !match_pattern(pattern, value, bindings)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        Pat::Tuple(_, _) => Ok(false),
+        Pat::Or(patterns, _) => {
+            for pattern in patterns {
+                if match_pattern(pattern, value, bindings)? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+    }
+}
+
+fn value_matches_literal(literal: &Literal, value: &Value) -> bool {
+    match (literal, value) {
+        (Literal::Int(left), Value::Int(right)) => left == right,
+        (Literal::Float(left), Value::Float(right)) => left == right,
+        (Literal::Bool(left), Value::Bool(right)) => left == right,
+        (Literal::String(left), Value::String(right)) => left == right,
+        (Literal::Char(left), Value::String(right)) => right == &left.to_string(),
+        _ => false,
+    }
+}
+
+fn range_bound(pattern: &Pat) -> Result<i64, String> {
+    match pattern {
+        Pat::Literal(Literal::Int(value), _) => Ok(*value),
+        _ => Err("range pattern bounds must be integer literals".to_string()),
     }
 }
 

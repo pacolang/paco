@@ -42,3 +42,27 @@ fn lexer_reports_invalid_characters_without_aborting() {
     assert!(reporter.has_errors());
     assert!(reporter.emit_to_string(&sources).contains("PACO-E0100"));
 }
+
+#[test]
+fn lexer_tokenizes_phase_three_pattern_tokens() {
+    let mut sources = SourceMap::new();
+    let file = sources.add_file(
+        "main.paco",
+        "match value { n @ 1..=9 => n, _ => 0 } for x in xs { x | 1..2 }",
+    );
+    let mut reporter = Reporter::new();
+
+    let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
+    let kinds: Vec<_> = tokens.iter().map(|token| token.kind).collect();
+
+    assert!(kinds.contains(&TokenKind::Match));
+    assert!(kinds.contains(&TokenKind::At));
+    assert!(kinds.contains(&TokenKind::DotDotEqual));
+    assert!(kinds.contains(&TokenKind::FatArrow));
+    assert!(kinds.contains(&TokenKind::Underscore));
+    assert!(kinds.contains(&TokenKind::For));
+    assert!(kinds.contains(&TokenKind::In));
+    assert!(kinds.contains(&TokenKind::Pipe));
+    assert!(kinds.contains(&TokenKind::DotDot));
+    assert!(!reporter.has_errors());
+}

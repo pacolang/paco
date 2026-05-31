@@ -6,10 +6,8 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-paco-diag.workspace = true
-paco-hir.workspace = true
 paco-span.workspace = true
-paco-types.workspace = true
+paco-syntax.workspace = true
 
 [lib]
 path = "src/lib.rs"

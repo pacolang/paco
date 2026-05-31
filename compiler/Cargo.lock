@@ -348,10 +348,8 @@ dependencies = [
 name = "paco-match"
 version = "0.0.0"
 dependencies = [
- "paco-diag",
- "paco-hir",
  "paco-span",
- "paco-types",
+ "paco-syntax",
 ]
 
 [[package]]
@@ -401,6 +399,7 @@ version = "0.0.0"
 dependencies = [
  "paco-diag",
  "paco-hir",
+ "paco-match",
  "paco-resolve",
  "paco-span",
  "paco-syntax",

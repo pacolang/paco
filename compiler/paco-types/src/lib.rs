@@ -3,10 +3,11 @@
 use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use paco_diag::{Diagnostic, Reporter};
+use paco_match::{ConstructorSet, analyze_match};
 use paco_span::Span;
 use paco_syntax::ast::{
-    BinaryOp, Block, EnumDecl, Expr, FnDecl, Item, LetStmt, Literal, MethodsBlock, Module, Param,
-    Pat, Stmt, StructDecl, Ty, UnaryOp, VariantFields,
+    BinaryOp, Block, EnumDecl, Expr, FnDecl, Item, LetStmt, Literal, MatchArm, MethodsBlock,
+    Module, Param, Pat, Stmt, StructDecl, Ty, UnaryOp, VariantFields,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -801,7 +802,11 @@ fn infer_expr(
             }
             Type::Never
         }
-        Expr::Match { span, .. } => unsupported_expr("match expressions", *span, reporter),
+        Expr::Match {
+            scrutinee,
+            arms,
+            span,
+        } => infer_match(scrutinee, arms, *span, program, context, reporter),
         Expr::Index { span, .. } => unsupported_expr("index expressions", *span, reporter),
         Expr::Spawn { span, .. } => unsupported_expr("spawn expressions", *span, reporter),
         Expr::Select { span, .. } => unsupported_expr("select expressions", *span, reporter),
@@ -844,6 +849,299 @@ fn infer_if(
         ));
         Type::Error
     })
+}
+
+fn infer_match(
+    scrutinee: &Expr,
+    arms: &[MatchArm],
+    span: Span,
+    program: &Program,
+    context: &mut FunctionContext<'_>,
+    reporter: &mut Reporter,
+) -> Type {
+    let scrutinee_ty = infer_expr(scrutinee, program, context, reporter);
+    check_match_coverage(&scrutinee_ty, arms, span, program, reporter);
+
+    let mut result_ty = None;
+    for arm in arms {
+        context.scopes.push(HashMap::new());
+        bind_pattern_types(&arm.pattern, &scrutinee_ty, program, context, reporter);
+        if let Some(guard) = &arm.guard {
+            let guard_ty = infer_expr(guard, program, context, reporter);
+            if !compatible(&guard_ty, &Type::Bool) {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0303",
+                    arm.span,
+                    format!("match guard must be bool, found {}", guard_ty.name()),
+                ));
+            }
+        }
+        let arm_ty = infer_expr(&arm.body, program, context, reporter);
+        context.scopes.pop();
+        result_ty = Some(match result_ty {
+            None => arm_ty,
+            Some(previous) => join_branch_types(&previous, &arm_ty).unwrap_or_else(|| {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0304",
+                    arm.span,
+                    format!(
+                        "match arms have incompatible types: {} and {}",
+                        previous.name(),
+                        arm_ty.name()
+                    ),
+                ));
+                Type::Error
+            }),
+        });
+    }
+
+    result_ty.unwrap_or_else(|| {
+        reporter.push(Diagnostic::error(
+            "PACO-E0401",
+            span,
+            "non-exhaustive match: no arms were provided",
+        ));
+        Type::Error
+    })
+}
+
+fn bind_pattern_types(
+    pattern: &Pat,
+    expected: &Type,
+    program: &Program,
+    context: &mut FunctionContext<'_>,
+    reporter: &mut Reporter,
+) {
+    match pattern {
+        Pat::Ident(name, _) => {
+            context.scopes.last_mut().unwrap().insert(
+                name.clone(),
+                Binding {
+                    ty: expected.clone(),
+                    mutable: false,
+                },
+            );
+        }
+        Pat::Binding { name, pattern, .. } => {
+            context.scopes.last_mut().unwrap().insert(
+                name.clone(),
+                Binding {
+                    ty: expected.clone(),
+                    mutable: false,
+                },
+            );
+            bind_pattern_types(pattern, expected, program, context, reporter);
+        }
+        Pat::Wildcard(_) => {}
+        Pat::Literal(literal, span) => {
+            let actual = literal_type(literal);
+            if !compatible(&actual, expected) {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0302",
+                    *span,
+                    format!(
+                        "pattern type mismatch: expected {}, found {}",
+                        expected.name(),
+                        actual.name()
+                    ),
+                ));
+            }
+        }
+        Pat::Range {
+            start, end, span, ..
+        } => {
+            if !compatible(expected, &Type::Int) {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0302",
+                    *span,
+                    format!("range pattern requires int, found {}", expected.name()),
+                ));
+            }
+            if !is_int_literal_pattern(start) || !is_int_literal_pattern(end) {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0306",
+                    *span,
+                    "range pattern bounds must be integer literals",
+                ));
+                return;
+            }
+            bind_pattern_types(start, &Type::Int, program, context, reporter);
+            bind_pattern_types(end, &Type::Int, program, context, reporter);
+        }
+        Pat::Enum { path, fields, span } => {
+            let Type::Enum(enum_name, _) = expected else {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0302",
+                    *span,
+                    format!(
+                        "enum pattern requires enum value, found {}",
+                        expected.name()
+                    ),
+                ));
+                return;
+            };
+            if path.len() < 2 || path.first() != Some(enum_name) {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0302",
+                    *span,
+                    format!("enum pattern does not match `{enum_name}`"),
+                ));
+                return;
+            }
+            let variant_name = path.last().unwrap();
+            let Some(variant) = program.enums.get(enum_name).and_then(|info| {
+                info.variants
+                    .iter()
+                    .find(|variant| &variant.name == variant_name)
+            }) else {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0314",
+                    *span,
+                    format!("variant `{variant_name}` not found for `{enum_name}`"),
+                ));
+                return;
+            };
+            let expected_fields = variant_field_types(variant, expected, program, reporter);
+            if fields.len() != expected_fields.len() {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0305",
+                    *span,
+                    format!(
+                        "variant `{variant_name}` expects {} fields, found {}",
+                        expected_fields.len(),
+                        fields.len()
+                    ),
+                ));
+            }
+            for (field, field_ty) in fields.iter().zip(expected_fields) {
+                bind_pattern_types(field, &field_ty, program, context, reporter);
+            }
+        }
+        Pat::Or(patterns, span) => {
+            bind_or_pattern_types(patterns, *span, expected, program, context, reporter);
+        }
+        Pat::Tuple(_, span) | Pat::Struct { span, .. } => {
+            reporter.push(Diagnostic::error(
+                "PACO-E0306",
+                *span,
+                "pattern form is not supported in Phase 3 type checking",
+            ));
+        }
+    }
+}
+
+fn bind_or_pattern_types(
+    patterns: &[Pat],
+    span: Span,
+    expected: &Type,
+    program: &Program,
+    context: &mut FunctionContext<'_>,
+    reporter: &mut Reporter,
+) {
+    let mut alternatives = Vec::new();
+    for pattern in patterns {
+        context.scopes.push(HashMap::new());
+        bind_pattern_types(pattern, expected, program, context, reporter);
+        alternatives.push(context.scopes.pop().unwrap_or_default());
+    }
+    let Some(first) = alternatives.first() else {
+        return;
+    };
+    let same_bindings = alternatives.iter().skip(1).all(|alternative| {
+        alternative.len() == first.len()
+            && first.iter().all(|(name, binding)| {
+                alternative
+                    .get(name)
+                    .is_some_and(|other| compatible(&binding.ty, &other.ty))
+            })
+    });
+    if !same_bindings {
+        reporter.push(Diagnostic::error(
+            "PACO-E0306",
+            span,
+            "or-pattern alternatives must bind the same names with compatible types",
+        ));
+        return;
+    }
+    context.scopes.last_mut().unwrap().extend(
+        first
+            .iter()
+            .map(|(name, binding)| (name.clone(), binding.clone())),
+    );
+}
+
+fn check_match_coverage(
+    scrutinee_ty: &Type,
+    arms: &[MatchArm],
+    span: Span,
+    program: &Program,
+    reporter: &mut Reporter,
+) {
+    let Some(constructors) = constructors_for_type(scrutinee_ty, program) else {
+        return;
+    };
+    let report = analyze_match(arms, constructors);
+    for unreachable in report.unreachable_arms {
+        let message = unreachable.witness.map_or_else(
+            || "unreachable match arm".to_string(),
+            |witness| format!("unreachable match arm: `{witness}` is already covered"),
+        );
+        reporter.push(Diagnostic::error(
+            "PACO-E0402",
+            pattern_span(&arms[unreachable.index].pattern),
+            message,
+        ));
+    }
+    if let Some(witness) = report.missing_witness {
+        reporter.push(Diagnostic::error(
+            "PACO-E0401",
+            span,
+            format!("non-exhaustive match: missing `{witness}`"),
+        ));
+    }
+}
+
+fn constructors_for_type(scrutinee_ty: &Type, program: &Program) -> Option<ConstructorSet> {
+    match scrutinee_ty {
+        Type::Bool => Some(ConstructorSet::closed(["true", "false"])),
+        Type::Enum(name, _) => program.enums.get(name).map(|info| {
+            ConstructorSet::closed(
+                info.variants
+                    .iter()
+                    .map(|variant| format!("{name}::{}", variant.name)),
+            )
+        }),
+        Type::Int | Type::Float | Type::String => Some(ConstructorSet::open("_")),
+        Type::Unknown | Type::Error => None,
+        _ => None,
+    }
+}
+
+fn is_int_literal_pattern(pattern: &Pat) -> bool {
+    matches!(pattern, Pat::Literal(Literal::Int(_), _))
+}
+
+fn variant_field_types(
+    variant: &VariantInfo,
+    enum_ty: &Type,
+    program: &Program,
+    reporter: &mut Reporter,
+) -> Vec<Type> {
+    match &variant.fields {
+        VariantFields::Unit => Vec::new(),
+        VariantFields::Tuple(types) => types
+            .iter()
+            .map(|ty| instantiate_ty(ty, enum_ty, program, reporter))
+            .collect(),
+        VariantFields::Struct(_) => {
+            reporter.push(Diagnostic::error(
+                "PACO-E0306",
+                variant.span,
+                "named enum variant patterns are not supported in Phase 3",
+            ));
+            Vec::new()
+        }
+    }
 }
 
 fn infer_call(
@@ -1483,6 +1781,29 @@ fn ty_span(ty: &Ty) -> Span {
         | Ty::Infer(span)
         | Ty::Never(span)
         | Ty::Borrow { span, .. } => *span,
+    }
+}
+
+fn pattern_span(pattern: &Pat) -> Span {
+    match pattern {
+        Pat::Ident(_, span)
+        | Pat::Wildcard(span)
+        | Pat::Literal(_, span)
+        | Pat::Tuple(_, span)
+        | Pat::Struct { span, .. }
+        | Pat::Enum { span, .. }
+        | Pat::Range { span, .. }
+        | Pat::Or(_, span)
+        | Pat::Binding { span, .. } => *span,
+    }
+}
+
+fn literal_type(literal: &Literal) -> Type {
+    match literal {
+        Literal::Int(_) => Type::Int,
+        Literal::Float(_) => Type::Float,
+        Literal::Bool(_) => Type::Bool,
+        Literal::String(_) | Literal::Char(_) => Type::String,
     }
 }
 

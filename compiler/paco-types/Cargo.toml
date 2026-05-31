@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 paco-diag.workspace = true
 paco-hir.workspace = true
+paco-match.workspace = true
 paco-resolve.workspace = true
 paco-span.workspace = true
 paco-syntax.workspace = true

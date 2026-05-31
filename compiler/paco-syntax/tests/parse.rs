@@ -1,7 +1,7 @@
 use paco_diag::Reporter;
 use paco_span::SourceMap;
 use paco_syntax::{
-    ast::{BinaryOp, Expr, Item, Literal, Ty, VariantFields},
+    ast::{BinaryOp, Expr, Item, Literal, Pat, Ty, VariantFields},
     lex::lex,
     parse::parse_module,
 };
@@ -159,6 +159,175 @@ fn parser_parses_generic_struct_type_application() {
     assert!(
         matches!(ty, Ty::Generic { path, args, .. } if path == &vec!["Box".to_string()] && args.len() == 1)
     );
+}
+
+#[test]
+fn parser_parses_match_with_literal_and_wildcard_arms() {
+    let module = parse_source("fn main() -> int { match value { 0 => 1, _ => 2 } }");
+    let Item::Fn(function) = &module.items[0] else {
+        panic!("expected function item");
+    };
+    let Some(tail) = &function.body.tail else {
+        panic!("expected tail expression");
+    };
+    let Expr::Match { arms, .. } = tail.as_ref() else {
+        panic!("expected match expression");
+    };
+
+    assert_eq!(arms.len(), 2);
+    assert!(matches!(arms[0].pattern, Pat::Literal(Literal::Int(0), _)));
+    assert!(matches!(arms[1].pattern, Pat::Wildcard(_)));
+}
+
+#[test]
+fn parser_parses_guarded_enum_variant_pattern() {
+    let module = parse_source(
+        "fn main() -> int { match value { Maybe::Some(x) if x > 0 => x, Maybe::None => 0 } }",
+    );
+    let Item::Fn(function) = &module.items[0] else {
+        panic!("expected function item");
+    };
+    let Some(tail) = &function.body.tail else {
+        panic!("expected tail expression");
+    };
+    let Expr::Match { arms, .. } = tail.as_ref() else {
+        panic!("expected match expression");
+    };
+
+    assert_eq!(arms.len(), 2);
+    assert!(arms[0].guard.is_some());
+    assert!(
+        matches!(&arms[0].pattern, Pat::Enum { path, fields, .. } if path == &vec!["Maybe".to_string(), "Some".to_string()] && fields.len() == 1)
+    );
+    assert!(
+        matches!(&arms[1].pattern, Pat::Enum { path, fields, .. } if path == &vec!["Maybe".to_string(), "None".to_string()] && fields.is_empty())
+    );
+}
+
+#[test]
+fn parser_parses_at_binding_with_range_pattern() {
+    let module = parse_source("fn main() -> int { match n { digit @ 1..=9 => digit, _ => 0 } }");
+    let Item::Fn(function) = &module.items[0] else {
+        panic!("expected function item");
+    };
+    let Some(tail) = &function.body.tail else {
+        panic!("expected tail expression");
+    };
+    let Expr::Match { arms, .. } = tail.as_ref() else {
+        panic!("expected match expression");
+    };
+
+    assert!(matches!(
+        &arms[0].pattern,
+        Pat::Binding { name, pattern, .. }
+            if name == "digit" && matches!(pattern.as_ref(), Pat::Range { inclusive: true, .. })
+    ));
+}
+
+#[test]
+fn parser_desugars_if_let_to_match_expression() {
+    let module =
+        parse_source("fn main() -> int { if let Maybe::Some(x) = value { x } else { 0 } }");
+    let Item::Fn(function) = &module.items[0] else {
+        panic!("expected function item");
+    };
+    let Some(tail) = &function.body.tail else {
+        panic!("expected tail expression");
+    };
+    let Expr::Match { arms, .. } = tail.as_ref() else {
+        panic!("expected if let to parse as match expression");
+    };
+
+    assert_eq!(arms.len(), 2);
+    assert!(
+        matches!(&arms[0].pattern, Pat::Enum { path, fields, .. } if path == &vec!["Maybe".to_string(), "Some".to_string()] && fields.len() == 1)
+    );
+    assert!(matches!(arms[1].pattern, Pat::Wildcard(_)));
+}
+
+#[test]
+fn parser_desugars_while_let_to_loop_with_match() {
+    let module = parse_source("fn main() { while let Maybe::Some(x) = next() { print(x) } }");
+    let Item::Fn(function) = &module.items[0] else {
+        panic!("expected function item");
+    };
+    let Some(tail) = &function.body.tail else {
+        panic!("expected tail expression");
+    };
+    let Expr::Loop { body, .. } = tail.as_ref() else {
+        panic!("expected while let to parse as loop expression");
+    };
+    let paco_syntax::ast::Stmt::Expr(Expr::Match { arms, .. }) = &body.stmts[0] else {
+        panic!("expected loop body to contain match expression");
+    };
+
+    assert_eq!(arms.len(), 2);
+    assert!(
+        matches!(&arms[0].pattern, Pat::Enum { path, fields, .. } if path == &vec!["Maybe".to_string(), "Some".to_string()] && fields.len() == 1)
+    );
+    assert!(matches!(arms[1].pattern, Pat::Wildcard(_)));
+}
+
+#[test]
+fn parser_desugars_for_range_to_block_expression() {
+    let module = parse_source("fn main() { for n in 1..=3 { print(n) } }");
+    let Item::Fn(function) = &module.items[0] else {
+        panic!("expected function item");
+    };
+    let Some(tail) = &function.body.tail else {
+        panic!("expected tail expression");
+    };
+    let Expr::Block(block) = tail.as_ref() else {
+        panic!("expected for range to parse as block expression");
+    };
+
+    assert_eq!(block.stmts.len(), 2);
+    let paco_syntax::ast::Stmt::Let(cursor) = &block.stmts[0] else {
+        panic!("expected generated cursor binding");
+    };
+    assert!(
+        matches!(&cursor.pattern, Pat::Ident(name, _) if name.starts_with("$paco_for_cursor_"))
+    );
+    assert!(matches!(
+        block.stmts[1],
+        paco_syntax::ast::Stmt::Expr(Expr::Loop { .. })
+    ));
+}
+
+#[test]
+fn parser_rewrites_for_range_continue_to_increment_first() {
+    let module = parse_source("fn main() { for n in 1..=3 { if n == 2 { continue } print(n) } }");
+    let Item::Fn(function) = &module.items[0] else {
+        panic!("expected function item");
+    };
+    let Some(Expr::Block(block)) = function.body.tail.as_deref() else {
+        panic!("expected for range block");
+    };
+    let paco_syntax::ast::Stmt::Expr(Expr::Loop { body, .. }) = &block.stmts[1] else {
+        panic!("expected loop in for range block");
+    };
+    let paco_syntax::ast::Stmt::Expr(Expr::If { then_branch, .. }) = &body.stmts[0] else {
+        panic!("expected loop body guard");
+    };
+    let paco_syntax::ast::Stmt::Expr(Expr::If {
+        then_branch: continue_branch,
+        ..
+    }) = &then_branch.stmts[1]
+    else {
+        panic!("expected user continue guard");
+    };
+    let Some(Expr::Block(continue_block)) = continue_branch.tail.as_deref() else {
+        panic!("expected continue to be rewritten to a block");
+    };
+
+    assert!(matches!(
+        continue_block.stmts[0],
+        paco_syntax::ast::Stmt::Expr(Expr::Assign { .. })
+    ));
+    assert!(matches!(
+        continue_block.stmts[1],
+        paco_syntax::ast::Stmt::Expr(Expr::Continue(_))
+    ));
 }
 
 fn parse_source(source: &str) -> paco_syntax::ast::Module {

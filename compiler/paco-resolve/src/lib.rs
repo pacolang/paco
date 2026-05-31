@@ -196,10 +196,38 @@ fn resolve_expr(
 }
 
 fn bind_pattern(scopes: &mut [HashSet<String>], pattern: &Pat) {
-    if let Pat::Ident(name, _) = pattern
-        && let Some(scope) = scopes.last_mut()
-    {
-        scope.insert(name.clone());
+    match pattern {
+        Pat::Ident(name, _) => bind_name(scopes, name),
+        Pat::Binding { name, pattern, .. } => {
+            bind_name(scopes, name);
+            bind_pattern(scopes, pattern);
+        }
+        Pat::Tuple(fields, _) | Pat::Or(fields, _) => {
+            for field in fields {
+                bind_pattern(scopes, field);
+            }
+        }
+        Pat::Struct { fields, .. } => {
+            for (_, field) in fields {
+                bind_pattern(scopes, field);
+            }
+        }
+        Pat::Enum { fields, .. } => {
+            for field in fields {
+                bind_pattern(scopes, field);
+            }
+        }
+        Pat::Range { start, end, .. } => {
+            bind_pattern(scopes, start);
+            bind_pattern(scopes, end);
+        }
+        Pat::Wildcard(_) | Pat::Literal(_, _) => {}
+    }
+}
+
+fn bind_name(scopes: &mut [HashSet<String>], name: &str) {
+    if let Some(scope) = scopes.last_mut() {
+        scope.insert(name.to_string());
     }
 }
 
