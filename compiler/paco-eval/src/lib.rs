@@ -587,6 +587,7 @@ fn value_from_literal(literal: &Literal) -> Value {
 
 fn eval_binary(op: BinaryOp, left: Value, right: Value) -> Result<Value, String> {
     match (op, left, right) {
+        // Int arithmetic
         (BinaryOp::Add, Value::Int(left), Value::Int(right)) => {
             checked_int(left.checked_add(right))
         }
@@ -604,12 +605,40 @@ fn eval_binary(op: BinaryOp, left: Value, right: Value) -> Result<Value, String>
         (BinaryOp::Rem, Value::Int(left), Value::Int(right)) => {
             checked_int(left.checked_rem(right))
         }
+        // Float arithmetic
+        (BinaryOp::Add, Value::Float(left), Value::Float(right)) => {
+            Ok(Value::Float(left + right))
+        }
+        (BinaryOp::Sub, Value::Float(left), Value::Float(right)) => {
+            Ok(Value::Float(left - right))
+        }
+        (BinaryOp::Mul, Value::Float(left), Value::Float(right)) => {
+            Ok(Value::Float(left * right))
+        }
+        (BinaryOp::Div, Value::Float(_), Value::Float(0.0)) => {
+            Err("division by zero".to_string())
+        }
+        (BinaryOp::Div, Value::Float(left), Value::Float(right)) => {
+            Ok(Value::Float(left / right))
+        }
+        (BinaryOp::Rem, Value::Float(_), Value::Float(0.0)) => {
+            Err("division by zero".to_string())
+        }
+        (BinaryOp::Rem, Value::Float(left), Value::Float(right)) => {
+            Ok(Value::Float(left % right))
+        }
+        // Comparisons
         (BinaryOp::Eq, left, right) => Ok(Value::Bool(left == right)),
         (BinaryOp::Ne, left, right) => Ok(Value::Bool(left != right)),
         (BinaryOp::Lt, Value::Int(left), Value::Int(right)) => Ok(Value::Bool(left < right)),
         (BinaryOp::Le, Value::Int(left), Value::Int(right)) => Ok(Value::Bool(left <= right)),
         (BinaryOp::Gt, Value::Int(left), Value::Int(right)) => Ok(Value::Bool(left > right)),
         (BinaryOp::Ge, Value::Int(left), Value::Int(right)) => Ok(Value::Bool(left >= right)),
+        (BinaryOp::Lt, Value::Float(left), Value::Float(right)) => Ok(Value::Bool(left < right)),
+        (BinaryOp::Le, Value::Float(left), Value::Float(right)) => Ok(Value::Bool(left <= right)),
+        (BinaryOp::Gt, Value::Float(left), Value::Float(right)) => Ok(Value::Bool(left > right)),
+        (BinaryOp::Ge, Value::Float(left), Value::Float(right)) => Ok(Value::Bool(left >= right)),
+        // Logical
         (BinaryOp::And, Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left && right)),
         (BinaryOp::Or, Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left || right)),
         _ => Err("binary operator received unsupported operands".to_string()),

@@ -1,0 +1,31 @@
+fn main() {
+    // Arithmetic Operators
+    print(10 + 5)
+    print(10 - 5)
+    print(10 * 5)
+    print(10 / 3)
+    print(10 % 3)
+
+    // Float Arithmetic
+    print(5.5 + 2.5)
+    print(5.5 - 2.5)
+    print(5.5 * 2.0)
+    print(5.5 / 2.0)
+
+    // Comparison Operators (Integers)
+    print(10 == 10)
+    print(10 != 5)
+    print(10 < 20)
+    print(10 <= 10)
+    print(10 > 5)
+    print(10 >= 10)
+
+    // Comparison Operators (Booleans)
+    print(true == true)
+    print(true != false)
+
+    // Precedence & Associativity
+    print(1 + 2 * 3) // multiplicative binds tighter: 7
+    print((1 + 2) * 3) // parenthesis overrides precedence: 9
+    print(10 - 4 - 2) // left-associative: 4
+}

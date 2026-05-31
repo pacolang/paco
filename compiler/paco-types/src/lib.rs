@@ -1480,12 +1480,14 @@ fn infer_binary(
         BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Rem => {
             if compatible(&left_ty, &Type::Int) && compatible(&right_ty, &Type::Int) {
                 Type::Int
+            } else if compatible(&left_ty, &Type::Float) && compatible(&right_ty, &Type::Float) {
+                Type::Float
             } else {
                 reporter.push(Diagnostic::error(
                     "PACO-E0301",
                     span,
                     format!(
-                        "type mismatch: expected int and int, found {} and {}",
+                        "type mismatch: expected compatible numeric types, found {} and {}",
                         left_ty.name(),
                         right_ty.name()
                     ),
@@ -1510,14 +1512,16 @@ fn infer_binary(
             }
         }
         BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge => {
-            if compatible(&left_ty, &Type::Int) && compatible(&right_ty, &Type::Int) {
+            if (compatible(&left_ty, &Type::Int) && compatible(&right_ty, &Type::Int))
+                || (compatible(&left_ty, &Type::Float) && compatible(&right_ty, &Type::Float))
+            {
                 Type::Bool
             } else {
                 reporter.push(Diagnostic::error(
                     "PACO-E0301",
                     span,
                     format!(
-                        "type mismatch: expected int and int, found {} and {}",
+                        "type mismatch: expected compatible numeric types, found {} and {}",
                         left_ty.name(),
                         right_ty.name()
                     ),
