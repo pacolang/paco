@@ -1,0 +1,1 @@
+error[PACO-E0301] input.paco:2:13: type mismatch: expected compatible numeric types, found string and int
