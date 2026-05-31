@@ -9,6 +9,7 @@ fn type_checker_reports_unsupported_phase_one_expressions() {
     let module = Module {
         items: vec![Item::Fn(FnDecl {
             name: "main".to_string(),
+            generics: Vec::new(),
             params: Vec::new(),
             return_ty: None,
             body: Block {
@@ -38,6 +39,7 @@ fn type_checker_reports_unknown_phase_one_types() {
     let module = Module {
         items: vec![Item::Fn(FnDecl {
             name: "main".to_string(),
+            generics: Vec::new(),
             params: Vec::new(),
             return_ty: Some(Ty::Path(vec!["User".to_string()], span)),
             body: Block {

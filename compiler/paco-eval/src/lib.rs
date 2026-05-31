@@ -1,8 +1,10 @@
-//! Tree-walking evaluator for the Phase 1 executable subset.
+//! Tree-walking evaluator for the executable frontend phases.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use paco_syntax::ast::{BinaryOp, Block, Expr, FnDecl, Item, Literal, Module, Pat, Stmt, UnaryOp};
+use paco_syntax::ast::{
+    BinaryOp, Block, Expr, FnDecl, Item, Literal, Module, Pat, Stmt, Ty, UnaryOp,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -10,34 +12,92 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     String(String),
+    Struct {
+        name: String,
+        fields: BTreeMap<String, Value>,
+    },
+    Enum {
+        name: String,
+        variant: String,
+        values: Vec<Value>,
+    },
     Unit,
 }
 
 pub fn evaluate_module(module: &Module) -> Result<String, String> {
-    let functions = module
-        .items
-        .iter()
-        .filter_map(|item| match item {
-            Item::Fn(function) => Some((function.name.clone(), function.clone())),
-            _ => None,
-        })
-        .collect();
-    let mut evaluator = Evaluator::new(functions);
+    let program = RuntimeProgram::from_module(module);
+    let mut evaluator = Evaluator::new(program);
     evaluator.call_function("main", Vec::new())?;
     Ok(evaluator.output)
 }
 
+#[derive(Clone, Debug, Default)]
+struct RuntimeProgram {
+    functions: HashMap<String, FnDecl>,
+    methods: HashMap<(String, String), FnDecl>,
+    associated: HashMap<(String, String), FnDecl>,
+    enum_variants: HashSet<(String, String)>,
+}
+
+impl RuntimeProgram {
+    fn from_module(module: &Module) -> Self {
+        let mut program = Self::default();
+        for item in &module.items {
+            match item {
+                Item::Fn(function) => {
+                    program
+                        .functions
+                        .insert(function.name.clone(), function.clone());
+                }
+                Item::Struct(decl) => {
+                    for method in &decl.methods {
+                        program.insert_attached_function(&decl.name, method);
+                    }
+                }
+                Item::Enum(decl) => {
+                    for variant in &decl.variants {
+                        program
+                            .enum_variants
+                            .insert((decl.name.clone(), variant.name.clone()));
+                    }
+                    for method in &decl.methods {
+                        program.insert_attached_function(&decl.name, method);
+                    }
+                }
+                Item::Methods(block) => {
+                    if let Some(name) = type_name(&block.target) {
+                        for method in &block.methods {
+                            program.insert_attached_function(&name, method);
+                        }
+                    }
+                }
+                Item::Trait(_) | Item::Use(_) => {}
+            }
+        }
+        program
+    }
+
+    fn insert_attached_function(&mut self, type_name: &str, function: &FnDecl) {
+        let key = (type_name.to_string(), function.name.clone());
+        if has_self_receiver(function) {
+            self.methods.insert(key, function.clone());
+        } else {
+            self.associated.insert(key, function.clone());
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Evaluator {
-    functions: HashMap<String, FnDecl>,
+    program: RuntimeProgram,
     scopes: Vec<HashMap<String, Value>>,
     output: String,
 }
 
 impl Evaluator {
-    fn new(functions: HashMap<String, FnDecl>) -> Self {
+    fn new(program: RuntimeProgram) -> Self {
         Self {
-            functions,
+            program,
             scopes: Vec::new(),
             output: String::new(),
         }
@@ -45,13 +105,28 @@ impl Evaluator {
 
     fn call_function(&mut self, name: &str, args: Vec<Value>) -> Result<Value, String> {
         let function = self
+            .program
             .functions
             .get(name)
             .cloned()
             .ok_or_else(|| format!("function `{name}` was not found"))?;
+        self.call_decl(&function, args)
+    }
+
+    fn call_decl(&mut self, function: &FnDecl, args: Vec<Value>) -> Result<Value, String> {
+        self.call_decl_with_bindings(function, args)
+            .map(|(value, _)| value)
+    }
+
+    fn call_decl_with_bindings(
+        &mut self,
+        function: &FnDecl,
+        args: Vec<Value>,
+    ) -> Result<(Value, HashMap<String, Value>), String> {
         if function.params.len() != args.len() {
             return Err(format!(
-                "function `{name}` expected {} arguments, found {}",
+                "function `{}` expected {} arguments, found {}",
+                function.name,
                 function.params.len(),
                 args.len()
             ));
@@ -65,14 +140,21 @@ impl Evaluator {
             self.define(name.clone(), value);
         }
 
-        let flow = self.eval_block(&function.body)?;
-        self.scopes.pop();
+        let flow = match self.eval_block(&function.body) {
+            Ok(flow) => flow,
+            Err(error) => {
+                self.scopes.pop();
+                return Err(error);
+            }
+        };
+        let bindings = self.scopes.pop().unwrap_or_default();
 
-        match flow {
+        let value = match flow {
             Flow::Value(value) | Flow::Return(value) => Ok(value),
             Flow::Break(_) => Err("break cannot escape a function".to_string()),
             Flow::Continue => Err("continue cannot escape a function".to_string()),
-        }
+        }?;
+        Ok((value, bindings))
     }
 
     fn eval_block(&mut self, block: &Block) -> Result<Flow, String> {
@@ -81,7 +163,7 @@ impl Evaluator {
             match statement {
                 Stmt::Let(statement) => {
                     let value = if let Some(value) = &statement.value {
-                        match Self::value_or_flow(self.eval_expr(value)?) {
+                        match self.eval_value(value)? {
                             Ok(value) => value,
                             Err(flow) => {
                                 self.scopes.pop();
@@ -130,7 +212,7 @@ impl Evaluator {
                 else_branch,
                 ..
             } => {
-                let condition = match Self::value_or_flow(self.eval_expr(condition)?) {
+                let condition = match self.eval_value(condition)? {
                     Ok(value) => value,
                     Err(flow) => return Ok(flow),
                 };
@@ -158,7 +240,7 @@ impl Evaluator {
                 condition, body, ..
             } => {
                 loop {
-                    let condition = match Self::value_or_flow(self.eval_expr(condition)?) {
+                    let condition = match self.eval_value(condition)? {
                         Ok(value) => value,
                         Err(flow) => return Ok(flow),
                     };
@@ -177,40 +259,50 @@ impl Evaluator {
                 Ok(Flow::Value(Value::Unit))
             }
             Expr::Call { callee, args, .. } => self.eval_call(callee, args),
+            Expr::MethodCall {
+                receiver,
+                method,
+                args,
+                ..
+            } => self.eval_method_call(receiver, method, args),
+            Expr::AssociatedCall {
+                ty, function, args, ..
+            } => self.eval_associated_call(ty, function, args),
             Expr::Binary {
                 op, left, right, ..
             } => {
-                let left = match Self::value_or_flow(self.eval_expr(left)?) {
+                let left = match self.eval_value(left)? {
                     Ok(value) => value,
                     Err(flow) => return Ok(flow),
                 };
-                let right = match Self::value_or_flow(self.eval_expr(right)?) {
+                let right = match self.eval_value(right)? {
                     Ok(value) => value,
                     Err(flow) => return Ok(flow),
                 };
                 eval_binary(*op, left, right).map(Flow::Value)
             }
             Expr::Unary { op, expr, .. } => {
-                let value = match Self::value_or_flow(self.eval_expr(expr)?) {
+                let value = match self.eval_value(expr)? {
                     Ok(value) => value,
                     Err(flow) => return Ok(flow),
                 };
                 eval_unary(*op, value).map(Flow::Value)
             }
             Expr::Assign { target, value, .. } => {
-                let Expr::Ident(name, _) = target.as_ref() else {
-                    return Err("assignment target must be an identifier".to_string());
-                };
-                let value = match Self::value_or_flow(self.eval_expr(value)?) {
+                let value = match self.eval_value(value)? {
                     Ok(value) => value,
                     Err(flow) => return Ok(flow),
                 };
-                self.assign(name, value.clone())?;
-                Ok(Flow::Value(value))
+                match target.as_ref() {
+                    Expr::Ident(_, _) | Expr::Field { .. } => self.assign_place(target, value)?,
+                    _ => return Err("assignment target must be an identifier or field".to_string()),
+                }
+                Ok(Flow::Value(Value::Unit))
             }
+            Expr::Field { base, field, .. } => self.eval_field(base, field),
             Expr::Return(value, _) => {
                 let value = if let Some(value) = value {
-                    match Self::value_or_flow(self.eval_expr(value)?) {
+                    match self.eval_value(value)? {
                         Ok(value) => value,
                         Err(flow) => return Ok(flow),
                     }
@@ -221,7 +313,7 @@ impl Evaluator {
             }
             Expr::Break(value, _) => {
                 let value = if let Some(value) = value {
-                    match Self::value_or_flow(self.eval_expr(value)?) {
+                    match self.eval_value(value)? {
                         Ok(value) => Some(value),
                         Err(flow) => return Ok(flow),
                     }
@@ -231,16 +323,13 @@ impl Evaluator {
                 Ok(Flow::Break(value))
             }
             Expr::Continue(_) => Ok(Flow::Continue),
+            Expr::StructLiteral { ty, fields, .. } => self.eval_struct_literal(ty, fields),
             Expr::Match { .. }
-            | Expr::MethodCall { .. }
-            | Expr::AssociatedCall { .. }
-            | Expr::Field { .. }
             | Expr::Index { .. }
             | Expr::Spawn { .. }
             | Expr::Select { .. }
             | Expr::Comptime { .. }
             | Expr::Yield(_, _)
-            | Expr::StructLiteral { .. }
             | Expr::Borrow { .. } => Err("expression is not executable in Phase 1".to_string()),
         }
     }
@@ -250,14 +339,10 @@ impl Evaluator {
             return Err("callee must be an identifier".to_string());
         };
 
-        let mut values = Vec::with_capacity(args.len());
-        for arg in args {
-            let value = match Self::value_or_flow(self.eval_expr(arg)?) {
-                Ok(value) => value,
-                Err(flow) => return Ok(flow),
-            };
-            values.push(value);
-        }
+        let values = match self.eval_values(args)? {
+            Ok(values) => values,
+            Err(flow) => return Ok(flow),
+        };
 
         if name == "print" {
             if values.len() != 1 {
@@ -269,6 +354,126 @@ impl Evaluator {
         }
 
         self.call_function(name, values).map(Flow::Value)
+    }
+
+    fn eval_method_call(
+        &mut self,
+        receiver_expr: &Expr,
+        method: &str,
+        args: &[Expr],
+    ) -> Result<Flow, String> {
+        let receiver = match self.eval_value(receiver_expr)? {
+            Ok(value) => value,
+            Err(flow) => return Ok(flow),
+        };
+        let Some(type_name) = value_type_name(&receiver) else {
+            return Err(format!("method `{method}` receiver is not a nominal value"));
+        };
+        let function = self
+            .program
+            .methods
+            .get(&(type_name.clone(), method.to_string()))
+            .cloned()
+            .ok_or_else(|| format!("method `{method}` was not found for `{type_name}`"))?;
+        let mut values = Vec::with_capacity(args.len() + 1);
+        values.push(receiver);
+        match self.eval_values(args)? {
+            Ok(args) => values.extend(args),
+            Err(flow) => return Ok(flow),
+        }
+        if has_mutable_self_receiver(&function) {
+            let (result, bindings) = self.call_decl_with_bindings(&function, values)?;
+            if let Some(updated_receiver) = bindings.get("self") {
+                self.assign_place(receiver_expr, updated_receiver.clone())?;
+            }
+            return Ok(Flow::Value(result));
+        }
+        self.call_decl(&function, values).map(Flow::Value)
+    }
+
+    fn eval_associated_call(
+        &mut self,
+        ty: &Ty,
+        function: &str,
+        args: &[Expr],
+    ) -> Result<Flow, String> {
+        let Some(type_name) = type_name(ty) else {
+            return Err("associated call target must be a nominal type".to_string());
+        };
+        let values = match self.eval_values(args)? {
+            Ok(values) => values,
+            Err(flow) => return Ok(flow),
+        };
+        if let Some(function_decl) = self
+            .program
+            .associated
+            .get(&(type_name.clone(), function.to_string()))
+            .cloned()
+        {
+            return self.call_decl(&function_decl, values).map(Flow::Value);
+        }
+        if self
+            .program
+            .enum_variants
+            .contains(&(type_name.clone(), function.to_string()))
+        {
+            return Ok(Flow::Value(Value::Enum {
+                name: type_name,
+                variant: function.to_string(),
+                values,
+            }));
+        }
+        Err(format!(
+            "associated function `{function}` was not found for `{type_name}`"
+        ))
+    }
+
+    fn eval_struct_literal(&mut self, ty: &Ty, fields: &[(String, Expr)]) -> Result<Flow, String> {
+        let Some(name) = type_name(ty) else {
+            return Err("struct literal target must be a nominal type".to_string());
+        };
+        let mut values = BTreeMap::new();
+        for (field, expr) in fields {
+            let value = match self.eval_value(expr)? {
+                Ok(value) => value,
+                Err(flow) => return Ok(flow),
+            };
+            values.insert(field.clone(), value);
+        }
+        Ok(Flow::Value(Value::Struct {
+            name,
+            fields: values,
+        }))
+    }
+
+    fn eval_field(&mut self, base: &Expr, field: &str) -> Result<Flow, String> {
+        let value = match self.eval_value(base)? {
+            Ok(value) => value,
+            Err(flow) => return Ok(flow),
+        };
+        let Value::Struct { fields, .. } = value else {
+            return Err(format!("field `{field}` receiver is not a struct"));
+        };
+        fields
+            .get(field)
+            .cloned()
+            .map(Flow::Value)
+            .ok_or_else(|| format!("field `{field}` was not found"))
+    }
+
+    fn eval_value(&mut self, expr: &Expr) -> Result<Result<Value, Flow>, String> {
+        Ok(Self::value_or_flow(self.eval_expr(expr)?))
+    }
+
+    fn eval_values(&mut self, args: &[Expr]) -> Result<Result<Vec<Value>, Flow>, String> {
+        let mut values = Vec::with_capacity(args.len());
+        for arg in args {
+            match self.eval_value(arg)? {
+                Ok(value) => values.push(value),
+                Err(flow) => return Ok(Err(flow)),
+            }
+        }
+        Ok(Ok(values))
     }
 
     fn value_or_flow(flow: Flow) -> Result<Value, Flow> {
@@ -292,6 +497,26 @@ impl Evaluator {
             }
         }
         Err(format!("name `{name}` was not found"))
+    }
+
+    fn assign_field(&mut self, target: &Expr, value: Value) -> Result<(), String> {
+        let Some((root, path)) = field_path(target) else {
+            return Err("field assignment target must start with a binding".to_string());
+        };
+        for scope in self.scopes.iter_mut().rev() {
+            if let Some(root_value) = scope.get_mut(root) {
+                return assign_nested_field(root_value, &path, value);
+            }
+        }
+        Err(format!("name `{root}` was not found"))
+    }
+
+    fn assign_place(&mut self, target: &Expr, value: Value) -> Result<(), String> {
+        match target {
+            Expr::Ident(name, _) => self.assign(name, value),
+            Expr::Field { .. } => self.assign_field(target, value),
+            _ => Err("assignment target must be an identifier or field".to_string()),
+        }
     }
 
     fn lookup(&self, name: &str) -> Option<Value> {
@@ -373,7 +598,93 @@ impl Value {
             Self::Float(value) => value.to_string(),
             Self::Bool(value) => value.to_string(),
             Self::String(value) => value.clone(),
+            Self::Struct { name, fields } => {
+                let fields = fields
+                    .iter()
+                    .map(|(name, value)| format!("{name}: {}", value.display()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{name} {{ {fields} }}")
+            }
+            Self::Enum {
+                name,
+                variant,
+                values,
+            } if values.is_empty() => format!("{name}::{variant}"),
+            Self::Enum {
+                name,
+                variant,
+                values,
+            } => {
+                let values = values
+                    .iter()
+                    .map(Value::display)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{name}::{variant}({values})")
+            }
             Self::Unit => "()".to_string(),
         }
     }
+}
+
+fn type_name(ty: &Ty) -> Option<String> {
+    match ty {
+        Ty::Path(path, _) | Ty::Generic { path, .. } => path.first().cloned(),
+        _ => None,
+    }
+}
+
+fn value_type_name(value: &Value) -> Option<String> {
+    match value {
+        Value::Struct { name, .. } | Value::Enum { name, .. } => Some(name.clone()),
+        _ => None,
+    }
+}
+
+fn has_self_receiver(function: &FnDecl) -> bool {
+    function
+        .params
+        .first()
+        .is_some_and(|param| matches!(&param.pattern, Pat::Ident(name, _) if name == "self"))
+}
+
+fn has_mutable_self_receiver(function: &FnDecl) -> bool {
+    function.params.first().is_some_and(|param| {
+        matches!(&param.pattern, Pat::Ident(name, _) if name == "self")
+            && matches!(&param.ty, Ty::Borrow { mutable: true, .. })
+    })
+}
+
+fn field_path(expr: &Expr) -> Option<(&str, Vec<&str>)> {
+    match expr {
+        Expr::Field { base, field, .. } => {
+            let (root, mut path) = field_path(base)?;
+            path.push(field.as_str());
+            Some((root, path))
+        }
+        Expr::Ident(name, _) => Some((name.as_str(), Vec::new())),
+        _ => None,
+    }
+}
+
+fn assign_nested_field(value: &mut Value, path: &[&str], new_value: Value) -> Result<(), String> {
+    let Some((field, rest)) = path.split_first() else {
+        *value = new_value;
+        return Ok(());
+    };
+    let Value::Struct { fields, .. } = value else {
+        return Err(format!("field `{field}` receiver is not a struct"));
+    };
+    if rest.is_empty() {
+        if !fields.contains_key(*field) {
+            return Err(format!("field `{field}` was not found"));
+        }
+        fields.insert((*field).to_string(), new_value);
+        return Ok(());
+    }
+    let field_value = fields
+        .get_mut(*field)
+        .ok_or_else(|| format!("field `{field}` was not found"))?;
+    assign_nested_field(field_value, rest, new_value)
 }

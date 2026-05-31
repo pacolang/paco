@@ -28,6 +28,7 @@ fn visit_walks_function_items_and_nested_expressions() {
     let module = Module {
         items: vec![Item::Fn(FnDecl {
             name: "main".to_string(),
+            generics: Vec::new(),
             params: vec![Param {
                 pattern: Pat::Ident("message".to_string(), span),
                 ty: Ty::Path(vec!["string".to_string()], span),
@@ -78,6 +79,7 @@ fn visit_walks_methods_block_functions() {
             target: Ty::Path(vec!["Point".to_string()], span),
             methods: vec![FnDecl {
                 name: "distance".to_string(),
+                generics: Vec::new(),
                 params: Vec::new(),
                 return_ty: None,
                 body: Block {
@@ -120,6 +122,7 @@ fn mut_visit_walks_nested_tail_expressions() {
     let mut module = Module {
         items: vec![Item::Fn(FnDecl {
             name: "main".to_string(),
+            generics: Vec::new(),
             params: Vec::new(),
             return_ty: None,
             body: Block {

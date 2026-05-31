@@ -52,7 +52,7 @@ pub fn run(cli: Cli) -> Result<DriverOutput, String> {
     match cli.command {
         Commands::Run { file } => run_file(file.unwrap_or_else(|| PathBuf::from("main.paco"))),
         Commands::Build { .. } => not_implemented("build"),
-        Commands::Check { .. } => not_implemented("check"),
+        Commands::Check { file } => check_file(file),
         Commands::Test { .. } => not_implemented("test"),
         Commands::Fmt { .. } => not_implemented("fmt"),
         Commands::Doc => not_implemented("doc"),
@@ -61,20 +61,11 @@ pub fn run(cli: Cli) -> Result<DriverOutput, String> {
 }
 
 fn run_file(file: PathBuf) -> Result<DriverOutput, String> {
-    let source = fs::read_to_string(&file)
-        .map_err(|error| format!("failed to read `{}`: {error}", file.display()))?;
-    let mut sources = SourceMap::new();
-    let file_id = sources.add_file(file.display().to_string(), source);
-    let source = sources.source(file_id).unwrap_or("");
-    let mut reporter = Reporter::new();
-
-    let tokens = lex(source, file_id, &mut reporter);
-    if reporter.has_errors() {
-        return Err(reporter.emit_to_string(&sources));
-    }
-
-    let module =
-        parse_module(&tokens, &mut reporter).map_err(|_| reporter.emit_to_string(&sources))?;
+    let CheckedProgram {
+        sources,
+        module,
+        mut reporter,
+    } = check_program(file)?;
     if !module
         .items
         .iter()
@@ -90,16 +81,56 @@ fn run_file(file: PathBuf) -> Result<DriverOutput, String> {
         return Err(reporter.emit_to_string(&sources));
     }
 
-    paco_resolve::resolve_module(&module, &mut reporter)
-        .map_err(|_| reporter.emit_to_string(&sources))?;
-    paco_types::check_module(&module, &mut reporter)
-        .map_err(|_| reporter.emit_to_string(&sources))?;
-
     let stdout =
         paco_eval::evaluate_module(&module).map_err(|error| format!("runtime error: {error}"))?;
     Ok(DriverOutput {
         stdout,
         stderr: String::new(),
+    })
+}
+
+fn check_file(file: PathBuf) -> Result<DriverOutput, String> {
+    let _ = check_program(file)?;
+    Ok(DriverOutput {
+        stdout: String::new(),
+        stderr: String::new(),
+    })
+}
+
+struct CheckedProgram {
+    sources: SourceMap,
+    module: paco_syntax::ast::Module,
+    reporter: Reporter,
+}
+
+fn check_program(file: PathBuf) -> Result<CheckedProgram, String> {
+    let source = fs::read_to_string(&file)
+        .map_err(|error| format!("failed to read `{}`: {error}", file.display()))?;
+    let mut sources = SourceMap::new();
+    let file_id = sources.add_file(file.display().to_string(), source);
+    let source = sources.source(file_id).unwrap_or("");
+    let mut reporter = Reporter::new();
+
+    let tokens = lex(source, file_id, &mut reporter);
+    if reporter.has_errors() {
+        return Err(reporter.emit_to_string(&sources));
+    }
+
+    let module =
+        parse_module(&tokens, &mut reporter).map_err(|_| reporter.emit_to_string(&sources))?;
+    if reporter.has_errors() {
+        return Err(reporter.emit_to_string(&sources));
+    }
+
+    paco_resolve::resolve_module(&module, &mut reporter)
+        .map_err(|_| reporter.emit_to_string(&sources))?;
+    paco_types::check_module(&module, &mut reporter)
+        .map_err(|_| reporter.emit_to_string(&sources))?;
+
+    Ok(CheckedProgram {
+        sources,
+        module,
+        reporter,
     })
 }
 

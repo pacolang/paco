@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use paco_diag::{Diagnostic, Reporter};
-use paco_syntax::ast::{Block, Expr, Item, LetStmt, Module, Pat, Stmt};
+use paco_syntax::ast::{Block, Expr, FnDecl, Item, LetStmt, Module, Pat, Stmt};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResolveError;
@@ -19,12 +19,24 @@ pub fn resolve_module(module: &Module, reporter: &mut Reporter) -> Result<(), Re
         .collect::<HashSet<_>>();
 
     for item in &module.items {
-        if let Item::Fn(function) = item {
-            let mut scopes = vec![HashSet::new()];
-            for param in &function.params {
-                bind_pattern(&mut scopes, &param.pattern);
+        match item {
+            Item::Fn(function) => resolve_function(function, &functions, reporter),
+            Item::Struct(decl) => {
+                for method in &decl.methods {
+                    resolve_function(method, &functions, reporter);
+                }
             }
-            resolve_block(&function.body, &functions, &mut scopes, reporter);
+            Item::Enum(decl) => {
+                for method in &decl.methods {
+                    resolve_function(method, &functions, reporter);
+                }
+            }
+            Item::Methods(block) => {
+                for method in &block.methods {
+                    resolve_function(method, &functions, reporter);
+                }
+            }
+            Item::Trait(_) | Item::Use(_) => {}
         }
     }
 
@@ -33,6 +45,14 @@ pub fn resolve_module(module: &Module, reporter: &mut Reporter) -> Result<(), Re
     } else {
         Ok(())
     }
+}
+
+fn resolve_function(function: &FnDecl, functions: &HashSet<String>, reporter: &mut Reporter) {
+    let mut scopes = vec![HashSet::new()];
+    for param in &function.params {
+        bind_pattern(&mut scopes, &param.pattern);
+    }
+    resolve_block(&function.body, functions, &mut scopes, reporter);
 }
 
 fn resolve_block(
@@ -110,6 +130,17 @@ fn resolve_expr(
                 resolve_expr(arg, functions, scopes, reporter);
             }
         }
+        Expr::MethodCall { receiver, args, .. } => {
+            resolve_expr(receiver, functions, scopes, reporter);
+            for arg in args {
+                resolve_expr(arg, functions, scopes, reporter);
+            }
+        }
+        Expr::AssociatedCall { args, .. } => {
+            for arg in args {
+                resolve_expr(arg, functions, scopes, reporter);
+            }
+        }
         Expr::Binary { left, right, .. } => {
             resolve_expr(left, functions, scopes, reporter);
             resolve_expr(right, functions, scopes, reporter);
@@ -119,22 +150,48 @@ fn resolve_expr(
             resolve_expr(target, functions, scopes, reporter);
             resolve_expr(value, functions, scopes, reporter);
         }
+        Expr::Field { base, .. } => resolve_expr(base, functions, scopes, reporter),
+        Expr::Index { base, index, .. } => {
+            resolve_expr(base, functions, scopes, reporter);
+            resolve_expr(index, functions, scopes, reporter);
+        }
         Expr::Return(value, _) | Expr::Break(value, _) => {
             if let Some(value) = value {
                 resolve_expr(value, functions, scopes, reporter);
             }
         }
-        Expr::Match { .. }
-        | Expr::MethodCall { .. }
-        | Expr::AssociatedCall { .. }
-        | Expr::Field { .. }
-        | Expr::Index { .. }
-        | Expr::Spawn { .. }
-        | Expr::Select { .. }
-        | Expr::Comptime { .. }
-        | Expr::Yield(_, _)
-        | Expr::StructLiteral { .. }
-        | Expr::Borrow { .. } => {}
+        Expr::Match {
+            scrutinee, arms, ..
+        } => {
+            resolve_expr(scrutinee, functions, scopes, reporter);
+            for arm in arms {
+                scopes.push(HashSet::new());
+                bind_pattern(scopes, &arm.pattern);
+                if let Some(guard) = &arm.guard {
+                    resolve_expr(guard, functions, scopes, reporter);
+                }
+                resolve_expr(&arm.body, functions, scopes, reporter);
+                scopes.pop();
+            }
+        }
+        Expr::Spawn { expr, .. } | Expr::Comptime { expr, .. } | Expr::Borrow { expr, .. } => {
+            resolve_expr(expr, functions, scopes, reporter);
+        }
+        Expr::Select { arms, default, .. } => {
+            for arm in arms {
+                resolve_expr(&arm.operation, functions, scopes, reporter);
+                resolve_block(&arm.body, functions, scopes, reporter);
+            }
+            if let Some(default) = default {
+                resolve_block(default, functions, scopes, reporter);
+            }
+        }
+        Expr::Yield(expr, _) => resolve_expr(expr, functions, scopes, reporter),
+        Expr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                resolve_expr(value, functions, scopes, reporter);
+            }
+        }
     }
 }
 

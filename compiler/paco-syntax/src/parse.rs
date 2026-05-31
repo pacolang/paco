@@ -5,8 +5,8 @@ use paco_span::Span;
 
 use crate::{
     ast::{
-        BinaryOp, Block, Expr, FnDecl, Item, LetStmt, Literal, Module, Param, Pat, Stmt, Ty,
-        UnaryOp,
+        BinaryOp, Block, EnumDecl, EnumVariant, Expr, FieldDecl, FnDecl, Item, LetStmt, Literal,
+        MethodsBlock, Module, Param, Pat, Stmt, StructDecl, Ty, UnaryOp, UseDecl, VariantFields,
     },
     lex::{Token, TokenKind},
 };
@@ -21,6 +21,7 @@ pub fn parse_module(tokens: &[Token], reporter: &mut Reporter) -> ParseResult<Mo
         tokens,
         reporter,
         current: 0,
+        allow_struct_literals: true,
     }
     .parse_module()
 }
@@ -29,6 +30,7 @@ struct Parser<'a, 'reporter> {
     tokens: &'a [Token],
     reporter: &'reporter mut Reporter,
     current: usize,
+    allow_struct_literals: bool,
 }
 
 impl Parser<'_, '_> {
@@ -39,6 +41,14 @@ impl Parser<'_, '_> {
         while !self.check(TokenKind::Eof) {
             if self.matches(TokenKind::Fn) {
                 items.push(Item::Fn(self.function_decl()?));
+            } else if self.matches(TokenKind::Struct) {
+                items.push(Item::Struct(self.struct_decl()?));
+            } else if self.matches(TokenKind::Enum) {
+                items.push(Item::Enum(self.enum_decl()?));
+            } else if self.matches(TokenKind::Methods) {
+                items.push(Item::Methods(self.methods_block()?));
+            } else if self.matches(TokenKind::Use) {
+                items.push(Item::Use(self.use_decl()?));
             } else {
                 self.error_here("PACO-E0110", "expected item declaration");
                 self.synchronize_item();
@@ -55,6 +65,7 @@ impl Parser<'_, '_> {
     fn function_decl(&mut self) -> ParseResult<FnDecl> {
         let start = self.previous().span.start();
         let name = self.consume_identifier("expected function name")?;
+        let generics = self.generic_params()?;
         self.consume(TokenKind::LeftParen, "expected `(` after function name")?;
         let params = self.parameter_list()?;
         self.consume(TokenKind::RightParen, "expected `)` after parameters")?;
@@ -71,11 +82,176 @@ impl Parser<'_, '_> {
         );
         Ok(FnDecl {
             name,
+            generics,
             params,
             return_ty,
             body,
             span,
         })
+    }
+
+    fn struct_decl(&mut self) -> ParseResult<StructDecl> {
+        let start = self.previous().span.start();
+        let name = self.consume_identifier("expected struct name")?;
+        let generics = self.generic_params()?;
+        self.consume(TokenKind::LeftBrace, "expected `{` before struct body")?;
+        let mut fields = Vec::new();
+        let mut methods = Vec::new();
+
+        while !self.check(TokenKind::RightBrace) && !self.check(TokenKind::Eof) {
+            if self.matches(TokenKind::Fn) {
+                methods.push(self.function_decl()?);
+            } else {
+                fields.push(self.field_decl()?);
+            }
+            self.matches(TokenKind::Comma);
+        }
+
+        let right = self.consume(TokenKind::RightBrace, "expected `}` after struct body")?;
+        Ok(StructDecl {
+            name,
+            generics,
+            fields,
+            methods,
+            span: Span::new(right.span.file_id(), start, right.span.end()),
+        })
+    }
+
+    fn enum_decl(&mut self) -> ParseResult<EnumDecl> {
+        let start = self.previous().span.start();
+        let name = self.consume_identifier("expected enum name")?;
+        let generics = self.generic_params()?;
+        self.consume(TokenKind::LeftBrace, "expected `{` before enum body")?;
+        let mut variants = Vec::new();
+        let mut methods = Vec::new();
+
+        while !self.check(TokenKind::RightBrace) && !self.check(TokenKind::Eof) {
+            if self.matches(TokenKind::Fn) {
+                methods.push(self.function_decl()?);
+            } else {
+                variants.push(self.enum_variant()?);
+            }
+            self.matches(TokenKind::Comma);
+        }
+
+        let right = self.consume(TokenKind::RightBrace, "expected `}` after enum body")?;
+        Ok(EnumDecl {
+            name,
+            generics,
+            variants,
+            methods,
+            span: Span::new(right.span.file_id(), start, right.span.end()),
+        })
+    }
+
+    fn methods_block(&mut self) -> ParseResult<MethodsBlock> {
+        let start = self.previous().span.start();
+        let generics = self.generic_params()?;
+        let target = self.ty()?;
+        self.consume(TokenKind::LeftBrace, "expected `{` before methods body")?;
+        let mut methods = Vec::new();
+
+        while !self.check(TokenKind::RightBrace) && !self.check(TokenKind::Eof) {
+            self.consume(TokenKind::Fn, "expected method declaration")?;
+            methods.push(self.function_decl()?);
+        }
+
+        let right = self.consume(TokenKind::RightBrace, "expected `}` after methods body")?;
+        Ok(MethodsBlock {
+            generics,
+            target,
+            methods,
+            span: Span::new(right.span.file_id(), start, right.span.end()),
+        })
+    }
+
+    fn use_decl(&mut self) -> ParseResult<UseDecl> {
+        let start = self.previous().span.start();
+        let path = self.path()?;
+        let end = self.previous().span.end();
+        self.matches(TokenKind::Semicolon);
+        Ok(UseDecl {
+            path,
+            span: Span::new(self.previous().span.file_id(), start, end),
+        })
+    }
+
+    fn field_decl(&mut self) -> ParseResult<FieldDecl> {
+        let start = self.peek().span.start();
+        let name = self.consume_identifier("expected field name")?;
+        self.consume(TokenKind::Colon, "expected `:` after field name")?;
+        let ty = self.ty()?;
+        Ok(FieldDecl {
+            name,
+            ty,
+            span: Span::new(
+                self.previous().span.file_id(),
+                start,
+                self.previous().span.end(),
+            ),
+        })
+    }
+
+    fn enum_variant(&mut self) -> ParseResult<EnumVariant> {
+        let start = self.peek().span.start();
+        let name = self.consume_identifier("expected enum variant name")?;
+        let fields = if self.matches(TokenKind::LeftParen) {
+            let mut tys = Vec::new();
+            if !self.check(TokenKind::RightParen) {
+                loop {
+                    tys.push(self.ty()?);
+                    if !self.matches(TokenKind::Comma) {
+                        break;
+                    }
+                }
+            }
+            self.consume(
+                TokenKind::RightParen,
+                "expected `)` after enum variant fields",
+            )?;
+            VariantFields::Tuple(tys)
+        } else if self.matches(TokenKind::LeftBrace) {
+            let mut fields = Vec::new();
+            if !self.check(TokenKind::RightBrace) {
+                loop {
+                    fields.push(self.field_decl()?);
+                    if !self.matches(TokenKind::Comma) {
+                        break;
+                    }
+                }
+            }
+            self.consume(
+                TokenKind::RightBrace,
+                "expected `}` after enum variant fields",
+            )?;
+            VariantFields::Struct(fields)
+        } else {
+            VariantFields::Unit
+        };
+        Ok(EnumVariant {
+            name,
+            fields,
+            span: Span::new(
+                self.previous().span.file_id(),
+                start,
+                self.previous().span.end(),
+            ),
+        })
+    }
+
+    fn generic_params(&mut self) -> ParseResult<Vec<String>> {
+        let mut params = Vec::new();
+        if !self.matches(TokenKind::Less) {
+            return Ok(params);
+        }
+        loop {
+            params.push(self.consume_identifier("expected generic parameter name")?);
+            if !self.matches(TokenKind::Comma) {
+                break;
+            }
+        }
+        self.consume(TokenKind::Greater, "expected `>` after generic parameters")?;
+        Ok(params)
     }
 
     fn parameter_list(&mut self) -> ParseResult<Vec<Param>> {
@@ -87,8 +263,24 @@ impl Parser<'_, '_> {
         loop {
             let start = self.peek().span.start();
             let name = self.consume_identifier("expected parameter name")?;
-            self.consume(TokenKind::Colon, "expected `:` after parameter name")?;
-            let ty = self.ty()?;
+            let ty = if name == "self" && self.matches(TokenKind::Ampersand) {
+                let mutable = self.matches(TokenKind::Mut);
+                Ty::Borrow {
+                    mutable,
+                    lifetime: None,
+                    ty: Box::new(Ty::Path(vec!["Self".to_string()], self.previous().span)),
+                    span: Span::new(
+                        self.previous().span.file_id(),
+                        start,
+                        self.previous().span.end(),
+                    ),
+                }
+            } else if name == "self" {
+                Ty::Path(vec!["Self".to_string()], self.previous().span)
+            } else {
+                self.consume(TokenKind::Colon, "expected `:` after parameter name")?;
+                self.ty()?
+            };
             let span = Span::new(
                 self.previous().span.file_id(),
                 start,
@@ -107,8 +299,40 @@ impl Parser<'_, '_> {
     }
 
     fn ty(&mut self) -> ParseResult<Ty> {
-        let token = self.consume(TokenKind::Identifier, "expected type name")?;
-        Ok(Ty::Path(vec![token.lexeme.clone()], token.span))
+        let start = self.peek().span.start();
+        let path = self.path()?;
+        if self.matches(TokenKind::Less) {
+            let mut args = Vec::new();
+            if !self.check(TokenKind::Greater) {
+                loop {
+                    args.push(self.ty()?);
+                    if !self.matches(TokenKind::Comma) {
+                        break;
+                    }
+                }
+            }
+            let end = self
+                .consume(
+                    TokenKind::Greater,
+                    "expected `>` after generic type arguments",
+                )?
+                .span
+                .end();
+            return Ok(Ty::Generic {
+                path,
+                args,
+                span: Span::new(self.previous().span.file_id(), start, end),
+            });
+        }
+        Ok(Ty::Path(path, self.previous().span))
+    }
+
+    fn path(&mut self) -> ParseResult<Vec<String>> {
+        let mut path = vec![self.consume_identifier("expected path segment")?];
+        while self.matches(TokenKind::ColonColon) {
+            path.push(self.consume_identifier("expected path segment after `::`")?);
+        }
+        Ok(path)
     }
 
     fn block(&mut self) -> ParseResult<Block> {
@@ -292,31 +516,67 @@ impl Parser<'_, '_> {
     fn call(&mut self) -> ParseResult<Expr> {
         let mut expr = self.primary()?;
         loop {
-            if !self.matches(TokenKind::LeftParen) {
+            if self.matches(TokenKind::LeftParen) {
+                let args = self.argument_list()?;
+                let right = self.consume(TokenKind::RightParen, "expected `)` after arguments")?;
+                let span = Span::new(
+                    expr_span(&expr).file_id(),
+                    expr_span(&expr).start(),
+                    right.span.end(),
+                );
+                expr = Expr::Call {
+                    callee: Box::new(expr),
+                    args,
+                    span,
+                };
+            } else if self.matches(TokenKind::Dot) {
+                let method_or_field = self.consume_identifier("expected field or method name")?;
+                if self.matches(TokenKind::LeftParen) {
+                    let args = self.argument_list()?;
+                    let right =
+                        self.consume(TokenKind::RightParen, "expected `)` after arguments")?;
+                    let span = Span::new(
+                        expr_span(&expr).file_id(),
+                        expr_span(&expr).start(),
+                        right.span.end(),
+                    );
+                    expr = Expr::MethodCall {
+                        receiver: Box::new(expr),
+                        method: method_or_field,
+                        args,
+                        span,
+                    };
+                } else {
+                    let span = Span::new(
+                        expr_span(&expr).file_id(),
+                        expr_span(&expr).start(),
+                        self.previous().span.end(),
+                    );
+                    expr = Expr::Field {
+                        base: Box::new(expr),
+                        field: method_or_field,
+                        span,
+                    }
+                };
+            } else {
                 break;
             }
-            let mut args = Vec::new();
-            if !self.check(TokenKind::RightParen) {
-                loop {
-                    args.push(self.expr()?);
-                    if !self.matches(TokenKind::Comma) {
-                        break;
-                    }
-                }
-            }
-            let right = self.consume(TokenKind::RightParen, "expected `)` after arguments")?;
-            let span = Span::new(
-                expr_span(&expr).file_id(),
-                expr_span(&expr).start(),
-                right.span.end(),
-            );
-            expr = Expr::Call {
-                callee: Box::new(expr),
-                args,
-                span,
-            };
         }
         Ok(expr)
+    }
+
+    fn argument_list(&mut self) -> ParseResult<Vec<Expr>> {
+        let mut args = Vec::new();
+        if self.check(TokenKind::RightParen) {
+            return Ok(args);
+        }
+        loop {
+            args.push(self.expr()?);
+            if !self.matches(TokenKind::Comma) {
+                break;
+            }
+        }
+        Ok(args)
     }
 
     fn primary(&mut self) -> ParseResult<Expr> {
@@ -344,8 +604,37 @@ impl Parser<'_, '_> {
             return Ok(Expr::Literal(Literal::Bool(false), self.previous().span));
         }
         if self.matches(TokenKind::Identifier) {
-            let token = self.previous();
-            return Ok(Expr::Ident(token.lexeme.clone(), token.span));
+            let token = self.previous().clone();
+            let ty = self.expr_type_path(&token)?;
+            if self.allow_struct_literals && self.matches(TokenKind::LeftBrace) {
+                return self.struct_literal(ty);
+            }
+            if self.matches(TokenKind::ColonColon) {
+                let function = self.consume_identifier("expected associated item name")?;
+                let mut args = Vec::new();
+                let mut end = self.previous().span.end();
+                if self.matches(TokenKind::LeftParen) {
+                    args = self.argument_list()?;
+                    end = self
+                        .consume(TokenKind::RightParen, "expected `)` after arguments")?
+                        .span
+                        .end();
+                }
+                let start = ty_span(&ty).start();
+                return Ok(Expr::AssociatedCall {
+                    ty,
+                    function,
+                    args,
+                    span: Span::new(token.span.file_id(), start, end),
+                });
+            }
+            if let Ty::Path(path, span) = ty
+                && path.len() == 1
+            {
+                return Ok(Expr::Ident(path[0].clone(), span));
+            }
+            self.error_here("PACO-E0111", "expected expression");
+            return Err(ParseError);
         }
         if self.matches(TokenKind::If) {
             return self.if_expr();
@@ -395,9 +684,91 @@ impl Parser<'_, '_> {
         Err(ParseError)
     }
 
+    fn expr_type_path(&mut self, token: &Token) -> ParseResult<Ty> {
+        let path = vec![token.lexeme.clone()];
+        if self.starts_generic_type_application() {
+            self.consume(
+                TokenKind::Less,
+                "expected `<` before generic type arguments",
+            )?;
+            let mut args = Vec::new();
+            if !self.check(TokenKind::Greater) {
+                loop {
+                    args.push(self.ty()?);
+                    if !self.matches(TokenKind::Comma) {
+                        break;
+                    }
+                }
+            }
+            let end = self
+                .consume(
+                    TokenKind::Greater,
+                    "expected `>` after generic type arguments",
+                )?
+                .span
+                .end();
+            Ok(Ty::Generic {
+                path,
+                args,
+                span: Span::new(token.span.file_id(), token.span.start(), end),
+            })
+        } else {
+            Ok(Ty::Path(path, token.span))
+        }
+    }
+
+    fn starts_generic_type_application(&self) -> bool {
+        if !self.check(TokenKind::Less) {
+            return false;
+        }
+        let mut depth = 0usize;
+        for index in self.current..self.tokens.len() {
+            let token = &self.tokens[index];
+            match token.kind {
+                TokenKind::Less => depth += 1,
+                TokenKind::Greater => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        let Some(next) = self.tokens.get(index + 1) else {
+                            return false;
+                        };
+                        return matches!(next.kind, TokenKind::LeftBrace | TokenKind::ColonColon);
+                    }
+                }
+                TokenKind::Eof | TokenKind::LeftBrace | TokenKind::RightBrace if depth == 0 => {
+                    return false;
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
+    fn struct_literal(&mut self, ty: Ty) -> ParseResult<Expr> {
+        let start = ty_span(&ty).start();
+        let mut fields = Vec::new();
+        if !self.check(TokenKind::RightBrace) {
+            loop {
+                let name = self.consume_identifier("expected struct field name")?;
+                self.consume(TokenKind::Colon, "expected `:` after struct field name")?;
+                let value = self.expr()?;
+                fields.push((name, value));
+                if !self.matches(TokenKind::Comma) {
+                    break;
+                }
+            }
+        }
+        let right = self.consume(TokenKind::RightBrace, "expected `}` after struct literal")?;
+        Ok(Expr::StructLiteral {
+            ty,
+            fields,
+            span: Span::new(right.span.file_id(), start, right.span.end()),
+        })
+    }
+
     fn if_expr(&mut self) -> ParseResult<Expr> {
         let start = self.previous().span;
-        let condition = self.expr()?;
+        let condition = self.expr_without_struct_literals()?;
         let then_branch = self.block()?;
         let else_branch = if self.matches(TokenKind::Else) {
             if self.matches(TokenKind::If) {
@@ -421,7 +792,7 @@ impl Parser<'_, '_> {
 
     fn while_expr(&mut self) -> ParseResult<Expr> {
         let start = self.previous().span;
-        let condition = self.expr()?;
+        let condition = self.expr_without_struct_literals()?;
         let body = self.block()?;
         let span = Span::new(start.file_id(), start.start(), body.span.end());
         Ok(Expr::While {
@@ -429,6 +800,14 @@ impl Parser<'_, '_> {
             body,
             span,
         })
+    }
+
+    fn expr_without_struct_literals(&mut self) -> ParseResult<Expr> {
+        let previous = self.allow_struct_literals;
+        self.allow_struct_literals = false;
+        let result = self.expr();
+        self.allow_struct_literals = previous;
+        result
     }
 
     fn consume(&mut self, kind: TokenKind, message: &str) -> ParseResult<&Token> {
@@ -477,7 +856,17 @@ impl Parser<'_, '_> {
     }
 
     fn synchronize_item(&mut self) {
-        while !self.check(TokenKind::Eof) && !self.check(TokenKind::Fn) {
+        while !self.check(TokenKind::Eof)
+            && !matches!(
+                self.peek().kind,
+                TokenKind::Fn
+                    | TokenKind::Struct
+                    | TokenKind::Enum
+                    | TokenKind::Methods
+                    | TokenKind::Use
+                    | TokenKind::Trait
+            )
+        {
             self.advance();
         }
     }
@@ -520,6 +909,20 @@ fn join_expr_span(left: &Expr, right: &Expr, fallback: Span) -> Span {
         left.start().min(fallback.start()),
         right.end().max(fallback.end()),
     )
+}
+
+fn ty_span(ty: &Ty) -> Span {
+    match ty {
+        Ty::Path(_, span)
+        | Ty::Generic { span, .. }
+        | Ty::Tuple(_, span)
+        | Ty::Slice(_, span)
+        | Ty::Dyn { span, .. }
+        | Ty::Fn { span, .. }
+        | Ty::Infer(span)
+        | Ty::Never(span)
+        | Ty::Borrow { span, .. } => *span,
+    }
 }
 
 fn decode_string(source: &str) -> String {

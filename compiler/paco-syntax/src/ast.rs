@@ -21,6 +21,7 @@ pub enum Item {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FnDecl {
     pub name: String,
+    pub generics: Vec<String>,
     pub params: Vec<Param>,
     pub return_ty: Option<Ty>,
     pub body: Block,
@@ -303,6 +304,11 @@ pub enum Pat {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ty {
     Path(Vec<String>, Span),
+    Generic {
+        path: Vec<String>,
+        args: Vec<Ty>,
+        span: Span,
+    },
     Tuple(Vec<Ty>, Span),
     Slice(Box<Ty>, Span),
     Borrow {
