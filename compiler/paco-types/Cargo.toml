@@ -10,6 +10,7 @@ paco-diag.workspace = true
 paco-hir.workspace = true
 paco-resolve.workspace = true
 paco-span.workspace = true
+paco-syntax.workspace = true
 
 [lib]
 path = "src/lib.rs"

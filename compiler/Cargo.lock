@@ -324,6 +324,7 @@ dependencies = [
  "paco-diag",
  "paco-mir",
  "paco-span",
+ "paco-syntax",
 ]
 
 [[package]]
@@ -370,6 +371,7 @@ dependencies = [
  "paco-diag",
  "paco-hir",
  "paco-span",
+ "paco-syntax",
 ]
 
 [[package]]
@@ -401,6 +403,7 @@ dependencies = [
  "paco-hir",
  "paco-resolve",
  "paco-span",
+ "paco-syntax",
 ]
 
 [[package]]

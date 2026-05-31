@@ -3,8 +3,15 @@ use paco_driver::{Cli, run};
 
 fn main() {
     let cli = Cli::parse();
-    if let Err(error) = run(cli) {
-        eprintln!("{error}");
-        std::process::exit(1);
+
+    match run(cli) {
+        Ok(output) => {
+            print!("{}", output.stdout);
+            eprint!("{}", output.stderr);
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
     }
 }
