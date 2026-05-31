@@ -1,0 +1,36 @@
+enum Option<T> {
+    Some(T),
+    None
+}
+
+enum Result<T, E> {
+    Ok(T),
+    Err(E)
+}
+
+fn unwrap_or(opt: Option<int>, default: int) -> int {
+    match opt {
+        Option::Some(x) => x,
+        Option::None => default
+    }
+}
+
+fn main() {
+    let x: Option<int> = Option::Some(42)
+    let y: Option<int> = Option::None
+    print(unwrap_or(x, 0))
+    print(unwrap_or(y, 100))
+
+    let r1: Result<int, string> = Result::Ok(123)
+    let r2: Result<int, string> = Result::Err("failed")
+
+    match r1 {
+        Result::Ok(val) => print(val),
+        Result::Err(err) => print(err)
+    }
+
+    match r2 {
+        Result::Ok(val) => print(val),
+        Result::Err(err) => print(err)
+    }
+}

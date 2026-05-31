@@ -327,12 +327,12 @@ impl Evaluator {
             Expr::Match {
                 scrutinee, arms, ..
             } => self.eval_match(scrutinee, arms),
+            Expr::Borrow { expr, .. } => self.eval_expr(expr),
             Expr::Index { .. }
             | Expr::Spawn { .. }
             | Expr::Select { .. }
             | Expr::Comptime { .. }
-            | Expr::Yield(_, _)
-            | Expr::Borrow { .. } => Err("expression is not executable yet".to_string()),
+            | Expr::Yield(_, _) => Err("expression is not executable yet".to_string()),
         }
     }
 

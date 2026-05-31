@@ -362,6 +362,16 @@ impl Program {
         generics: &HashMap<String, Type>,
         reporter: &mut Reporter,
     ) -> Type {
+        self.ty_from_ast_omitted(ty, generics, false, reporter)
+    }
+
+    fn ty_from_ast_omitted(
+        &self,
+        ty: &Ty,
+        generics: &HashMap<String, Type>,
+        allow_omitted: bool,
+        reporter: &mut Reporter,
+    ) -> Type {
         match ty {
             Ty::Path(path, _) if path.as_slice() == ["int"] => Type::Int,
             Ty::Path(path, _) if path.as_slice() == ["float"] => Type::Float,
@@ -369,17 +379,23 @@ impl Program {
             Ty::Path(path, _) if path.as_slice() == ["string"] => Type::String,
             Ty::Borrow { mutable, ty, .. } => Type::Borrow {
                 mutable: *mutable,
-                ty: Box::new(self.ty_from_ast(ty, generics, reporter)),
+                ty: Box::new(self.ty_from_ast_omitted(ty, generics, allow_omitted, reporter)),
             },
             Ty::Path(path, span) if path.len() == 1 => {
                 if let Some(ty) = generics.get(&path[0]) {
                     ty.clone()
                 } else if let Some(info) = self.structs.get(&path[0]) {
-                    self.check_generic_arity(&path[0], info.generics.len(), 0, *span, reporter);
-                    Type::Struct(path[0].clone(), Vec::new())
+                    if !info.generics.is_empty() && !allow_omitted {
+                        self.check_generic_arity(&path[0], info.generics.len(), 0, *span, reporter);
+                    }
+                    let args = info.generics.iter().map(|g| Type::Generic(g.clone())).collect();
+                    Type::Struct(path[0].clone(), args)
                 } else if let Some(info) = self.enums.get(&path[0]) {
-                    self.check_generic_arity(&path[0], info.generics.len(), 0, *span, reporter);
-                    Type::Enum(path[0].clone(), Vec::new())
+                    if !info.generics.is_empty() && !allow_omitted {
+                        self.check_generic_arity(&path[0], info.generics.len(), 0, *span, reporter);
+                    }
+                    let args = info.generics.iter().map(|g| Type::Generic(g.clone())).collect();
+                    Type::Enum(path[0].clone(), args)
                 } else {
                     reporter.push(Diagnostic::error(
                         "PACO-E0306",
@@ -392,7 +408,7 @@ impl Program {
             Ty::Generic { path, args, .. } if path.len() == 1 => {
                 let args = args
                     .iter()
-                    .map(|arg| self.ty_from_ast(arg, generics, reporter))
+                    .map(|arg| self.ty_from_ast_omitted(arg, generics, allow_omitted, reporter))
                     .collect::<Vec<_>>();
                 if let Some(info) = self.structs.get(&path[0]) {
                     self.check_generic_arity(
@@ -599,6 +615,9 @@ fn check_function(
     }
 
     let actual = infer_block(&function.body, program, &mut context, reporter);
+    let mut substitutions = HashMap::new();
+    unify_type(&signature.return_ty, &actual, &mut substitutions);
+    let actual = substitute_generics(&actual, &substitutions);
     if !compatible(&actual, &signature.return_ty) && actual != Type::Never {
         reporter.push(Diagnostic::error(
             "PACO-E0302",
@@ -644,13 +663,20 @@ fn check_let(
     context: &mut FunctionContext<'_>,
     reporter: &mut Reporter,
 ) {
-    let value_ty = statement.value.as_ref().map_or(Type::Unknown, |value| {
+    let mut value_ty = statement.value.as_ref().map_or(Type::Unknown, |value| {
         infer_expr(value, program, context, reporter)
     });
     let declared_ty = statement
         .ty
         .as_ref()
         .map(|ty| program.ty_from_ast(ty, &HashMap::new(), reporter));
+    
+    let mut substitutions = HashMap::new();
+    if let Some(ref declared_ty) = declared_ty {
+        unify_type(declared_ty, &value_ty, &mut substitutions);
+        value_ty = substitute_generics(&value_ty, &substitutions);
+    }
+    
     let binding_ty = declared_ty.clone().unwrap_or_else(|| value_ty.clone());
     if let Some(declared_ty) = declared_ty
         && !compatible(&value_ty, &declared_ty)
@@ -768,9 +794,12 @@ fn infer_expr(
             span,
         } => infer_assign(target, value, *span, program, context, reporter),
         Expr::Return(value, span) => {
-            let actual = value.as_ref().map_or(Type::Unit, |value| {
+            let mut actual = value.as_ref().map_or(Type::Unit, |value| {
                 infer_expr(value, program, context, reporter)
             });
+            let mut substitutions = HashMap::new();
+            unify_type(context.expected_return, &actual, &mut substitutions);
+            actual = substitute_generics(&actual, &substitutions);
             if !compatible(&actual, context.expected_return) {
                 reporter.push(Diagnostic::error(
                     "PACO-E0302",
@@ -1278,7 +1307,7 @@ fn infer_associated_call(
     context: &mut FunctionContext<'_>,
     reporter: &mut Reporter,
 ) -> Type {
-    let target_ty = program.ty_from_ast(ty, &HashMap::new(), reporter);
+    let target_ty = program.ty_from_ast_omitted(ty, &HashMap::new(), true, reporter);
     let Some(type_name) = target_type_name(&target_ty) else {
         return Type::Error;
     };
@@ -1289,8 +1318,9 @@ fn infer_associated_call(
             .iter()
             .find(|variant| variant.name == function)
     {
-        check_variant_args(variant, args, &target_ty, program, context, reporter);
-        return target_ty;
+        let mut substitutions = HashMap::new();
+        check_variant_args(variant, args, &target_ty, program, context, reporter, &mut substitutions);
+        return substitute_generics(&target_ty, &substitutions);
     }
 
     let Some(signature) = program
@@ -1622,6 +1652,7 @@ fn check_variant_args(
     program: &Program,
     context: &mut FunctionContext<'_>,
     reporter: &mut Reporter,
+    substitutions: &mut HashMap<String, Type>,
 ) {
     let expected = match &variant.fields {
         VariantFields::Unit => Vec::new(),
@@ -1645,7 +1676,7 @@ fn check_variant_args(
         program,
         context,
         reporter,
-        &mut HashMap::new(),
+        substitutions,
     );
 }
 
@@ -1735,6 +1766,19 @@ fn unify_type(expected: &Type, actual: &Type, substitutions: &mut HashMap<String
                 true
             }
         }
+        (_, Type::Generic(name)) => {
+            if let Some(existing) = substitutions.get(name).cloned() {
+                if matches!(existing, Type::Generic(_)) {
+                    substitutions.insert(name.clone(), expected.clone());
+                    true
+                } else {
+                    compatible(&existing, expected)
+                }
+            } else {
+                substitutions.insert(name.clone(), expected.clone());
+                true
+            }
+        }
         (Type::Struct(expected_name, expected_args), Type::Struct(actual_name, actual_args))
         | (Type::Enum(expected_name, expected_args), Type::Enum(actual_name, actual_args)) => {
             expected_name == actual_name
@@ -1760,10 +1804,17 @@ fn unify_type(expected: &Type, actual: &Type, substitutions: &mut HashMap<String
 
 fn substitute_generics(ty: &Type, substitutions: &HashMap<String, Type>) -> Type {
     match ty {
-        Type::Generic(name) => substitutions
-            .get(name)
-            .cloned()
-            .unwrap_or_else(|| Type::Generic(name.clone())),
+        Type::Generic(name) => {
+            if let Some(val) = substitutions.get(name) {
+                if val == ty {
+                    val.clone()
+                } else {
+                    substitute_generics(val, substitutions)
+                }
+            } else {
+                Type::Generic(name.clone())
+            }
+        }
         Type::Struct(name, args) => Type::Struct(
             name.clone(),
             args.iter()

@@ -54,7 +54,7 @@ pub fn run(cli: Cli) -> Result<DriverOutput, String> {
         Commands::Build { .. } => not_implemented("build"),
         Commands::Check { file } => check_file(file),
         Commands::Test { .. } => not_implemented("test"),
-        Commands::Fmt { .. } => not_implemented("fmt"),
+        Commands::Fmt { file, write } => format_file(file, write),
         Commands::Doc => not_implemented("doc"),
         Commands::Clean => not_implemented("clean"),
     }
@@ -95,6 +95,42 @@ fn check_file(file: PathBuf) -> Result<DriverOutput, String> {
         stdout: String::new(),
         stderr: String::new(),
     })
+}
+
+fn format_file(file: PathBuf, write: bool) -> Result<DriverOutput, String> {
+    let source = fs::read_to_string(&file)
+        .map_err(|error| format!("failed to read `{}`: {error}", file.display()))?;
+    let mut sources = SourceMap::new();
+    let file_id = sources.add_file(file.display().to_string(), source);
+    let source_ref = sources.source(file_id).unwrap_or("");
+    let mut reporter = Reporter::new();
+
+    let tokens = lex(source_ref, file_id, &mut reporter);
+    if reporter.has_errors() {
+        return Err(reporter.emit_to_string(&sources));
+    }
+
+    let module =
+        parse_module(&tokens, &mut reporter).map_err(|_| reporter.emit_to_string(&sources))?;
+    if reporter.has_errors() {
+        return Err(reporter.emit_to_string(&sources));
+    }
+
+    let formatted = paco_syntax::fmt::format_module(&module, Some(source_ref));
+
+    if write {
+        fs::write(&file, &formatted)
+            .map_err(|error| format!("failed to write `{}`: {error}", file.display()))?;
+        Ok(DriverOutput {
+            stdout: String::new(),
+            stderr: String::new(),
+        })
+    } else {
+        Ok(DriverOutput {
+            stdout: formatted,
+            stderr: String::new(),
+        })
+    }
 }
 
 struct CheckedProgram {

@@ -1,0 +1,13 @@
+struct Point {
+    x: int,
+    y: int,
+
+    fn set_x(self&, x: int) {
+        // do nothing
+    }
+}
+
+fn main() {
+    let p = Point { x: 10, y: 20 }
+    p.set_x("not an int")
+}
