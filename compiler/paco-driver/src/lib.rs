@@ -126,6 +126,8 @@ fn check_program(file: PathBuf) -> Result<CheckedProgram, String> {
         .map_err(|_| reporter.emit_to_string(&sources))?;
     paco_types::check_module(&module, &mut reporter)
         .map_err(|_| reporter.emit_to_string(&sources))?;
+    paco_borrow::check_module(&module, &mut reporter)
+        .map_err(|_| reporter.emit_to_string(&sources))?;
 
     Ok(CheckedProgram {
         sources,

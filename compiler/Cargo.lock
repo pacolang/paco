@@ -267,6 +267,7 @@ dependencies = [
  "paco-diag",
  "paco-hir",
  "paco-span",
+ "paco-syntax",
  "paco-types",
 ]
 
