@@ -1,0 +1,17 @@
+fn find(target: i64, x: i64) -> Option<i64> {
+    if x == target {
+        return Some(x)
+    }
+    None
+}
+
+fn main() {
+    match find(2, 2) {
+        Some(i) => print(i),
+        None => print(-1),
+    }
+    match find(2, 9) {
+        Some(i) => print(i),
+        None => print(-1),
+    }
+}

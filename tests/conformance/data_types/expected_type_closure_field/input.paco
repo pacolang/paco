@@ -1,0 +1,8 @@
+struct Adder {
+    step: fn(i64) -> i64,
+}
+
+fn main() {
+    let a = Adder { step: |x| x + 10 };
+    print((a.step)(32));
+}

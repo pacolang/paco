@@ -3701,7 +3701,18 @@ fn infer_expr_uncached(
             scrutinee,
             arms,
             span,
-        } => infer_match(scrutinee, arms, *span, program, context, reporter),
+        } => {
+            // A hint set on the whole `match` (its `let` target, the
+            // function's return type, ...) applies to every arm's body,
+            // not just the first one `infer_match`'s left-to-right join
+            // happens to see.
+            if let Some(hint) = named::take_hint(expr, context) {
+                for arm in arms {
+                    named::set_hint(&arm.body, hint.clone(), context);
+                }
+            }
+            infer_match(scrutinee, arms, *span, program, context, reporter)
+        }
         Expr::Try { expr: inner, span } => {
             named::forward_hint(expr, inner, context);
             infer_try(inner, *span, program, context, reporter)
@@ -3882,7 +3893,7 @@ fn infer_if(
     let else_ty = else_branch.map_or(Type::Unit, |else_branch| {
         infer_expr(else_branch, program, context, reporter)
     });
-    if let Some(joined) = join_branch_types(&then_ty, &else_ty) {
+    if let Some(joined) = join_branch_types(&then_ty, &else_ty, &context.generics) {
         if let Some(tail) = &then_branch.tail {
             refine_branch(program, tail, &joined);
         }
@@ -3890,7 +3901,7 @@ fn infer_if(
             refine_branch(program, else_branch, &joined);
         }
     }
-    join_branch_types(&then_ty, &else_ty).unwrap_or_else(|| {
+    join_branch_types(&then_ty, &else_ty, &context.generics).unwrap_or_else(|| {
         reporter.push(Diagnostic::error(
             "PACO-E0304",
             span,
@@ -3933,7 +3944,7 @@ fn infer_match(
         context.scopes.pop();
         result_ty = Some(match result_ty {
             None => arm_ty,
-            Some(previous) => join_branch_types(&previous, &arm_ty).unwrap_or_else(|| {
+            Some(previous) => join_branch_types(&previous, &arm_ty, &context.generics).unwrap_or_else(|| {
                 reporter.push(Diagnostic::error(
                     "PACO-E0304",
                     arm.span,
@@ -4432,7 +4443,7 @@ fn infer_select(
     }
     branch_types
         .into_iter()
-        .reduce(|a, b| join_branch_types(&a, &b).unwrap_or(Type::Unit))
+        .reduce(|a, b| join_branch_types(&a, &b, &context.generics).unwrap_or(Type::Unit))
         .unwrap_or(Type::Unit)
 }
 
@@ -6236,7 +6247,8 @@ fn unify_type(expected: &Type, actual: &Type, substitutions: &mut HashMap<String
         (Type::Generic(name), _) if !is_atom(name) || substitutions.contains_key(name) => match substitutions.get(name) {
             Some(existing) if is_bound(name, existing) => {
                 let mut decayed = None;
-                let agreed = rebinding_agrees_at(name, &existing.clone(), actual, &mut decayed);
+                let existing = existing.clone();
+                let agreed = rebinding_agrees_at(name, &existing, actual, &mut decayed, substitutions);
                 if let Some(decayed) = decayed {
                     substitutions.insert(name.clone(), decayed);
                 }
@@ -6248,7 +6260,10 @@ fn unify_type(expected: &Type, actual: &Type, substitutions: &mut HashMap<String
             }
         },
         (_, Type::Generic(name)) if !is_atom(name) => match substitutions.get(name) {
-            Some(existing) if is_bound(name, existing) => rebinding_agrees(name, existing, expected),
+            Some(existing) if is_bound(name, existing) => {
+                let existing = existing.clone();
+                rebinding_agrees(name, &existing, expected, substitutions)
+            }
             _ => {
                 substitutions.insert(name.clone(), expected.clone());
                 true
@@ -6353,14 +6368,20 @@ fn take_unproved() -> Option<String> {
 
 /// A dimension parameter already bound to `Dyn` never proves a second
 /// occurrence; a type parameter holding a `Dyn` type compares as a type.
-fn rebinding_agrees(name: &str, existing: &Type, actual: &Type) -> bool {
-    rebinding_agrees_at(name, existing, actual, &mut None)
+fn rebinding_agrees(name: &str, existing: &Type, actual: &Type, substitutions: &mut HashMap<String, Type>) -> bool {
+    rebinding_agrees_at(name, existing, actual, &mut None, substitutions)
 }
 
 /// Like [`rebinding_agrees`]; a type parameter whose two bindings differ
 /// only in anonymous extents is rebound to the type with those decayed to
 /// `Dyn`, which `decayed` returns.
-fn rebinding_agrees_at(name: &str, existing: &Type, actual: &Type, decayed: &mut Option<Type>) -> bool {
+fn rebinding_agrees_at(
+    name: &str,
+    existing: &Type,
+    actual: &Type,
+    decayed: &mut Option<Type>,
+    substitutions: &mut HashMap<String, Type>,
+) -> bool {
     if !matches!(existing, Type::Dim(_) | Type::Pack(_) | Type::Generic(_))
         && !compatible(actual, existing)
         && compatible(&named::erase_anonymous(actual), &named::erase_anonymous(existing))
@@ -6377,7 +6398,12 @@ fn rebinding_agrees_at(name: &str, existing: &Type, actual: &Type, decayed: &mut
         record_unproved(format!("`{name}` is bound to `{}` by an earlier argument", existing.name()));
         return false;
     }
-    compatible(actual, existing)
+    // A rebinding whose new observation (`actual`) still carries its own
+    // unresolved generics (e.g. `Vec::new()`'s `Vec<T>` seen where `V` is
+    // already bound to a concrete `Vec<i64>`) is not a structural mismatch:
+    // unify the two against each other to resolve `actual`'s remaining
+    // parameters from the type already on file for `name`.
+    compatible(actual, existing) || unify_type(existing, actual, substitutions)
 }
 
 thread_local! {
@@ -6648,17 +6674,23 @@ fn compatible(actual: &Type, expected: &Type) -> bool {
         }
 }
 
-fn join_branch_types(left: &Type, right: &Type) -> Option<Type> {
+fn join_branch_types(left: &Type, right: &Type, known: &HashMap<String, Type>) -> Option<Type> {
+    // A branch whose own type still carries an unresolved generic (an
+    // existential from bare variant construction, marked `#`, or a plain
+    // callee-own type parameter like `Vec::new()`'s `Vec<T>` that another
+    // branch's concrete type can resolve) is not a real mismatch against a
+    // branch that already settled on a concrete type.
+    let unresolved = |ty: &Type| has_unbound_variant_param(ty) || type_has_foreign_generic(ty, known);
     if compatible(left, right) {
         Some(left.clone())
     } else if *left == Type::Never {
         Some(right.clone())
     } else if *right == Type::Never {
         Some(left.clone())
-    } else if has_unbound_variant_param(left) || has_unbound_variant_param(right) {
+    } else if unresolved(left) || unresolved(right) {
         let mut substitutions = HashMap::new();
         if unify_type(left, right, &mut substitutions) && unify_type(right, left, &mut substitutions) {
-            Some(substitute_generics(if has_unbound_variant_param(left) { right } else { left }, &substitutions))
+            Some(substitute_generics(if unresolved(left) { right } else { left }, &substitutions))
         } else {
             None
         }

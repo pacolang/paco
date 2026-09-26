@@ -1055,13 +1055,17 @@ pub(crate) fn check_broadcast(
     }
 }
 
-/// Unbound own dimension parameters of a call are solved from the type the
-/// context expects of its result.
+/// Unbound own generic parameters of a call — not just dimensions — are
+/// solved from the type the context expects of its result.
 pub(crate) fn solve_from_hint(call: &Expr, key: &str, return_ty: &Type, substitutions: &mut HashMap<String, Type>, program: &Program, context: &mut FunctionContext<'_>) {
     let hint = take_hint(call, context);
     let Some(params) = program.own_generics.get(key) else { return };
+    // Every generic kind but `Lifetime` is represented as `Type::Generic(name)`
+    // in `substitutions` until resolved (`generic_substitutions`), so an
+    // expected-type hint can resolve any of them, not only `const`/`dim`
+    // parameters — a plain type parameter like `Vec<T>`'s `T` needs this too.
     let unbound = params.iter().any(|param| {
-        param.is_const() || param.is_dim()
+        !matches!(param.kind, ast::GenericParamKind::Lifetime)
     } && matches!(substitutions.get(&param.name), Some(Type::Generic(name)) if name == &param.name));
     if !unbound {
         return;
