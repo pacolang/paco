@@ -1,0 +1,3 @@
+panic at input.paco:153:5: dimension `N` = `B * B` overflows i64 or divides by zero
+   at square::dyn (input.paco:153:5)
+   at main (input.paco:160:11)

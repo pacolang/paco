@@ -1,0 +1,12 @@
+use stdlib::io;
+
+fn main() {
+    match io::read_file(&"../../tests/conformance/stdlib/io_read_file/fixture.txt") {
+        Ok(content) => print(content),
+        Err(e) => print(e.message),
+    }
+    match io::read_file(&"does/not/exist.txt") {
+        Ok(content) => print(content),
+        Err(e) => print(e.message),
+    }
+}

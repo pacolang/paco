@@ -1,0 +1,23 @@
+struct Guard {
+    name: string,
+    rank: i64,
+
+    fn drop(&mut self) {
+        print(string_concat(&"close ", &self.name));
+    }
+}
+
+enum Pair {
+    Two(Guard, Guard),
+    None,
+}
+
+fn main() {
+    let p = Pair::Two(Guard { name: "left", rank: 1 }, Guard { name: "right", rank: 2 });
+    match p {
+        Pair::Two(a, b) if a.rank > 5 => print("big"),
+        Pair::Two(a, b) => print(b.name),
+        Pair::None => print("none"),
+    }
+    print("end");
+}

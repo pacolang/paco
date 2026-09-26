@@ -1,0 +1,45 @@
+use stdlib::string;
+
+fn consume(s: string) -> i64 {
+    s.as_bytes().len()
+}
+
+fn maybe_consume(s: string, flag: bool) -> i64 {
+    let note = "kept";
+    if flag {
+        return consume(s);
+    }
+    print(note);
+    print(s);
+    0
+}
+
+enum Slot {
+    Full(string),
+    Empty,
+}
+
+fn take(slot: Slot) -> string {
+    match slot {
+        Slot::Full(text) => text,
+        Slot::Empty => "nothing",
+    }
+}
+
+fn main() {
+    print(maybe_consume("moved away", true));
+    print(maybe_consume("stays", false));
+
+    let mut k: i64 = 0;
+    while k < 6 {
+        let item = k.display();
+        k = k + 1;
+        if k % 2 == 0 {
+            print(consume(item));
+            continue;
+        }
+    }
+
+    print(take(Slot::Full("inside")));
+    print(take(Slot::Empty));
+}

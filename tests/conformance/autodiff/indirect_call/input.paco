@@ -1,0 +1,12 @@
+use stdlib::autodiff;
+
+#[differentiable]
+fn f(x: float) -> float {
+    let scale: fn(float) -> float = |v| v * 2.0;
+    scale(x)
+}
+
+fn main() {
+    let (v, d) = autodiff::grad(f, 3.0);
+    print(d);
+}

@@ -1,0 +1,57 @@
+struct Arena {
+    left: []i64,
+    right: []i64,
+    next: i64,
+
+    fn new(capacity: i64) -> Arena {
+        Arena { left: slice_of_zeros<i64>(capacity), right: slice_of_zeros<i64>(capacity), next: 0 }
+    }
+
+    fn build(&mut self, depth: i64) -> i64 {
+        let id = self.next;
+        self.next = id + 1;
+        if depth == 0 {
+            self.left[id] = -1;
+            self.right[id] = -1;
+        } else {
+            let l = self.build(depth - 1);
+            let r = self.build(depth - 1);
+            self.left[id] = l;
+            self.right[id] = r;
+        }
+        id
+    }
+
+    fn check(&self, id: i64) -> i64 {
+        let l = self.left[id];
+        if l < 0 { 1 } else { 1 + self.check(l) + self.check(self.right[id]) }
+    }
+}
+
+fn nodes(depth: i64) -> i64 {
+    let one: i64 = 1;
+    one << (depth + 1)
+}
+
+fn main() {
+    let min_depth: i64 = 4;
+    let max_depth: i64 = 10;
+    let mut stretch = Arena::new(nodes(max_depth + 1));
+    let root = stretch.build(max_depth + 1);
+    print(stretch.check(root));
+    let mut long_lived = Arena::new(nodes(max_depth));
+    let long_root = long_lived.build(max_depth);
+    let mut depth = min_depth;
+    while depth <= max_depth {
+        let iterations = nodes(max_depth - depth + min_depth - 1);
+        let mut total: i64 = 0;
+        for i in 0..iterations {
+            let mut arena = Arena::new(nodes(depth));
+            let r = arena.build(depth);
+            total = total + arena.check(r);
+        }
+        print(total);
+        depth = depth + 2;
+    }
+    print(long_lived.check(long_root));
+}

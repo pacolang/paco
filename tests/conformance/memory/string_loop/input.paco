@@ -1,0 +1,32 @@
+use stdlib::string;
+
+fn label(n: i64) -> string {
+    let prefix = "item";
+    string_concat(&prefix, &n.display())
+}
+
+fn main() {
+    let mut matches: i64 = 0;
+    let mut i: i64 = 0;
+    while i < 2000 {
+        let s = label(i);
+        if s == "item42" {
+            print(s);
+            matches = matches + 1;
+        }
+        i = i + 1;
+    }
+    print(matches);
+
+    let mut acc = "";
+    let mut j: i64 = 0;
+    while j < 40 {
+        acc = string_concat(&acc, &"ab");
+        j = j + 1;
+    }
+    print(acc.as_bytes().len());
+    match acc.get(0, 6) {
+        Some(head) => print(head),
+        None => print("none"),
+    }
+}

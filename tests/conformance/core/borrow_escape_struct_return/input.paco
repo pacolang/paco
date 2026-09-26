@@ -1,0 +1,9 @@
+struct H { r: &i64 }
+fn make() -> H {
+    let t = 5;
+    H { r: &t }
+}
+fn main() {
+    let h = make();
+    print(*h.r);
+}

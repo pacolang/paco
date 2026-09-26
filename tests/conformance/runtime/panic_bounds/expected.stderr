@@ -1,0 +1,2 @@
+panic at input.paco:5:11: index 5 out of bounds for length 3
+   at main (input.paco:5:11)

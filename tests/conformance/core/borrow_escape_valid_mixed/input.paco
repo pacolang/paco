@@ -1,0 +1,13 @@
+struct H { r: &i64 }
+struct P { x: i64 }
+fn get(p: &P) -> &i64 { &p.x }
+fn wrap(x: &i64) -> H { H { r: x } }
+fn main() {
+    let t = 5;
+    let h = H { r: &t };
+    let mut v: Vec<&i64> = Vec::new();
+    v.push(&t);
+    let p = P { x: 3 };
+    let w = wrap(get(&p));
+    print(*h.r + v.len() + *w.r);
+}

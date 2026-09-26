@@ -1,0 +1,9 @@
+fn main() {
+    let mut s: Set<i64> = Set::new();
+    s.insert(5);
+    s.insert(7);
+    s.insert(5);
+    print(s.len());
+    print(s.contains(5));
+    print(s.contains(9))
+}

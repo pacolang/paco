@@ -1,0 +1,7 @@
+struct H { f: fn() -> i64 }
+fn make() -> H {
+    let t = 5;
+    let r = &t;
+    H { f: || *r }
+}
+fn main() { let h = make(); print(1); }

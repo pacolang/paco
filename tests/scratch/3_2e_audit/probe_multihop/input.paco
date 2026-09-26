@@ -1,0 +1,18 @@
+use stdlib::autodiff;
+use a;
+use b;
+
+#[differentiable]
+fn loss(t: a::T2<f32, 2>) -> f32 {
+    let u = a::T2<f32, 2>::zeros(2);
+    let s = t.add(&u);
+    s.sum()
+}
+
+fn main() {
+    let t = a::T2<f32, 2>::zeros(2);
+    let (n, ga) = autodiff::grad(loss, t);
+    print(n);
+    print(ga.at(0));
+    print(ga.at(1));
+}

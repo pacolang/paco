@@ -1,0 +1,43 @@
+use stdlib::numerics;
+
+fn show(t: &numerics::Tensor<i64, 2, 3>) {
+    for i in 0..t.len() {
+        print(t.at(i))
+    }
+}
+
+fn main() {
+    let mut a = numerics::Tensor<i64, 2, 3>::zeros();
+    print(a.rank());
+    print(a.len());
+    print(a.dyn_dims().len());
+    a.set(numerics::dims2(0, 1), 5);
+    a.set(numerics::dims2(1, 2), 7);
+    print(a.get(numerics::dims2(1, 2)));
+    print(a.offset(&numerics::dims2(1, 2)));
+
+    let mut data = slice_of_zeros<i64>(6);
+    for i in 0..6 {
+        data[i] = i * 10
+    }
+    match numerics::Tensor<i64, 2, 3>::from_slice(data, numerics::dims0()) {
+        Result::Ok(b) => {
+            print(b.get(numerics::dims2(1, 0)));
+            match a + &b {
+                Result::Ok(sum) => show(&sum),
+                Result::Err(e) => print(e.axis),
+            }
+            print(b.scale(2).sum())
+        }
+        Result::Err(e) => print(e.found),
+    }
+
+    match numerics::Tensor<i64, 2, 3>::from_slice(slice_of_zeros<i64>(5), numerics::dims0()) {
+        Result::Ok(bad) => print(bad.len()),
+        Result::Err(e) => {
+            print(e.axis);
+            print(e.expected);
+            print(e.found)
+        }
+    }
+}

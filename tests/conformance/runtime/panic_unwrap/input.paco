@@ -1,0 +1,14 @@
+fn lookup(key: i64) -> Option<string> {
+    if key == 1 {
+        Some("one")
+    } else {
+        None
+    }
+}
+
+fn main() {
+    print(lookup(1).unwrap());
+    let parsed: Result<i64, string> = Result::Ok(7);
+    print(parsed.expect("not a number"));
+    print(lookup(2).unwrap());
+}

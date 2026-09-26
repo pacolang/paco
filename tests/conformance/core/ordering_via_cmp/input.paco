@@ -1,0 +1,36 @@
+struct Version {
+    major: i64,
+    minor: i64,
+
+    fn cmp(&self, other: &Version) -> i64 {
+        if self.major != other.major { self.major - other.major } else { self.minor - other.minor }
+    }
+}
+
+#[derive(Copy)]
+struct Rank {
+    value: i64,
+
+    fn cmp(&self, other: Rank) -> i64 {
+        other.value - self.value
+    }
+}
+
+fn max_of<T: Ord>(a: T, b: T) -> T {
+    if a < b { b } else { a }
+}
+
+fn main() {
+    let a = Version { major: 1, minor: 2 };
+    let b = Version { major: 1, minor: 10 };
+    print(a < b);
+    print(a <= b);
+    print(a > b);
+    print(a >= Version { major: 1, minor: 2 });
+    print(max_of(a, b).minor);
+    let x = Rank { value: 1 };
+    let y = Rank { value: 2 };
+    print(x < y);
+    print(max_of(x, y).value);
+    print(max_of(3, 9));
+}

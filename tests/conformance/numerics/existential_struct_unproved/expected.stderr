@@ -1,0 +1,4 @@
+error[PACO-E0342] input.paco:152:5: cannot prove these dimensions are equal: dimension 0 expected `n`, found `m` (expected `Grid<i64, n>`, found `Grid<i64, m>`)
+  note at input.paco:150:5: `n` is bound here
+  note at input.paco:151:5: `m` is bound here
+  note: `n` and `m` are run-time extents with different names; nothing proves them equal

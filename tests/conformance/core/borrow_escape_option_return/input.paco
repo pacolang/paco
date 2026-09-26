@@ -1,0 +1,7 @@
+fn make() -> Option<&i64> {
+    let t = 5;
+    Option::Some(&t)
+}
+fn main() {
+    match make() { Option::Some(r) => print(*r), Option::None => print(0), }
+}

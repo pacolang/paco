@@ -1,0 +1,3 @@
+panic at input.paco:2:5: division by zero
+   at divide (input.paco:2:5)
+   at main (input.paco:7:11)

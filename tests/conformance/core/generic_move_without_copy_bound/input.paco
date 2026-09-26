@@ -1,0 +1,8 @@
+fn dup<T>(x: T) -> T {
+    let y = x;
+    x
+}
+
+fn main() {
+    print(dup(3));
+}

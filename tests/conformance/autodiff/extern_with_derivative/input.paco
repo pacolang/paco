@@ -1,0 +1,36 @@
+use stdlib::autodiff;
+
+extern "C" {
+    fn cbrt(x: float) -> float;
+}
+
+struct CbrtPullback {
+    root: f64,
+    type Seed = f64;
+    type Gradients = f64;
+
+    fn pullback(self, seed: f64) -> f64 {
+        seed / (3.0 * self.root * self.root)
+    }
+}
+
+#[derivative(of = cbrt)]
+fn cbrt_derivative(x: float) -> (float, CbrtPullback) {
+    let root: float = unsafe { cbrt(x) };
+    (root, CbrtPullback { root: root })
+}
+
+fn helper(x: float) -> float {
+    unsafe { cbrt(x) }
+}
+
+#[differentiable]
+fn f(x: float) -> float {
+    helper(x) * 2.0
+}
+
+fn main() {
+    let (v, d) = autodiff::grad(f, 8.0);
+    print(v);
+    print(d);
+}

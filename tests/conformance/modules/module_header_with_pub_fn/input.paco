@@ -1,0 +1,9 @@
+module nn;
+
+pub fn greet() -> string {
+    "hello"
+}
+
+fn main() {
+    print(greet())
+}

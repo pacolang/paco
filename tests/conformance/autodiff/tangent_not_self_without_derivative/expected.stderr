@@ -1,0 +1,3 @@
+error[PACO-E0815] input.paco:24:5: `predict` reads a field of a `Line` that carries a derivative, but its `Tangent` is `LineGradient`, not itself, so the compiler cannot route the field's gradient; give `predict` a `#[derivative]`
+  note at input.paco:34:18: reached through this call in `main`
+  note at input.paco:29:13: reached through this call in `loss`

@@ -1,0 +1,53 @@
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+struct Named {
+    name: string,
+    at: Point,
+}
+
+fn score(s: &string, expected: &string) -> i64 {
+    if s == expected { 1 } else { 0 }
+}
+
+fn clobber(n: i64) -> i64 {
+    let a = Point { x: n, y: n };
+    let b = string_concat(&"zzzzzzzzzzzz", &"yyyyyyyyyyyy");
+    a.x + a.y + score(&b, &"zz")
+}
+
+fn start(name: string, p: Point) -> JoinHandle<i64> {
+    let label = string_concat(&"task ", &name);
+    let named = Named { name: label, at: p };
+    spawn (named.at.x * 100 + named.at.y * 10 + score(&named.name, &"task alpha") + score(&name, &"alpha"))
+}
+
+fn start_blocking(word: string) -> JoinHandle<i64> {
+    let doubled = string_concat(&word, &word);
+    spawn_blocking(|| score(&doubled, &"abcabc") * 3)
+}
+
+fn start_closure(tag: string) -> JoinHandle<i64> {
+    let suffix = string_concat(&tag, &"!");
+    let shout = |n: i64| n * 2 + score(&suffix, &"beta!");
+    spawn shout(20)
+}
+
+fn report(handle: JoinHandle<i64>) {
+    match handle.join() {
+        Result::Ok(value) => print(value),
+        Result::Err(e) => print(-1),
+    }
+}
+
+fn main() {
+    let a = start("alpha", Point { x: 3, y: 4 });
+    let b = start_blocking("abc");
+    let c = start_closure("beta");
+    print(clobber(9));
+    report(a);
+    report(b);
+    report(c);
+}

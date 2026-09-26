@@ -1,0 +1,33 @@
+fn greeting(name: string) -> string {
+    string_concat(&"hello, ", &name)
+}
+
+fn describe(count: i64, flag: bool, letter: char) -> string {
+    let mut text = int_to_string(count);
+    text = string_concat(&text, &" ");
+    text = string_concat(&text, &bool_to_string(flag));
+    text = string_concat(&text, &" ");
+    string_concat(&text, &char_to_string(letter))
+}
+
+fn repeat(word: string, times: i64) -> string {
+    let mut out = "";
+    let mut i = 0;
+    while i < times {
+        out = string_concat(&out, &word);
+        i = i + 1;
+    }
+    out
+}
+
+fn same(a: string, b: string) -> bool {
+    a == b
+}
+
+fn main() {
+    print(greeting("paco"));
+    print(describe(42, true, 'é'));
+    print(repeat("ab", 3));
+    print(same("x", "x"));
+    print(same("x", "y"));
+}

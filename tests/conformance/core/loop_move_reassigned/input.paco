@@ -1,0 +1,33 @@
+fn relay(s: string) -> string {
+    string_concat(&s, &"!")
+}
+
+struct Holder {
+    items: Vec<i64>,
+}
+
+fn grow(holder: Holder) -> Holder {
+    let mut items = holder.items;
+    let count = items.len();
+    items.push(count);
+    Holder { items: items }
+}
+
+fn main() {
+    let mut holder = Holder { items: Vec::new() };
+    for i in 0..4 {
+        holder = grow(holder);
+    }
+    print(holder.items.len());
+    let mut s = "go";
+    for i in 0..3 {
+        s = relay(s);
+    }
+    let mut n: i64 = 0;
+    while n < 2 {
+        let t = s;
+        s = t;
+        n = n + 1;
+    }
+    print(s);
+}

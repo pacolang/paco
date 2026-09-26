@@ -1,0 +1,41 @@
+use stdlib::numerics;
+
+fn report(r: Result<numerics::Tensor<f32, Dyn, 3>, numerics::ShapeError>) {
+    match r {
+        Result::Ok(t) => {
+            print(t.shape()[0]);
+            print(t.len())
+        }
+        Result::Err(e) => {
+            print(e.axis);
+            print(e.expected);
+            print(e.found)
+        }
+    }
+}
+
+fn batch_sum(a: &numerics::Tensor<f32, Dyn, 3>, b: &numerics::Tensor<f32, Dyn, 3>) {
+    report(a.checked_add(b))
+}
+
+fn main() {
+    let x = numerics::Tensor<f32, Dyn, 3>::zeros_with(numerics::dims1(2));
+    let y = numerics::Tensor<f32, Dyn, 3>::zeros_with(numerics::dims1(4));
+    match x {
+        Result::Ok(a) => match y {
+            Result::Ok(b) => {
+                print(a.rank());
+                print(a.dyn_dims().len());
+                batch_sum(&a, &a);
+                batch_sum(&a, &b);
+                report(a.concat(&b))
+            }
+            Result::Err(e) => print(e.axis),
+        },
+        Result::Err(e) => {
+            let unused = y;
+            print(e.axis)
+        }
+    }
+    report(numerics::Tensor<f32, Dyn, 3>::zeros_with(numerics::dims0()))
+}

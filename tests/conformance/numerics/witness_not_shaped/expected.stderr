@@ -1,0 +1,2 @@
+error[PACO-E0345] input.paco:146:13: `Plain<p.dim0>` does not satisfy `stdlib::dims::Shaped`, so it has no `dim()`
+  note: `Shaped` needs `fn extent(&self, axis: i64) -> i64`

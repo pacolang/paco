@@ -1,0 +1,28 @@
+[package]
+name = "paco-codegen-llvm"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+inkwell = { version = "0.10.0", default-features = false, features = ["llvm18-1-prefer-dynamic", "target-x86", "target-aarch64"], optional = true }
+paco-diag.workspace = true
+paco-mir.workspace = true
+paco-span.workspace = true
+paco-types.workspace = true
+
+[features]
+default = []
+llvm = ["dep:inkwell"]
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+paco-borrow.workspace = true
+paco-syntax.workspace = true
+
+[[test]]
+name = "lowering"
+required-features = ["llvm"]

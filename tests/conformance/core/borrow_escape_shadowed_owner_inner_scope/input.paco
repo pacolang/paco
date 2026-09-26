@@ -1,0 +1,9 @@
+fn main() {
+    let a = 1;
+    let mut v: Vec<&i64> = Vec::new();
+    {
+        let a = 5;
+        v.push(&a);
+    }
+    print(v.len());
+}

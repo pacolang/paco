@@ -1,0 +1,16 @@
+fn main() {
+    let base = 10;
+    let add = |x: i64, y| x + y + base;
+    let negate = |b: bool| !b;
+    let say = || print(7);
+    print(add(1, 2));
+    print(add(3, 4));
+    print(negate(false));
+    say();
+    let mut i: i64 = 0;
+    while i < 100 {
+        let step = |v: i64| v + i;
+        i = step(i) + 1;
+    }
+    print(i);
+}

@@ -1,0 +1,22 @@
+fn describe(s: string) -> i64 {
+    match s {
+        "one" => 1,
+        "two" => 2,
+        _ => 0,
+    }
+}
+
+fn main() {
+    print(describe("two"));
+    print(describe("zzz"));
+    let c = 'é';
+    match c {
+        'a' => print("a"),
+        'é' => print(c),
+        _ => print("other"),
+    }
+    print("ab" == "ab");
+    print("ab" != "ab");
+    let x: u8 = 200;
+    print(x);
+}

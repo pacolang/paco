@@ -1,0 +1,31 @@
+struct Particle {
+    x: f64,
+    hits: i64,
+}
+
+fn main() {
+    let mut data: Vec<i64> = Vec::new();
+    let mut seed: i64 = 42;
+    for i in 0..3 {
+        seed = (seed * 11 + 7) % 100;
+        let k0 = seed % 20 - 10;
+        let k = if k0 < 0 { 0 - k0 } else { k0 };
+        data.push(k);
+        print(k);
+        let doubled = match k { 0 => 0, other => other * 2 };
+        let total = { doubled + k };
+        print(total + doubled);
+    }
+    let mut ps: Vec<Particle> = Vec::new();
+    ps.push(Particle { x: 1.5, hits: 2 });
+    ps.push(Particle { x: 2.5, hits: 3 });
+    let mut hits: i64 = 0;
+    for i in 0..ps.len() {
+        let p = &ps[i];
+        let h = p.hits;
+        hits = hits + h + p.hits;
+        print(p.x);
+    }
+    print(hits);
+    print(data.len());
+}

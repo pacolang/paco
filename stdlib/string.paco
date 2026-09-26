@@ -1,0 +1,54 @@
+module string;
+
+pub struct CharsIter {
+    source: string,
+    pos: i64,
+
+    pub fn next(&mut self) -> Option<char> {
+        match string_char_at(&self.source, self.pos) {
+            Some(c) => {
+                self.pos = string_next_char_boundary(&self.source, self.pos);
+                Option::Some(c)
+            }
+            None => Option::None
+        }
+    }
+}
+
+pub struct BytesIter {
+    source: string,
+    pos: i64,
+
+    pub fn next(&mut self) -> Option<i64> {
+        match string_byte_at(&self.source, self.pos) {
+            Some(b) => {
+                self.pos = self.pos + 1;
+                Option::Some(b)
+            }
+            None => Option::None
+        }
+    }
+}
+
+pub methods string {
+    pub fn get(&self, start: i64, end: i64) -> Option<string> {
+        string_slice_utf8(self, start, end)
+    }
+
+    pub fn as_bytes(&self) -> []byte {
+        string_to_bytes(&self)
+    }
+
+    /// The length in bytes.
+    pub fn len(&self) -> i64 {
+        string_len_bytes(&self)
+    }
+
+    pub fn chars(&self) -> CharsIter {
+        CharsIter { source: self, pos: 0 }
+    }
+
+    pub fn bytes(&self) -> BytesIter {
+        BytesIter { source: self, pos: 0 }
+    }
+}

@@ -1,0 +1,326 @@
+module numerics;
+
+/// A disagreement between run-time extents. `axis` is the dimension that
+/// disagreed, or `-1` when the element count or the number of `Dyn`
+/// extents supplied was wrong.
+pub struct ShapeError {
+    pub axis: i64,
+    pub expected: i64,
+    pub found: i64,
+}
+
+pub fn dims0() -> []i64 {
+    slice_of_zeros<i64>(0)
+}
+
+pub fn dims1(a: i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(1);
+    out[0] = a;
+    out
+}
+
+pub fn dims2(a: i64, b: i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(2);
+    out[0] = a;
+    out[1] = b;
+    out
+}
+
+pub fn dims3(a: i64, b: i64, c: i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(3);
+    out[0] = a;
+    out[1] = b;
+    out[2] = c;
+    out
+}
+
+/// How many positions of a static shape are `Dyn` (read as `-1`).
+pub fn dyn_count(dims: &[]i64) -> i64 {
+    let mut count = 0;
+    for i in 0..dims.len() {
+        if dims[i] < 0 {
+            count = count + 1
+        }
+    }
+    count
+}
+
+/// The full shape: each `Dyn` position takes the next run-time extent.
+pub fn full_shape(dims: &[]i64, dyn_dims: &[]i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(dims.len());
+    let mut next = 0;
+    for i in 0..dims.len() {
+        if dims[i] < 0 {
+            out[i] = dyn_dims[next];
+            next = next + 1
+        } else {
+            out[i] = dims[i]
+        }
+    }
+    out
+}
+
+pub fn copy_dims(dims: &[]i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(dims.len());
+    for i in 0..dims.len() {
+        out[i] = dims[i]
+    }
+    out
+}
+
+pub fn element_count(shape: &[]i64) -> i64 {
+    let mut count = 1;
+    for i in 0..shape.len() {
+        count = count * shape[i]
+    }
+    count
+}
+
+/// Checks that two full shapes agree, rank first and then axis by axis.
+pub fn check_shape(expected: &[]i64, found: &[]i64) -> Result<i64, ShapeError> {
+    if expected.len() != found.len() {
+        return Result::Err(ShapeError { axis: -1, expected: expected.len(), found: found.len() })
+    }
+    for i in 0..expected.len() {
+        if expected[i] != found[i] {
+            return Result::Err(ShapeError { axis: i, expected: expected[i], found: found[i] })
+        }
+    }
+    Result::Ok(0)
+}
+
+/// A dense tensor: one owned row-major buffer, plus one run-time extent for
+/// each `Dyn` dimension of its type. Static dimensions live only in the type.
+pub struct Tensor<T: Numeric, const D: int...> {
+    data: []T,
+    dyn_dims: []i64,
+
+    /// All zeros. Every `Dyn` dimension gets extent `0`.
+    pub fn zeros() -> Self {
+        let dims = D;
+        let dyn_dims = slice_of_zeros<i64>(dyn_count(&dims));
+        let shape = full_shape(&dims, &dyn_dims);
+        Tensor { data: slice_of_zeros<T>(element_count(&shape)), dyn_dims: dyn_dims }
+    }
+
+    /// All zeros, with one run-time extent per `Dyn` dimension, in order.
+    pub fn zeros_with(dyn_dims: []i64) -> Result<Self, ShapeError> {
+        let dims = D;
+        let wanted = dyn_count(&dims);
+        if dyn_dims.len() != wanted {
+            return Result::Err(ShapeError { axis: -1, expected: wanted, found: dyn_dims.len() })
+        }
+        let shape = full_shape(&dims, &dyn_dims);
+        Result::Ok(Tensor { data: slice_of_zeros<T>(element_count(&shape)), dyn_dims: dyn_dims })
+    }
+
+    /// Takes ownership of a row-major buffer whose length must match the shape.
+    pub fn from_slice(data: []T, dyn_dims: []i64) -> Result<Self, ShapeError> {
+        let dims = D;
+        let wanted = dyn_count(&dims);
+        if dyn_dims.len() != wanted {
+            return Result::Err(ShapeError { axis: -1, expected: wanted, found: dyn_dims.len() })
+        }
+        let shape = full_shape(&dims, &dyn_dims);
+        let count = element_count(&shape);
+        if data.len() != count {
+            return Result::Err(ShapeError { axis: -1, expected: count, found: data.len() })
+        }
+        Result::Ok(Tensor { data: data, dyn_dims: dyn_dims })
+    }
+
+    /// Converts every element with `as`.
+    pub fn cast<S: Numeric>(source: &Tensor<S, D...>) -> Self {
+        let mut data = slice_of_zeros<T>(source.data.len());
+        for i in 0..source.data.len() {
+            data[i] = source.data[i] as T
+        }
+        Tensor { data: data, dyn_dims: copy_dims(&source.dyn_dims) }
+    }
+
+    pub fn rank(&self) -> i64 {
+        D.len()
+    }
+
+    pub fn shape(&self) -> []i64 {
+        let dims = D;
+        full_shape(&dims, &self.dyn_dims)
+    }
+
+    pub fn len(&self) -> i64 {
+        self.data.len()
+    }
+
+    pub fn dyn_dims(&self) -> &[]i64 {
+        &self.dyn_dims
+    }
+
+    pub fn data(&self) -> &[]T {
+        &self.data
+    }
+
+    pub fn data_mut(&mut self) -> &mut []T {
+        &mut self.data
+    }
+
+    pub fn at(&self, i: i64) -> T {
+        self.data[i]
+    }
+
+    pub fn set_at(&mut self, i: i64, value: T) {
+        self.data[i] = value
+    }
+
+    /// The row-major offset of a multi-index.
+    pub fn offset(&self, index: &[]i64) -> i64 {
+        let shape = self.shape();
+        let mut flat = 0;
+        for axis in 0..shape.len() {
+            flat = flat * shape[axis] + index[axis]
+        }
+        flat
+    }
+
+    pub fn get(&self, index: []i64) -> T {
+        self.data[self.offset(&index)]
+    }
+
+    pub fn set(&mut self, index: []i64, value: T) {
+        let flat = self.offset(&index);
+        self.data[flat] = value
+    }
+}
+
+methods<T: Numeric + Add + Sub + Mul, const D: int...> Tensor<T, D...> {
+    pub fn add(&self, other: &Self) -> Result<Self, ShapeError> {
+        self.checked_add(other)
+    }
+
+    /// Element-wise `+` on operands whose shapes are not proved equal; the
+    /// shapes are compared at run time.
+    pub fn checked_add<const E: int...>(&self, other: &Tensor<T, E...>) -> Result<Self, ShapeError> {
+        check_shape(&self.shape(), &other.shape())?;
+        let mut out = slice_of_zeros<T>(self.data.len());
+        for i in 0..self.data.len() {
+            out[i] = self.data[i] + other.data[i]
+        }
+        Result::Ok(Tensor { data: out, dyn_dims: copy_dims(&self.dyn_dims) })
+    }
+
+    pub fn sub(&self, other: &Self) -> Result<Self, ShapeError> {
+        self.checked_sub(other)
+    }
+
+    /// Element-wise `-` on operands whose shapes are not proved equal; the
+    /// shapes are compared at run time.
+    pub fn checked_sub<const E: int...>(&self, other: &Tensor<T, E...>) -> Result<Self, ShapeError> {
+        check_shape(&self.shape(), &other.shape())?;
+        let mut out = slice_of_zeros<T>(self.data.len());
+        for i in 0..self.data.len() {
+            out[i] = self.data[i] - other.data[i]
+        }
+        Result::Ok(Tensor { data: out, dyn_dims: copy_dims(&self.dyn_dims) })
+    }
+
+    pub fn mul(&self, other: &Self) -> Result<Self, ShapeError> {
+        self.checked_mul(other)
+    }
+
+    /// Element-wise `*` on operands whose shapes are not proved equal; the
+    /// shapes are compared at run time.
+    pub fn checked_mul<const E: int...>(&self, other: &Tensor<T, E...>) -> Result<Self, ShapeError> {
+        check_shape(&self.shape(), &other.shape())?;
+        let mut out = slice_of_zeros<T>(self.data.len());
+        for i in 0..self.data.len() {
+            out[i] = self.data[i] * other.data[i]
+        }
+        Result::Ok(Tensor { data: out, dyn_dims: copy_dims(&self.dyn_dims) })
+    }
+
+    pub fn scale(&self, k: T) -> Self {
+        let mut out = slice_of_zeros<T>(self.data.len());
+        for i in 0..self.data.len() {
+            out[i] = self.data[i] * k
+        }
+        Tensor { data: out, dyn_dims: copy_dims(&self.dyn_dims) }
+    }
+
+    pub fn sum(&self) -> T {
+        let zero = slice_of_zeros<T>(1);
+        let mut acc = zero[0];
+        for i in 0..self.data.len() {
+            acc = acc + self.data[i]
+        }
+        acc
+    }
+}
+
+methods<T: Numeric, const R: int...> Tensor<T, Dyn, R...> {
+    /// Stacks two tensors along their leading `Dyn` axis. Their other
+    /// extents must agree at run time; a disagreement is an `Err`.
+    pub fn concat<const S: int...>(&self, other: &Tensor<T, Dyn, S...>) -> Result<Self, ShapeError> {
+        let left = self.shape();
+        let right = other.shape();
+        if left.len() != right.len() {
+            return Result::Err(ShapeError { axis: -1, expected: left.len(), found: right.len() })
+        }
+        for i in 1..left.len() {
+            if left[i] != right[i] {
+                return Result::Err(ShapeError { axis: i, expected: left[i], found: right[i] })
+            }
+        }
+        let mut data = slice_of_zeros<T>(self.data.len() + other.data.len());
+        for i in 0..self.data.len() {
+            data[i] = self.data[i]
+        }
+        for i in 0..other.data.len() {
+            data[self.data.len() + i] = other.data[i]
+        }
+        let mut dyn_dims = slice_of_zeros<i64>(self.dyn_dims.len());
+        for i in 0..self.dyn_dims.len() {
+            dyn_dims[i] = self.dyn_dims[i]
+        }
+        dyn_dims[0] = self.dyn_dims[0] + other.dyn_dims[0];
+        Result::Ok(Tensor { data: data, dyn_dims: dyn_dims })
+    }
+}
+
+methods<T: Numeric + Add + Mul, const M: int, const K: int> Tensor<T, M, K> {
+    /// `self` (M×K) times `other` (K×N); the inner dimensions are proved
+    /// equal by the type.
+    pub fn matmul<const N: int>(&self, other: &Tensor<T, K, N>) -> Result<Tensor<T, M, N>, ShapeError> {
+        self.checked_matmul(other)
+    }
+
+    /// `self` (M×K) times `other` (J×N) where `K` and `J` are not proved
+    /// equal; they are compared at run time.
+    pub fn checked_matmul<const J: int, const N: int>(&self, other: &Tensor<T, J, N>) -> Result<Tensor<T, M, N>, ShapeError> {
+        let left = self.shape();
+        let right = other.shape();
+        if left[1] != right[0] {
+            return Result::Err(ShapeError { axis: 0, expected: left[1], found: right[0] })
+        }
+        let rows = left[0];
+        let inner = left[1];
+        let cols = right[1];
+        let mut data = slice_of_zeros<T>(rows * cols);
+        for r in 0..rows {
+            for c in 0..cols {
+                let mut acc = data[r * cols + c];
+                for k in 0..inner {
+                    acc = acc + self.data[r * inner + k] * other.data[k * cols + c]
+                }
+                data[r * cols + c] = acc
+            }
+        }
+        let mut dyn_dims = slice_of_zeros<i64>(0);
+        if M < 0 && N < 0 {
+            dyn_dims = dims2(rows, cols)
+        } else if M < 0 {
+            dyn_dims = dims1(rows)
+        } else if N < 0 {
+            dyn_dims = dims1(cols)
+        }
+        Tensor<T, M, N>::from_slice(data, dyn_dims)
+    }
+}

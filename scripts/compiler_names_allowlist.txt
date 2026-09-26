@@ -1,0 +1,19 @@
+# Reviewed false positives for scripts/check_compiler_names.py, one
+# `path:line` per line.
+#
+# `extract-domain-libraries` task 4.1/4.2: the transition-window alias table,
+# deprecation warning, missing-dependency error and missing-library hint
+# genuinely need to say `Tensor` by name — it is the whole point of each
+# diagnostic (design.md: "the compiler cannot tell this apart from an
+# unrelated user type... that ambiguity is inherent to a hint named after the
+# library's exact type name"). Temporary: tied to the same two-core-minor-
+# release transition window as the alias table itself (design.md "Window
+# length"); task 5.3 removes the alias table and this allowlisting along with
+# it once the window closes.
+compiler/paco-driver/src/lib.rs:773
+compiler/paco-driver/src/lib.rs:778
+compiler/paco-driver/src/lib.rs:2365
+compiler/paco-driver/src/lib.rs:2911
+compiler/paco-driver/src/lib.rs:2925
+compiler/paco-driver/src/lib.rs:2926
+compiler/paco-driver/src/lib.rs:2937

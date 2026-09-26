@@ -1,0 +1,20 @@
+fn risky(n: i64) -> i64 {
+    if n > 2 {
+        panic("too big");
+    }
+    n * 10
+}
+
+fn main() {
+    let ok = spawn risky(1);
+    match ok.join() {
+        Ok(value) => print(value),
+        Err(e) => print(e.message),
+    }
+    let bad = spawn risky(5);
+    match bad.join() {
+        Ok(value) => print(value),
+        Err(e) => print(e.message),
+    }
+    print("still running");
+}

@@ -1,0 +1,5 @@
+use stdlib::blas;
+
+fn main() {
+    print("blas extern block parses and type-checks")
+}

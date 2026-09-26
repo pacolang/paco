@@ -1,0 +1,31 @@
+use stdlib::autodiff;
+
+/// Central finite differences: step `0.000001`, relative tolerance
+/// `0.000001` for `f64` (the widths' values are documented in
+/// `paco-test-harness`).
+fn agrees(analytic: float, numeric: float) -> bool {
+    (analytic - numeric).abs() <= 0.000001 * (1.0 + numeric.abs())
+}
+
+fn horner_value(x: float) -> float {
+    let mut acc = 0.0;
+    let mut i = 0;
+    while i < 6 {
+        acc = acc * x + 1.0;
+        i = i + 1
+    }
+    acc
+}
+
+#[differentiable]
+fn horner(x: float) -> float {
+    horner_value(x)
+}
+
+fn main() {
+    let h = 0.000001;
+    let (v, d) = autodiff::grad(horner, 1.3);
+    print(v);
+    print(d);
+    print(agrees(d, (horner_value(1.3 + h) - horner_value(1.3 - h)) / (2.0 * h)));
+}

@@ -1,0 +1,9 @@
+use stdlib::string;
+fn main() {
+    let t = "abc";
+    let r = &t;
+    let f = || r.as_bytes().len();
+    let u = t;
+    print(f());
+    print(u);
+}

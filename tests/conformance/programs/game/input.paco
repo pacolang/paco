@@ -1,0 +1,83 @@
+#[derive(Copy)]
+struct Vec2 {
+    x: f64,
+    y: f64,
+
+    fn add(&self, o: Vec2) -> Vec2 { Vec2 { x: self.x + o.x, y: self.y + o.y } }
+    fn sub(&self, o: Vec2) -> Vec2 { Vec2 { x: self.x - o.x, y: self.y - o.y } }
+    fn scale(&self, s: f64) -> Vec2 { Vec2 { x: self.x * s, y: self.y * s } }
+    fn dot(&self, o: Vec2) -> f64 { self.x * o.x + self.y * o.y }
+}
+
+#[derive(Copy)]
+struct Particle {
+    pos: Vec2,
+    vel: Vec2,
+    radius: f64,
+    hits: i64,
+}
+
+fn step(ps: &mut Vec<Particle>, dt: f64, w: f64, h: f64) {
+    let gravity = Vec2 { x: 0.0, y: -9.8 };
+    let n = ps.len();
+    for i in 0..n {
+        let p = ps[i];
+        let mut vel = p.vel + gravity.scale(dt);
+        let mut pos = p.pos + vel.scale(dt);
+        let mut hits = p.hits;
+        if pos.x < p.radius || pos.x > w - p.radius {
+            pos = Vec2 { x: if pos.x < p.radius { p.radius } else { w - p.radius }, y: pos.y };
+            vel = Vec2 { x: -vel.x * 0.9, y: vel.y };
+            hits = hits + 1;
+        }
+        if pos.y < p.radius || pos.y > h - p.radius {
+            pos = Vec2 { x: pos.x, y: if pos.y < p.radius { p.radius } else { h - p.radius } };
+            vel = Vec2 { x: vel.x, y: -vel.y * 0.9 };
+            hits = hits + 1;
+        }
+        ps.set(i, Particle { pos: pos, vel: vel, radius: p.radius, hits: hits });
+    }
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let a = ps[i];
+            let b = ps[j];
+            let d = b.pos - a.pos;
+            let rr = a.radius + b.radius;
+            let dist2 = d.dot(d);
+            if dist2 < rr * rr && dist2 > 0.000001 {
+                let along = (b.vel - a.vel).dot(d) / dist2;
+                if along < 0.0 {
+                    let impulse = d.scale(along);
+                    ps.set(i, Particle { pos: a.pos, vel: a.vel + impulse, radius: a.radius, hits: a.hits + 1 });
+                    ps.set(j, Particle { pos: b.pos, vel: b.vel - impulse, radius: b.radius, hits: b.hits + 1 });
+                }
+            }
+        }
+    }
+}
+
+fn main() {
+    let mut ps: Vec<Particle> = Vec::new();
+    let mut seed: i64 = 7;
+    for i in 0..60 {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        let x = (seed % 1000) as f64 / 50.0;
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        let y = (seed % 1000) as f64 / 50.0;
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        let vx = ((seed % 200) - 100) as f64 / 10.0;
+        ps.push(Particle { pos: Vec2 { x: x, y: y }, vel: Vec2 { x: vx, y: 0.0 }, radius: 0.5, hits: 0 });
+    }
+    for frame in 0..300 {
+        step(&mut ps, 0.004, 20.0, 20.0);
+    }
+    let mut hits: i64 = 0;
+    let mut energy: f64 = 0.0;
+    for i in 0..ps.len() {
+        let p = ps[i];
+        hits = hits + p.hits;
+        energy = energy + p.vel.dot(p.vel);
+    }
+    print(hits);
+    print(energy);
+}

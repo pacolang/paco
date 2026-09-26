@@ -1,0 +1,5 @@
+module b;
+
+pub struct Widget {
+    pub value: i64,
+}

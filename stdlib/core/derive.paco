@@ -1,0 +1,24 @@
+module core;
+
+pub comptime fn derive_display(t: type) -> Code {
+    let mut acc = quote { #(type_name(t)) };
+    let mut first = true;
+    for field in fields_of(t) {
+        let label = if first {
+            string_concat(&" { ", &string_concat(&field.name, &": "))
+        } else {
+            string_concat(&", ", &string_concat(&field.name, &": "))
+        };
+        first = false;
+        acc = quote { string_concat(&string_concat(&#(acc), &#(label)), &self.#(field.name).display()) }
+    }
+    let suffix = if first { " {  }" } else { " }" };
+    acc = quote { string_concat(&#(acc), &#(suffix)) };
+    quote {
+        methods #(t) {
+            pub fn display(&self) -> string {
+                #(acc)
+            }
+        }
+    }
+}

@@ -1,0 +1,1 @@
+error[PACO-E0332] input.paco:3:11: `string` has no `index` method; indexing requires `fn index(&self, i: Idx) -> &Output`

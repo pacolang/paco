@@ -1,0 +1,9 @@
+[package]
+name = "paco-span"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"

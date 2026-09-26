@@ -1,0 +1,38 @@
+struct Guard {
+    name: string,
+
+    fn new(name: string) -> Guard {
+        print(string_concat(&"open ", &name));
+        Guard { name: name }
+    }
+
+    fn drop(&mut self) {
+        print(string_concat(&"close ", &self.name));
+    }
+}
+
+fn wrap(g: Guard) -> Guard {
+    print(string_concat(&"wrap ", &g.name));
+    Guard::new(string_concat(&g.name, &"+"))
+}
+
+fn main() {
+    let s = string_concat(&"a", &"1");
+    let s = string_concat(&s, &"2");
+    print(s);
+    let g = Guard::new("same-1");
+    let g = Guard::new("same-2");
+    {
+        let g = Guard::new("inner");
+        print(g.name);
+    }
+    let mut i: i64 = 0;
+    while i < 2 {
+        let l = Guard::new("loop-a");
+        let l = Guard::new("loop-b");
+        i = i + 1;
+    }
+    let w = Guard::new("w");
+    let w = wrap(w);
+    print("end");
+}

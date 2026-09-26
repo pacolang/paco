@@ -1,0 +1,81 @@
+module core;
+
+pub trait From<T> {
+    fn from(value: T) -> Self;
+}
+
+pub trait Into<T> {
+    fn into(self) -> T;
+}
+
+#[derivable(derive_display)]
+pub trait Display {
+    fn display(&self) -> string;
+}
+
+pub trait Clone {
+    fn clone(&self) -> Self;
+}
+
+pub trait Copy {
+}
+
+pub trait Drop {
+    fn drop(&mut self);
+}
+
+pub trait Eq {
+    fn eq(&self, other: Self) -> bool;
+}
+
+pub trait Ord {
+    fn cmp(&self, other: Self) -> i64;
+}
+
+/// Satisfied natively by every integer type, `bool`, `char` and `string`.
+pub trait Hash {
+    fn hash(&self) -> u64;
+}
+
+pub trait Add {
+    fn add(&self, other: Self) -> Self;
+}
+
+pub trait Sub {
+    fn sub(&self, other: Self) -> Self;
+}
+
+pub trait Mul {
+    fn mul(&self, other: Self) -> Self;
+}
+
+pub trait Div {
+    fn div(&self, other: Self) -> Self;
+}
+
+pub trait Rem {
+    fn rem(&self, other: Self) -> Self;
+}
+
+pub trait Neg {
+    fn neg(&self) -> Self;
+}
+
+pub trait Index<Idx> {
+    type Output;
+    fn index(&self, i: Idx) -> &Self::Output;
+}
+
+pub trait Iter {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+
+pub trait Call {
+    fn call(&self);
+}
+
+/// Satisfied natively by every integer and floating-point primitive, and by
+/// nothing else: the element types a `Tensor` may hold.
+pub trait Numeric {
+}

@@ -1,0 +1,47 @@
+module dims;
+
+/// A value whose extents are known at run time. `with_dims`, `as_dims`,
+/// `dim`, `erase_dims` and `assume_dims` exist on every `Shaped` type.
+/// Obligation: a `&mut self` method never changes an extent that the
+/// value's type names or leaves `Dyn`; an operation that changes an extent
+/// takes `self` and returns a new name (`-> Grid<f32, ?m, 784>`).
+pub trait Shaped {
+    fn extent(&self, axis: i64) -> i64;
+}
+
+/// An extent that disagreed with the dimension a refinement expected.
+/// `origin` is the `file:line` that bound `expected`; `bound` is its value.
+pub struct DimError {
+    pub axis: i64,
+    pub expected: string,
+    pub origin: string,
+    pub bound: i64,
+    pub observed: i64,
+
+    pub fn display(&self) -> string {
+        let axis = self.axis.display();
+        let observed = self.observed.display();
+        if self.axis < 0 {
+            return string_concat(&"the length ", &string_concat(&observed, &" is negative"));
+        }
+        if self.observed < 0 {
+            return string_concat(&"dimension ", &string_concat(&axis, &string_concat(&": the extent ", &string_concat(&observed, &" is negative"))));
+        }
+        let mut place = string_concat(&" = ", &self.bound.display());
+        if self.origin != "" {
+            place = string_concat(&place, &string_concat(&" (bound at ", &string_concat(&self.origin, &")")));
+        }
+        let expected = string_concat(&"`", &string_concat(&self.expected, &string_concat(&"`", &place)));
+        let found = string_concat(&expected, &string_concat(&", found ", &observed));
+        string_concat(&"dimension ", &string_concat(&axis, &string_concat(&": expected ", &found)))
+    }
+}
+
+/// Names a plain length as a dimension: `let t = dims::witness(len)?;`
+/// makes `t` usable in types for the rest of the block.
+pub fn witness(n: i64) -> Result<i64, DimError> {
+    if n < 0 {
+        return Result::Err(DimError { axis: -1, expected: "", origin: "", bound: -1, observed: n });
+    }
+    Result::Ok(n)
+}

@@ -1,0 +1,10 @@
+#[derive(Copy)]
+struct Named {
+    id: i64,
+    name: string,
+}
+
+fn main() {
+    let n = Named { id: 1, name: "a" };
+    print(n.id);
+}

@@ -1,0 +1,13 @@
+[workspace]
+resolver = "3"
+members = ["paco-runtime", "paco-runtime-ffi"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+repository = "https://github.com/pacolang/paco"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+corosensei = "0.3.4"
+libm = "0.2.16"

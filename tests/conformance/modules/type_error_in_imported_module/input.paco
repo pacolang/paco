@@ -1,0 +1,5 @@
+use geo;
+
+fn main() {
+    print(geo::area(2, 3))
+}

@@ -1,0 +1,41 @@
+fn count_primes(lo: i64, hi: i64) -> i64 {
+    let mut count: i64 = 0;
+    for n in lo..hi {
+        if n < 2 {
+            continue;
+        }
+        let mut d: i64 = 2;
+        let mut prime = true;
+        while d * d <= n {
+            if n % d == 0 {
+                prime = false;
+                break;
+            }
+            d = d + 1;
+        }
+        if prime {
+            count = count + 1;
+        }
+    }
+    count
+}
+
+fn worker(tx: Sender<i64>, lo: i64, hi: i64) {
+    let sent = tx.send(count_primes(lo, hi));
+}
+
+fn main() {
+    let limit: i64 = 20000;
+    let q = limit / 4;
+    let (tx, rx) = channel<i64>(capacity: 4);
+    let h1 = spawn_blocking(|| { count_primes(0, q) });
+    let h2 = spawn_blocking(|| { count_primes(q, 2 * q) });
+    let h3 = spawn_blocking(|| { count_primes(2 * q, 3 * q) });
+    let w = spawn worker(tx, 3 * q, limit);
+    let mut total: i64 = 0;
+    match h1.join() { Ok(v) => total = total + v, Err(e) => print(-1), }
+    match h2.join() { Ok(v) => total = total + v, Err(e) => print(-1), }
+    match h3.join() { Ok(v) => total = total + v, Err(e) => print(-1), }
+    match rx.recv() { Ok(v) => total = total + v, Err(e) => print(-1), }
+    print(total);
+}

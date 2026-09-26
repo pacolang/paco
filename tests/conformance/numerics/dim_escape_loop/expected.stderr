@@ -1,0 +1,3 @@
+error[PACO-E0343] input.paco:163:9: the dimension `fresh.n` does not live as long as `keep`
+  note at input.paco:162:13: `fresh.n` is bound here, in an inner scope
+  note: each iteration or block opens a fresh name; declare the variable inside the scope, or forget the name with `.erase_dims()`

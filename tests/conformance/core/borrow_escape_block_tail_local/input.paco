@@ -1,0 +1,4 @@
+fn main() {
+    let r = { let t = 1; &t };
+    print(*r);
+}

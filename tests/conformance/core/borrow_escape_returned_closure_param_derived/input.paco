@@ -1,0 +1,9 @@
+struct H { f: fn() -> i64 }
+fn wrap(p: &i64) -> H { H { f: || *p } }
+fn keep(p: &i64) -> fn() -> i64 { || *p }
+fn main() {
+    let x = 4;
+    let h = wrap(&x);
+    let f = keep(&x);
+    print(f() + (h.f)());
+}

@@ -1,0 +1,21 @@
+fn parse(text: string) -> Result<i64, string> {
+    if text == "42" {
+        Result::Ok(42)
+    } else {
+        Result::Err("not a number")
+    }
+}
+
+fn main() {
+    let name: Option<string> = Some("paco");
+    let owned = name.unwrap();
+    print(owned);
+    print(Some("expected").expect("missing"));
+    print(parse("42").unwrap());
+    let words: Result<string, string> = Result::Ok("ok");
+    print(words.expect("failed"));
+    match parse("x") {
+        Result::Ok(value) => print(value),
+        Result::Err(message) => print(message),
+    }
+}

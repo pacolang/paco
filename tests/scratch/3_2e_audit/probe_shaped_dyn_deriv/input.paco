@@ -1,0 +1,22 @@
+use stdlib::autodiff;
+use vecmod;
+
+#[differentiable]
+fn loss(t: vecmod::T2<f32, Dyn>) -> f32 {
+    t.add(&t).sum()
+}
+
+fn extents1(a: i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(1);
+    out[0] = a;
+    out
+}
+
+fn main() {
+    let t = vecmod::T2<f32, Dyn>::zeros(extents1(2));
+    print(t.extent(0));
+    let (n, ga) = autodiff::grad(loss, t);
+    print(n);
+    print(ga.at(0));
+    print(ga.at(1));
+}

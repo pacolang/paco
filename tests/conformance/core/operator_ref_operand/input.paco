@@ -1,0 +1,38 @@
+struct Bag {
+    items: Vec<i64>,
+
+    fn add(&self, other: &Bag) -> Bag {
+        let mut items: Vec<i64> = Vec::new();
+        items.push(self.items.len() + other.items.len());
+        Bag { items: items }
+    }
+
+    fn sub(&self, other: Bag) -> Bag {
+        let mut items: Vec<i64> = Vec::new();
+        items.push(self.items.len() - other.items.len());
+        Bag { items: items }
+    }
+}
+
+fn filled(count: i64) -> Bag {
+    let mut items: Vec<i64> = Vec::new();
+    for i in 0..count {
+        items.push(i);
+    }
+    Bag { items: items }
+}
+
+fn main() {
+    let a = filled(2);
+    let b = filled(3);
+    let c = a + b;
+    print(c.items[0]);
+    print(a.items.len() + b.items.len());
+    let d = a + filled(4);
+    print(d.items[0]);
+    let e = &a + &b;
+    print(e.items[0]);
+    let f = b - filled(1);
+    print(f.items[0]);
+    print(b.items.len());
+}

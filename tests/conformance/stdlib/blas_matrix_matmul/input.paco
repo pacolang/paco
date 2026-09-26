@@ -1,0 +1,27 @@
+use stdlib::blas;
+use stdlib::math;
+
+fn main() {
+    let mut a = math::Matrix<float, 2, 3>::zeros();
+    let mut b = math::Matrix<float, 3, 2>::zeros();
+    for r in 0..2 {
+        for c in 0..3 {
+            a.set(r, c, (r * 3 + c + 1) as float);
+            b.set(c, r, (c * 2 + r + 7) as float)
+        }
+    }
+    match blas::matmul(&a, &b) {
+        Result::Ok(fast) => match a * &b {
+            Result::Ok(slow) => {
+                for r in 0..2 {
+                    for c in 0..2 {
+                        print(fast.get(r, c));
+                        print(slow.get(r, c))
+                    }
+                }
+            }
+            Result::Err(e) => print(e.axis),
+        },
+        Result::Err(e) => print(e.axis),
+    }
+}

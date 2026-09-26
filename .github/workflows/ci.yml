@@ -1,0 +1,203 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      os:
+        description: Runner images to test, space-separated (ubuntu-latest ubuntu-24.04-arm macos-latest windows-latest), or all
+        default: all
+      full:
+        description: Run every conformance leg and the AddressSanitizer check on every platform
+        type: boolean
+        default: false
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+
+jobs:
+  changes:
+    name: Changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - id: matrix
+        env:
+          OS: ${{ inputs.os || 'all' }}
+        run: |
+          all='[{"os":"ubuntu-latest","experimental":false,"full":true},{"os":"ubuntu-24.04-arm","experimental":false,"full":false},{"os":"macos-latest","experimental":false,"full":false},{"os":"windows-latest","experimental":false,"full":false}]'
+          matrix="$(jq -c --arg os "$OS" '[.[] | select(.os as $o | $os == "all" or (($os | split(" ") | index($o)) != null))] | {include: .}' <<< "$all")"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'compiler/**'
+              - 'runtime/**'
+              - 'stdlib/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'rust-toolchain.toml'
+              - '.github/workflows/**'
+
+  compiler:
+    name: Compiler workspace (${{ matrix.os }}${{ matrix.experimental && ', experimental' || '' }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
+
+    defaults:
+      run:
+        working-directory: compiler
+
+    env:
+      PACO_CONFORMANCE_LEGS: ${{ (matrix.full || inputs.full) && 'all' || 'representative' }}
+      PACO_SKIP_LEAK_CHECK: ${{ !(matrix.full || inputs.full) && '1' || '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Exclude the workspace from Defender scanning (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Add-MpPreference -ExclusionPath "${{ github.workspace }}"
+
+      - name: Cache Cargo builds
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            compiler -> target
+            runtime -> target
+
+      - name: Install BLAS and qemu (Linux)
+        if: runner.os == 'Linux'
+        timeout-minutes: 8
+        uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: libblas-dev qemu-user
+          version: 1
+          execute_install_scripts: true
+
+      - name: Check
+        run: cargo check --workspace --no-default-features
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+
+      - name: Static link every std module (Linux)
+        if: runner.os == 'Linux'
+        working-directory: .
+        run: scripts/check_static_link.sh
+
+      - name: Build and check the distribution (Linux, main)
+        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: .
+        env:
+          PACO_NO_LLVM: 1
+        run: |
+          rustup component add llvm-tools
+          dist="$(scripts/dist.sh)"
+          scripts/check-dist.sh "$dist"
+
+      - name: Test
+        run: cargo test --workspace --no-default-features --no-fail-fast
+
+      - name: Runtime tests
+        if: ${{ !cancelled() }}
+        working-directory: runtime
+        run: cargo test --workspace
+
+      - name: Cross-build Linux programs (macOS)
+        if: runner.os == 'macOS' && !cancelled()
+        shell: bash
+        working-directory: .
+        run: |
+          rustup component add llvm-tools
+          cargo build --quiet --manifest-path compiler/Cargo.toml -p paco-driver --no-default-features
+          mkdir -p cross
+          printf 'fn main() {\n    print(1.5);\n    print(42);\n}\n' > cross/main.paco
+          for arch in x86_64 aarch64; do
+            target="$arch-unknown-linux-musl"
+            settings="$(scripts/runtime-env.sh "$target")"
+            (
+              while IFS= read -r setting; do export "$setting"; done <<< "$settings"
+              cargo build --release --quiet --manifest-path runtime/Cargo.toml -p paco-runtime-ffi --target "$target"
+            )
+            compiler/target/debug/paco build --target "$arch-unknown-linux" cross/main.paco
+            mv cross/main "cross/main-$arch-debug"
+            compiler/target/debug/paco build --release --backend cranelift --target "$arch-unknown-linux" cross/main.paco
+            mv cross/main "cross/main-$arch-release"
+          done
+
+      - name: Upload the Linux programs built on macOS
+        if: runner.os == 'macOS' && !cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-programs-from-macos
+          path: cross/main-*
+
+  cross-from-macos:
+    name: Linux programs built on macOS
+    needs: [changes, compiler]
+    if: contains(needs.changes.outputs.matrix, 'macos')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-programs-from-macos
+          path: cross
+      - uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        timeout-minutes: 8
+        with:
+          packages: qemu-user
+          version: 1
+      - name: Run them
+        run: |
+          chmod +x cross/main-*
+          for program in cross/main-*; do
+            case "$program" in *aarch64*) output="$(qemu-aarch64 "$program")" ;; *) output="$("$program")" ;; esac
+            [ "$output" = "$(printf '1.5\n42')" ] || { echo "$program printed: $output"; exit 1; }
+            file "$program"
+          done
+
+  docs:
+    name: Documentation consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Canonical syntax in docs
+        run: python3 scripts/check_docs_consistency.py
+      - name: Standard-library scope
+        run: python3 scripts/check_std_scope.py
+      - name: Compiler and runtime name hygiene
+        run: python3 scripts/check_compiler_names.py

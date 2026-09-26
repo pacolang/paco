@@ -1,0 +1,66 @@
+use stdlib::string;
+
+struct ParseError {
+    message: string,
+}
+
+struct Wrapped {
+    detail: string,
+
+    fn from(error: ParseError) -> Self {
+        Wrapped { detail: string_concat(&"wrapped: ", &error.message) }
+    }
+}
+
+fn parse(text: string) -> Result<i64, ParseError> {
+    if text == "bad" {
+        return Result::Err(ParseError { message: string_concat(&"cannot parse ", &text) });
+    }
+    Result::Ok(text.as_bytes().len())
+}
+
+fn sum(a: string, b: string) -> Result<i64, Wrapped> {
+    let label = "summing";
+    let x = parse(a)?;
+    let y = parse(b)?;
+    print(label);
+    Result::Ok(x + y)
+}
+
+fn byte_count(text: &string) -> i64 {
+    text.as_bytes().len()
+}
+
+fn first_long(words: Vec<string>) -> string {
+    let mut i: i64 = 0;
+    while i < words.len() {
+        let word = words[i];
+        let size = byte_count(&word);
+        if size > 3 {
+            return word;
+        }
+        i = i + 1;
+    }
+    "none"
+}
+
+fn main() {
+    match sum("ab", "cde") {
+        Result::Ok(n) => print(n),
+        Result::Err(e) => print(e.detail),
+    }
+    match sum("bad", "cde") {
+        Result::Ok(n) => print(n),
+        Result::Err(e) => print(e.detail),
+    }
+    match sum("ab", "bad") {
+        Result::Ok(n) => print(n),
+        Result::Err(e) => print(e.detail),
+    }
+    let mut words: Vec<string> = Vec::new();
+    words.push("to");
+    words.push("be");
+    words.push("longer");
+    words.push("tail");
+    print(first_long(words));
+}

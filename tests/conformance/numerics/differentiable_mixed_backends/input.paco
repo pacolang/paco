@@ -1,0 +1,53 @@
+use stdlib::autodiff;
+
+struct Cells {
+    data: []f32,
+    type Tangent = Cells;
+
+    fn zeros(len: i64) -> Cells {
+        Cells { data: slice_of_zeros<f32>(len) }
+    }
+
+    fn zero_tangent(&self) -> Cells {
+        Cells { data: slice_of_zeros<f32>(self.data.len()) }
+    }
+
+    fn move_by(&mut self, offset: &Cells) {
+        for i in 0..self.data.len() {
+            self.data[i] = self.data[i] + offset.data[i]
+        }
+    }
+
+    fn sum(&self) -> f32 {
+        let mut total: f32 = 0.0 as f32;
+        for i in 0..self.data.len() {
+            total = total + self.data[i]
+        }
+        total
+    }
+}
+
+fn square(x: f32) -> f32 {
+    x * x
+}
+
+#[differentiable]
+fn loss(w: &Cells) -> f32 {
+    let offset: f32 = 1.5;
+    square(w.sum() + offset)
+}
+
+fn describe(n: i64) -> i64 {
+    n * 10
+}
+
+fn main() {
+    let w = Cells::zeros(4);
+    print(loss(&w));
+    print(describe(4));
+    let (value, gradient) = autodiff::grad(loss, &w);
+    print(value);
+    for i in 0..gradient.data.len() {
+        print(gradient.data[i])
+    }
+}

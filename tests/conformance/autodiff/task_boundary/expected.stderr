@@ -1,0 +1,2 @@
+error[PACO-E0811] input.paco:9:18: a value that carries a derivative is sent to another task or written through a raw address
+  note at input.paco:17:18: reached through this call in `main`

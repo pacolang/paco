@@ -1,0 +1,16 @@
+struct Field<T: Numeric, const D: int...> {
+    data: []T,
+
+    pub fn rank(&self) -> i64 {
+        D.len()
+    }
+}
+
+fn project(a: &Field<f32, Dyn, 768>) -> i64 {
+    a.rank()
+}
+
+fn main() {
+    let t = Field<f32, 4, 768> { data: slice_of_zeros<f32>(0) };
+    print(project(&t))
+}

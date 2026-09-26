@@ -1,0 +1,6 @@
+fn main() {
+    print(comptime {
+        let big: i64 = 9223372036854775807;
+        big + 1
+    });
+}

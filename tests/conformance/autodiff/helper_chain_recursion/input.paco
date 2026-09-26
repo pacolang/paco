@@ -1,0 +1,45 @@
+use stdlib::autodiff;
+
+/// Central finite differences: step `0.000001`, relative tolerance
+/// `0.000001` for `f64` (the widths' values are documented in
+/// `paco-test-harness`).
+fn agrees(analytic: float, numeric: float) -> bool {
+    (analytic - numeric).abs() <= 0.000001 * (1.0 + numeric.abs())
+}
+
+fn inner(x: float) -> float {
+    x * x + 1.0
+}
+
+fn outer(x: float) -> float {
+    inner(x) * inner(x + 1.0)
+}
+
+fn constant(x: float) -> float {
+    3.0
+}
+
+#[differentiable]
+fn chain(x: float) -> float {
+    outer(x) + constant(x)
+}
+
+fn pow_n(x: float, n: i64) -> float {
+    if n == 0 { 1.0 } else { x * pow_n(x, n - 1) }
+}
+
+#[differentiable]
+fn power(x: float) -> float {
+    pow_n(x, 5)
+}
+
+fn main() {
+    let h = 0.000001;
+    let (c, dc) = autodiff::grad(chain, 0.8);
+    print(c);
+    print(agrees(dc, (outer(0.8 + h) - outer(0.8 - h)) / (2.0 * h)));
+    let (p, dp) = autodiff::grad(power, 1.2);
+    print(p);
+    print(dp);
+    print(agrees(dp, (pow_n(1.2 + h, 5) - pow_n(1.2 - h, 5)) / (2.0 * h)));
+}

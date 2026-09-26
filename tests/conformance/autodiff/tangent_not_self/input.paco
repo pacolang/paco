@@ -1,0 +1,72 @@
+use stdlib::autodiff;
+
+/// A line `w * x + b` whose gradient is a separate type.
+struct Line {
+    w: f64,
+    b: f64,
+    type Tangent = LineGradient;
+
+    fn zero_tangent(&self) -> LineGradient {
+        LineGradient { dw: 0.0, db: 0.0 }
+    }
+
+    fn move_by(&mut self, offset: &LineGradient) {
+        self.w = self.w + offset.dw;
+        self.b = self.b + offset.db
+    }
+}
+
+struct LineGradient {
+    dw: f64,
+    db: f64,
+
+    fn add(&self, other: LineGradient) -> LineGradient {
+        LineGradient { dw: self.dw + other.dw, db: self.db + other.db }
+    }
+}
+
+fn predict(line: &Line, x: f64) -> f64 {
+    line.w * x + line.b
+}
+
+struct PredictPullback {
+    x: f64,
+    w: f64,
+    type Seed = f64;
+    type Gradients = (LineGradient, f64);
+
+    fn pullback(self, seed: f64) -> (LineGradient, f64) {
+        (LineGradient { dw: seed * self.x, db: seed }, seed * self.w)
+    }
+}
+
+#[derivative(of = predict)]
+fn predict_derivative(line: &Line, x: f64) -> (f64, PredictPullback) {
+    (predict(line, x), PredictPullback { x: x, w: line.w })
+}
+
+fn squared_error(line: &Line, x: f64, target: f64) -> f64 {
+    let error = predict(line, x) - target;
+    error * error
+}
+
+#[differentiable]
+fn loss(line: Line) -> f64 {
+    squared_error(&line, 2.0, 5.0) + squared_error(&line, -1.0, 0.0)
+}
+
+#[differentiable]
+fn untouched(line: Line, x: f64) -> f64 {
+    x * x
+}
+
+fn main() {
+    let (l, g) = autodiff::grad(loss, Line { w: 3.0, b: 1.0 });
+    print(l);
+    print(g.dw);
+    print(g.db);
+    let (u, (gl, gx)) = autodiff::grad(untouched, (Line { w: 3.0, b: 1.0 }, 1.5));
+    print(u);
+    print(gl.dw);
+    print(gx);
+}

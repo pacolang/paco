@@ -1,0 +1,1155 @@
+# Every diagnostic code Paco emits. See README.md in this directory.
+#
+# A code never changes meaning once released. Retire it and point at a successor
+# instead. Codes are never recycled.
+
+[E0335]
+message_template = "cannot infer the type of this closure parameter; add a type annotation"
+severity = "error"
+explanation = """
+A closure parameter written without a type annotation (`|x| x + 1`) takes \
+its type from the arguments of the first call to the closure. A closure \
+that is never called with arguments of a known type gives the compiler \
+nothing to infer the parameter's type from."""
+cause = "An unannotated closure parameter has no call site from which its type can be inferred."
+fix = "Annotate the parameter (`|x: i64| x + 1`), or call the closure with arguments of a known type."
+spec_ref = "docs/grammar/grammar.ebnf"
+adr_ref = "docs/design/decisions/0018-blocking-foreign-calls.md"
+introduced_in = "phase-8"
+status = "active"
+lint = false
+
+[E0354]
+message_template = "cannot derive `Copy`: field `{field}` has type `{type}`, which is not `Copy`"
+severity = "error"
+explanation = """
+`#[derive(Copy)]` makes a struct or enum duplicate bit for bit on assignment, \
+argument passing and reads instead of moving. That is only sound when \
+nothing in the value owns a resource, so every field and variant payload \
+must itself be `Copy`: numeric primitives, `bool`, `char`, shared borrows, \
+raw pointers, tuples of `Copy` types and other `Copy` user types."""
+cause = "A type marked `#[derive(Copy)]` has a field or payload whose type owns a resource or moves."
+fix = "Remove `Copy` from the derive, or change the field to a `Copy` type."
+spec_ref = "docs/design/spec.md"
+introduced_in = "real-programs-gaps"
+status = "active"
+lint = false
+
+[E0353]
+message_template = "cannot derive `{trait_name}`: no `#[derivable(..)]` registration found"
+severity = "error"
+explanation = """
+`#[derive(Trait, ...)]` (`phase-9-comptime` Decision 8) expands each named \
+trait by looking up a `#[derivable(fn_name)]` attribute on that trait's \
+own declaration — the `comptime fn` that generates a satisfying \
+implementation. A trait with no such attribute has no registered \
+derive expansion, so it cannot be named in `#[derive(..)]`."""
+cause = "`#[derive(..)]` named a trait whose declaration has no `#[derivable(..)]` attribute."
+fix = "Add `#[derivable(fn_name)]` to the trait's own declaration, naming a `comptime fn` that generates a satisfying implementation — or remove the trait from `#[derive(..)]` and implement it by hand."
+spec_ref = "openspec/changes/phase-9-comptime/design.md"
+adr_ref = "docs/design/decisions/0005-metaprogramming-and-packages.md"
+introduced_in = "phase-9"
+status = "active"
+lint = false
+
+[E0352]
+message_template = "{what} is a `comptime fn` and can only be called from inside a comptime context"
+severity = "error"
+explanation = """
+A `comptime fn` may use `Value::Type`/`Code` (`phase-9-comptime` Decision \
+5/7), neither of which has any representation once compilation finishes \
+— so calling one only makes sense while already inside a comptime \
+context: a `comptime { .. }` block, another `comptime fn`'s own body, or \
+the `#[derive]` expansion machinery."""
+cause = "A `comptime fn` was called from ordinary (non-comptime) code."
+fix = "Call it from inside `comptime { .. }`, or from another `comptime fn`."
+spec_ref = "openspec/changes/phase-9-comptime/design.md"
+adr_ref = "docs/design/decisions/0005-metaprogramming-and-packages.md"
+introduced_in = "phase-9"
+status = "active"
+lint = false
+
+[E0351]
+message_template = "`{name}` is generic; a `type` argument must name a non-generic struct or enum"
+severity = "error"
+explanation = """
+A bare struct/enum name passed where a `type`-typed parameter is expected \
+resolves to a captured `Type::TypeValue`, per `phase-9-comptime`'s \
+type-as-value mechanism — but only for a non-generic struct or enum. \
+Passing a generic type's own name (e.g. `Box` from `struct Box<T> { .. \
+}`) has no single concrete type to capture without further type \
+arguments, which this mechanism does not resolve."""
+cause = "A generic struct or enum's bare name was passed as a `type` argument."
+fix = "Pass a non-generic struct or enum name instead. Passing an already-instantiated generic type (e.g. `Box<i64>`) as a `type` value is not supported."
+spec_ref = "openspec/changes/phase-9-comptime/design.md"
+adr_ref = "docs/design/decisions/0005-metaprogramming-and-packages.md"
+introduced_in = "phase-9"
+status = "active"
+lint = false
+
+[E0350]
+message_template = "comptime evaluation failed: {reason}"
+severity = "error"
+explanation = """
+A `comptime { .. }` block failed while the compiler ran it at compile time \
+— distinct from an ordinary type error, since the block type-checked \
+successfully and the failure only happens during evaluation: performing \
+file/network I/O, calling an `extern` function, exceeding the instruction \
+budget, or another comptime-only restriction."""
+cause = "The block's code, once type-checked, attempted something comptime execution forbids (I/O, FFI, or unbounded work), or otherwise failed while the compiler evaluated it."
+fix = "Remove the forbidden operation from the `comptime` block, or restructure the computation to terminate within the evaluator's instruction budget."
+spec_ref = "docs/design/decisions/0005-metaprogramming-and-packages.md"
+adr_ref = "docs/design/decisions/0005-metaprogramming-and-packages.md"
+introduced_in = "phase-9"
+status = "active"
+lint = false
+
+[E0301]
+message_template = "type mismatch: expected {expected}, found {found}"
+severity = "error"
+explanation = """
+An operator or assignment received operands whose types do not agree. Paco has \
+no implicit conversion between numeric types, and none at all between a numeric \
+type and `string`."""
+cause = "One operand's type is not compatible with the other's, and no implicit conversion exists to bridge them."
+fix = "Convert explicitly with `as`, or change one side so the types agree. Even widening needs an explicit `as`."
+spec_ref = "docs/design/spec.md#9-ergonomics--performance-feature-10"
+adr_ref = "docs/design/decisions/0014-reduced-precision-floats.md"
+introduced_in = "phase-2"
+status = "active"
+lint = false
+
+[L0001]
+message_template = "use of `{name}` after it was moved"
+severity = "error"
+explanation = """
+A moved value loses its original owner. Reading the old binding afterwards is \
+always an ownership bug, because the value it named no longer lives there."""
+cause = "The value was passed by value, assigned to another binding, or sent over a channel, and the original binding was used after that point."
+fix = "Borrow instead of moving (`&` or `&mut`) if ownership does not need to transfer, or clone before the move if both are genuinely needed."
+spec_ref = "docs/design/spec.md#3-ownership-borrowing-and-lifetimes"
+adr_ref = "docs/design/decisions/0001-memory-model.md"
+introduced_in = "phase-4"
+status = "active"
+lint = "use-after-move"
+
+[L0002]
+message_template = "`{name}` is a bare reference; wrap it in `Arc` to share it with a spawned task"
+severity = "error"
+explanation = """
+A `&T` borrow is only valid for the lifetime of its owner's stack frame. A \
+spawned task may run concurrently with, or outlive, the frame that took the \
+borrow, so the borrow checker cannot prove it stays valid on the other side. \
+`Arc<T>` is an owned, reference-counted value — not a borrow — so it crosses \
+the boundary safely."""
+cause = "A bare `&T` (not wrapped in `Arc<T>`) was captured by a `spawn` expression or sent as the value argument to `Sender::send`."
+fix = "Wrap the value in `Arc::new(...)` before capturing it in `spawn` or sending it over a channel."
+spec_ref = "docs/design/spec.md#8-concurrency-tasks-generators-and-channels-features-3-11-12"
+adr_ref = "docs/design/decisions/0001-memory-model.md"
+introduced_in = "phase-8"
+status = "active"
+lint = "shared-without-sync"
+
+[E0115]
+message_template = "expected `;` after this statement"
+severity = "error"
+explanation = """
+Every statement ends in `;`, as in Rust; a newline does not end one. Only \
+the final expression of a block, whose value is the block's value, and an \
+expression statement ending in a block (`if`, `match`, `while`, `for`, \
+`loop`, `select`, `unsafe`, `comptime`, `{ }`) may omit it. Items that are \
+not blocks — `module`, `use`, `const`, an associated `type` — also end in \
+`;`."""
+cause = "A statement or non-block item was followed by more code without a `;` between them."
+fix = "Insert `;` at the end of the statement the diagnostic points at."
+spec_ref = "docs/grammar/grammar.ebnf"
+introduced_in = "phase-13"
+status = "active"
+lint = false
+
+[E0114]
+message_template = "a const parameter pack must be the last generic parameter"
+severity = "error"
+explanation = """
+A trailing const parameter pack (`const D: int...`) takes every remaining \
+generic argument, so nothing may follow it, and a parameter list has at most \
+one."""
+cause = "A const parameter pack was followed by another generic parameter, or a second pack was declared."
+fix = "Move the pack to the end of the parameter list, and keep only one."
+spec_ref = "docs/grammar/grammar.ebnf"
+adr_ref = "docs/design/decisions/0023-const-generics.md"
+introduced_in = "phase-13"
+status = "active"
+lint = false
+
+[E0336]
+message_template = "shape mismatch: dimension {index} expected `{expected}`, found `{found}`"
+severity = "error"
+explanation = """
+Two types provably differ in a dimension. Dimension expressions are compared \
+by their polynomial normal forms, so `B + B` equals `2 * B` and `(N + 1) * 2` \
+equals `2 * N + 2`; two dimensions provably differ when their difference is a \
+non-zero constant (`2 * n` and `2 * n + 1`), when two literals differ, when the \
+ranks differ, or when a static extent meets a run-time one (`Dyn` or a name): \
+those are stored differently and are never equal. A difference that is not a \
+constant is `PACO-E0342` ("cannot prove") instead."""
+cause = "A value whose shape (or rank) provably disagrees with the expected type was passed, returned or assigned."
+fix = "Make the shapes agree; for a dimension known only at run time, declare it `Dyn` or name it with a `dim` parameter or a witness."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0029-named-dynamic-dimensions.md"
+introduced_in = "phase-13"
+status = "active"
+lint = false
+
+[E0337]
+message_template = "`{item}` exceeds its instantiation limit of {limit} distinct const arguments; instantiated with {constants}"
+severity = "error"
+explanation = """
+Every distinct set of const arguments is a separate monomorphised copy of an \
+item. The number per item is capped so a shape-parameterised library cannot \
+make compilation unbounded; the diagnostic lists every set of constants seen."""
+cause = "A generic item was used with more distinct const arguments than its limit (256 by default)."
+fix = "Raise the limit with `#[instantiation_limit(N)]` on the item, or declare a dimension that varies `dim` (one instance for every extent) or `Dyn`."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0023-const-generics.md"
+introduced_in = "phase-13"
+status = "active"
+lint = false
+
+[E0338]
+message_template = "expected a constant dimension or `Dyn`, found {found}"
+severity = "error"
+explanation = """
+A const generic parameter takes an integer constant expression over literals \
+and const parameters, or `Dyn`; a type parameter takes a type. The argument \
+given does not fit its parameter's kind."""
+cause = "A type was written where a dimension is expected, or a constant where a type is expected."
+fix = "Pass a dimension (`768`, `N * 2`, `Dyn`, `D...`) to a const parameter and a type to a type parameter."
+spec_ref = "docs/grammar/grammar.ebnf"
+adr_ref = "docs/design/decisions/0023-const-generics.md"
+introduced_in = "phase-13"
+status = "active"
+lint = false
+
+[E0339]
+message_template = "`{type}` is a storage-only format with no arithmetic or ordering; convert with `as` first"
+severity = "error"
+explanation = """
+`f8e4m3` and `f8e5m2` carry no arithmetic operators and no comparison beyond \
+equality: they are storage and interchange formats, computed on after an \
+explicit widening."""
+cause = "An arithmetic or ordering operator was applied to FP8 values."
+fix = "Widen explicitly (`(w as f32) * x`) and narrow the result back if needed."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0014-reduced-precision-floats.md"
+introduced_in = "phase-13"
+status = "active"
+lint = false
+
+[E0340]
+message_template = "`{type}` does not satisfy `{trait}`, required by `{param}` in `{item}`"
+severity = "error"
+explanation = """
+A type parameter's trait bound is checked where the item is used. Primitives \
+satisfy the operator traits natively (FP8 has none); other types satisfy a \
+trait by having all of its methods."""
+cause = "A generic item was used with a type argument that lacks a bound its parameter requires."
+fix = "Use a type that satisfies the bound, or convert the value first."
+spec_ref = "docs/design/spec.md"
+introduced_in = "phase-13"
+status = "active"
+lint = false
+
+[E0341]
+message_template = "`#[differentiable]` function `{name}`: only floating-point scalars and `Differentiable` types can be differentiated"
+severity = "error"
+explanation = """
+The compiler differentiates floating-point data. A `#[differentiable]` \
+function takes and returns float scalars (`f64`, `f32`, `f16`, `bf16`), values \
+of types that satisfy `std::autodiff::Differentiable` (a `type Tangent`, \
+`zero_tangent` and `move_by`), borrows of them, or tuples of them, and `grad` \
+only accepts such a function. FP8 values never carry a derivative."""
+cause = "A `#[differentiable]` signature mentions a type that is neither a float with arithmetic nor `Differentiable`, or `grad` was given a function that is not `#[differentiable]`."
+fix = "Differentiate with respect to floating-point or `Differentiable` inputs only (add `type Tangent`, `zero_tangent` and `move_by` to a type of your own), and mark the function `#[differentiable]`."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0026-native-autodiff.md"
+introduced_in = "phase-13"
+status = "active"
+lint = false
+
+[E0342]
+message_template = "cannot prove these dimensions are equal: dimension {index} expected `{expected}`, found `{found}`"
+severity = "error"
+explanation = """
+Where two dimensions must be equal, the type checker proves it by comparing \
+polynomial normal forms. Two different run-time names (witnesses such as \
+`let n = x.dim(0);`, the anonymous `x.dim0` of an immutable binding, `dim` \
+parameters, opened existentials), two `Dyn` extents, a parameter bound to \
+`Dyn` by one argument and used again by another, and expressions whose \
+difference is not a constant (`/`, `%` and overflowing terms are opaque) \
+cannot be proved equal. The diagnostic names where each name was bound. The \
+compiler never turns such an equality into a run-time check."""
+cause = "Two dimensions that must agree are different names, anonymous `Dyn` extents or expressions that differ by more than a constant."
+fix = "Refine the values once with `with_dims` so both carry the same name, use the type's `checked_*` form, which compares at run time and returns `Result`, or write the dimensions so that they are equal as polynomials."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0029-named-dynamic-dimensions.md"
+introduced_in = "named-dynamic-dims"
+status = "active"
+lint = false
+
+[E0344]
+message_template = "cannot infer `{param}` from `{expected}`"
+severity = "error"
+explanation = """
+A dimension parameter is inferred only where it appears alone in a parameter's \
+dimension, or from `N + c` with a literal `c`. Any other position, such as \
+`2 * N`, does not determine the parameter, and the call must pass it."""
+cause = "A call relies on inferring a dimension parameter that appears only in a non-invertible expression."
+fix = "Pass the parameter explicitly, for example `half<4>(g)`."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0029-named-dynamic-dimensions.md"
+introduced_in = "named-dynamic-dims"
+status = "active"
+lint = false
+
+[E0343]
+message_template = "the dimension `{name}` would become `Dyn` implicitly"
+severity = "error"
+explanation = """
+A named dimension (a witness such as `let n = x.dim(0);`, a `dim` parameter or \
+an opened existential) is only valid in the scope that bound it, and it is \
+never weakened to `Dyn` behind the program's back. Returning or storing a value \
+whose type names it where the type says `Dyn`, or assigning it to a variable \
+that outlives the scope (a loop iteration opens a fresh name each time), would \
+drop the name silently. Passing it to a parameter declared `Dyn` is the one \
+implicit conversion."""
+cause = "A value whose type names a dimension is returned, annotated or assigned where `Dyn` is written, or outlives the scope of the name."
+fix = "Name the extent in the signature (`-> Grid<f32, ?n>`), or forget the name explicitly with `.erase_dims()`."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0029-named-dynamic-dimensions.md"
+introduced_in = "named-dynamic-dims"
+status = "active"
+lint = false
+
+[E0345]
+message_template = "`{name}` cannot name a dimension: {reason}"
+severity = "error"
+explanation = """
+`v.dim(i)` reads the extent of axis `i` of a `Shaped` value and, bound by an \
+immutable `let`, names it for the rest of the block. The axis must be an \
+integer literal within the value's rank, the receiver's type must satisfy \
+`std::dims::Shaped` (`fn extent(&self, axis: i64) -> i64`), and a `let mut` \
+binding cannot name a dimension because its value could change."""
+cause = "`dim` was called with a computed or out-of-range axis or on a type that is not `Shaped`, or a `let mut` binding was used in a type."
+fix = "Use an integer literal axis within the rank, give the type an `extent` method, or bind the witness with `let`."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0029-named-dynamic-dimensions.md"
+introduced_in = "named-dynamic-dims"
+status = "active"
+lint = false
+
+[E0346]
+message_template = "cannot prove this broadcast: {problem}"
+severity = "error"
+explanation = """
+A method marked `#[broadcasts(D, T)]` broadcasts its source pack `D` to its \
+target pack `T`. Aligned from the right, each source dimension must be proved \
+equal to its target or be the literal `1`; missing leading dimensions are \
+added. A run-time extent is never treated as `1`, since it might not be."""
+cause = "A dimension of the source is neither provably equal to its target nor the literal `1`."
+fix = "Use the type's `checked_broadcast_to()`, which compares at run time and returns `Result`, or refine the source with `with_dims` first."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0029-named-dynamic-dimensions.md"
+introduced_in = "named-dynamic-dims"
+status = "active"
+lint = false
+
+[E0347]
+message_template = "`const {param}` cannot take the run-time dimension `{dimension}`"
+severity = "error"
+explanation = """
+A `const` parameter is static: each value is a separate instantiation, known \
+when the program is compiled. A dimension known only at run time (a witness, \
+a `dim` parameter or an existential) cannot instantiate it. A `dim` parameter \
+accepts static, named and `Dyn` extents alike and is passed at run time."""
+cause = "A named, run-time dimension was passed where a `const` parameter is declared."
+fix = "Declare the parameter `dim N` instead of `const N: int`."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0029-named-dynamic-dimensions.md"
+introduced_in = "named-dynamic-dims"
+status = "active"
+lint = false
+
+[E0348]
+message_template = "`{method}` cannot turn `{from}` into `{to}`"
+severity = "error"
+explanation = """
+`with_dims`, `as_dims` and `assume_dims` rename the dimensions of a value \
+without copying it, so the target must have the same type constructor, element \
+type and rank, and each position must stay static or stay dynamic: a static \
+and a run-time extent are stored differently. The target comes from the \
+context (a `let` annotation, a parameter or the return type), and a static \
+position that differs from the source is `PACO-E0336`."""
+cause = "A refinement changes a static position to a dynamic one (or back), changes the type or rank, or has no annotated target."
+fix = "Annotate the binding with the target type, keep static positions static, or use a copying conversion of the type."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0029-named-dynamic-dimensions.md"
+introduced_in = "named-dynamic-dims"
+status = "active"
+lint = false
+
+[E0801]
+message_template = "`std::autodiff::grad` cannot be built: no backend of this toolchain differentiates it"
+severity = "error"
+explanation = """
+Retired: gradients are computed by the compiler itself, over MIR, in every \
+build mode (ADR 0026), so a gradient request is never refused for lack of a \
+backend. There is no successor."""
+cause = "Earlier toolchains rejected every program that called `std::autodiff::grad`."
+fix = "Nothing to fix: `grad` builds and runs in `paco run`, `paco build` and `paco build --release`."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0026-native-autodiff.md"
+introduced_in = "phase-13"
+status = "retired"
+lint = false
+
+[E0802]
+message_template = "the target glibc (`{file}`) for `{target}` was not found; searched {dirs}; pass the target system's root with `--sysroot <dir>`"
+severity = "error"
+explanation = """
+A dynamically linked program (one with `extern` blocks, or built with \
+`--link dynamic`) links against the target system's own glibc: `libc.so.6`, \
+`libm.so.6` and `libgcc_s.so.1`. For a build for the host's architecture they \
+come from `/`; for another architecture they come from the system root given \
+with `--sysroot` or `PACO_SYSROOT`."""
+cause = "A dynamic build could not find one of the target's C runtime libraries in any searched directory."
+fix = "Pass `--sysroot <dir>` pointing at a copy of the target system's root (for example a Debian `libc6` and `libgcc-s1` package extracted with `scripts/fetch-sysroot.sh`), or build a program without `extern` blocks statically."
+spec_ref = "docs/design/spec.md"
+introduced_in = "self-contained-toolchain"
+status = "active"
+lint = false
+
+[E0803]
+message_template = "library `lib{name}` for the `extern` block in module `{name}` was not found for target `{target}`; searched {dirs}; pass the target system's root with `--sysroot <dir>`"
+severity = "error"
+explanation = """
+Each module containing an `extern` block is linked against the shared library \
+of the same name (`blas` → `libblas.so`, or a versioned `libblas.so.N`), found \
+in the target system's library directories."""
+cause = "No `lib<name>.so`, `lib<name>.a` or `lib<name>.so.N` exists in the searched directories."
+fix = "Install the library for the target, or pass `--sysroot <dir>` pointing at a system root that has it."
+spec_ref = "docs/design/spec.md"
+introduced_in = "self-contained-toolchain"
+status = "active"
+lint = false
+
+[E0804]
+message_template = "`extern` blocks need dynamic linking against the target's C libraries, but `{target}` is a static build; use `--link dynamic` or a `-gnu` target"
+severity = "error"
+explanation = """
+Static builds link Paco's runtime with musl and contain no dynamic loader, so \
+they cannot load the shared C libraries an `extern` block calls. Programs \
+with `extern` blocks link dynamically against glibc by default; this error \
+appears only when static linking was requested explicitly."""
+cause = "`--link static` or a `-musl` target was given for a program with an `extern` block."
+fix = "Drop `--link static` / the `-musl` suffix, or remove the `extern` block."
+spec_ref = "docs/design/spec.md"
+introduced_in = "self-contained-toolchain"
+status = "active"
+lint = false
+
+[E0805]
+message_template = "component `{file}` for target `{target}` is missing from the Paco distribution at `{path}`"
+severity = "error"
+explanation = """
+`paco build` links with files shipped in the distribution's `lib/paco/<target>/` \
+directory: musl's startup objects and `libc.a`, `libunwind.a` and the Paco \
+runtime archive. A development checkout takes them from the rustup toolchain \
+and `runtime/target/`."""
+cause = "The distribution is incomplete, or (in a development checkout) the runtime was not built for that target."
+fix = "Reinstall the Paco distribution; in a development checkout run `scripts/dist.sh`, which builds the runtime for every supported target."
+spec_ref = "docs/design/spec.md"
+introduced_in = "self-contained-toolchain"
+status = "active"
+lint = false
+
+[E0810]
+message_template = "a value that carries a derivative is passed to or returned from `{function}`, which the compiler cannot differentiate"
+severity = "error"
+explanation = """
+A gradient reaches a call whose body the compiler cannot see: an `extern` function, or a runtime primitive with no derivative rule. Its effect on the result cannot be differentiated."""
+cause = "A value that depends on a differentiated input, and that the result depends on, is an argument or the result of such a call."
+fix = "Give the function a hand-written derivative with `#[derivative(of = f)]` (for an `extern` function, write a Paco wrapper and give the wrapper the derivative), or keep the value out of the call."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0026-native-autodiff.md"
+introduced_in = "native-autodiff"
+status = "active"
+lint = false
+
+[E0811]
+message_template = "a value that carries a derivative is read or written through a raw pointer, sent to another task, or reinterpreted"
+severity = "error"
+explanation = """
+Differentiation follows every place a value is stored in. A raw-pointer read or write, a borrow whose target is not known at compile time, a value moved to another task or channel, or a bit-level reinterpretation hides where the derivative goes."""
+cause = "A value that depends on a differentiated input reaches one of those constructs on the way to the result."
+fix = "Borrow the value directly instead of through a pointer or a borrow returned by a call, keep tasks and channels outside the differentiated code, or give the function containing the construct a `#[derivative]`."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0026-native-autodiff.md"
+introduced_in = "native-autodiff"
+status = "active"
+lint = false
+
+[E0812]
+message_template = "a value that carries a derivative is passed to a call whose target is not known at compile time"
+severity = "error"
+explanation = """
+A call through a function value (a closure or `fn` value) is resolved at run time, so the compiler cannot know which body to differentiate."""
+cause = "A differentiated value is an argument or the result of an indirect call, or a gradient contains a gradient of the function that takes it."
+fix = "Call the function by name."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0026-native-autodiff.md"
+introduced_in = "native-autodiff"
+status = "active"
+lint = false
+
+[E0813]
+message_template = "`grad` needs a floating-point scalar result"
+severity = "error"
+explanation = """
+`grad` computes the derivative of one scalar with respect to its inputs. The result is the function's return value, or, for a function that returns `()`, the final value of its single differentiable `&mut` parameter."""
+cause = "The differentiated function returns a non-scalar value, or returns `()` with zero or several differentiable `&mut` parameters."
+fix = "Return a scalar loss computed from the value (for example the sum of its components), or give the `()`-returning function exactly one differentiable `&mut` parameter."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0026-native-autodiff.md"
+introduced_in = "native-autodiff"
+status = "active"
+lint = false
+
+[E0814]
+message_template = "invalid `#[derivative(of = {function})]`"
+severity = "error"
+explanation = """
+`#[derivative(of = f)] fn d(<f's parameters>) -> (<f's result>, P)` registers `d` as the derivative of `f`, where `P` satisfies `std::autodiff::Pullback` with `Seed` the tangent of `f`'s result and `Gradients` the tangents of `f`'s differentiable parameters (a tuple when there are several). A function has at most one."""
+cause = "The attribute names an unknown function, the parameters or the result differ from `f`'s, `P` lacks `Seed`, `Gradients` or `pullback`, their types do not match, or `f` already has a derivative."
+fix = "Make `d`'s parameters identical to `f`'s and its result `(<f's result>, P)`, give `P` the matching `Seed`, `Gradients` and `pullback`, and keep one derivative per function."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0026-native-autodiff.md"
+introduced_in = "native-autodiff"
+status = "active"
+lint = false
+
+[E0815]
+message_template = "the fields of a value whose `Tangent` is not itself are read without a `#[derivative]`"
+severity = "error"
+explanation = """
+When a type's `Tangent` is itself, the gradient of each field is routed to the same field. When it is another type, the compiler cannot map fields to tangent fields, so a function reading the fields of such a value on a differentiated path needs a hand-written derivative."""
+cause = "A differentiated function reads a field of, or returns, a value whose `type Tangent` differs from its own type, and has no `#[derivative]`."
+fix = "Give the function that reads the fields a `#[derivative(of = ...)]` returning the gradient as the `Tangent` type, or make the type its own `Tangent`."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0026-native-autodiff.md"
+introduced_in = "native-autodiff"
+status = "active"
+lint = false
+
+[E0901]
+message_template = "`use std::{module}` is deprecated; replace it with `use {library};` (the `{new_module}::` qualifier)"
+severity = "warning"
+explanation = """
+`std::numerics`, `std::math` and `std::blas` moved out of the compiler into the `github.com/pacolang/numerics` \
+library, as its `tensor`, `math` and `blas` modules. During the transition window the old `use std::<module>` \
+line still resolves — bound to the same qualifier as before — as long as `paco.mod` declares the library, but is \
+deprecated: `paco fix` migrates it automatically."""
+cause = "A file writes `use std::numerics`, `use std::math` or `use std::blas`, and `paco.mod` declares `github.com/pacolang/numerics`."
+fix = "Run `paco fix`, or replace the `use` line with the library path yourself."
+spec_ref = "openspec/changes/extract-domain-libraries/specs/compiler/module-loading/spec.md"
+adr_ref = "docs/design/decisions/0030-repository-organization-and-stdlib-scope.md"
+introduced_in = "extract-domain-libraries"
+status = "active"
+lint = false
+
+[E0902]
+message_template = "`use std::{module}` has moved to `github.com/pacolang/numerics`; add `use {library};` and run `paco get github.com/pacolang/numerics`"
+severity = "error"
+explanation = """
+`std::numerics`, `std::math` and `std::blas` moved out of the compiler into the `github.com/pacolang/numerics` \
+library. A project with a `paco.mod` that does not declare that library gets this error, naming the \
+replacement line and the command that adds the dependency, rather than silently resolving to the old `std` \
+file. A project with no `paco.mod` at all is unaffected by this error (it keeps resolving to the old `std` \
+file with only the `PACO-E0901` deprecation warning) — `paco.mod`'s absence is not itself grounds for this \
+diagnostic, only an explicit `paco.mod` that omits the dependency is."""
+cause = "A file writes `use std::numerics`, `use std::math` or `use std::blas`, the project has a `paco.mod`, and that `paco.mod` does not declare `github.com/pacolang/numerics`."
+fix = "Run `paco get github.com/pacolang/numerics`, or run `paco fix` to do that and rewrite the `use` line."
+spec_ref = "openspec/changes/extract-domain-libraries/specs/compiler/module-loading/spec.md"
+adr_ref = "docs/design/decisions/0030-repository-organization-and-stdlib-scope.md"
+introduced_in = "extract-domain-libraries"
+status = "active"
+lint = false
+
+[E0903]
+message_template = "cannot find `Tensor`; add `use github.com/pacolang/numerics/tensor;`"
+severity = "error"
+explanation = """
+`Tensor` moved out of the compiler into the `github.com/pacolang/numerics` library's `tensor` module; the \
+compiler itself knows no tensor type (design.md's "the compiler knows no tensor" decision). A bare `Tensor`, or \
+a `tensor::`/`numerics::` path, with no import providing it most likely means this library, so the error \
+suggests the import (and, if `paco.mod` does not declare the dependency yet, the `paco get` command) rather \
+than the compiler's ordinary "type is not supported yet" message."""
+cause = "A file names `Tensor`, bare or through a `tensor::`/`numerics::` path, and no import in that file provides it."
+fix = "Add `use github.com/pacolang/numerics/tensor;`; if `paco.mod` does not declare the dependency, run `paco get github.com/pacolang/numerics` first."
+spec_ref = "openspec/changes/extract-domain-libraries/specs/compiler/module-loading/spec.md"
+adr_ref = "docs/design/decisions/0030-repository-organization-and-stdlib-scope.md"
+introduced_in = "extract-domain-libraries"
+status = "active"
+lint = false
+
+[E1001]
+message_template = "module `{name}` is not imported in this file; add a `use` declaration for it"
+severity = "error"
+explanation = """
+A qualified name (`math::Matrix`) resolves only through a module this file \
+imports itself. A module that is imported by one of this file's imports lends \
+its types to the signatures that mention them, but its name is not bound here."""
+cause = "A path is qualified by a module that only another imported module brings in."
+fix = "Add `use` for that module (for example `use std::math`) to this file."
+spec_ref = "docs/design/spec.md"
+adr_ref = "docs/design/decisions/0015-modules-and-visibility.md"
+introduced_in = "phase-13"
+status = "active"
+lint = false
+
+[E1002]
+message_template = "function `{name}` is tagged `#[test]` but `{file}` is not a `_test.paco` file"
+severity = "error"
+explanation = """
+`#[test]` marks a function as an executable test case, discovered and run by \
+`paco test`. A test case only makes sense inside a file the compiler already \
+excludes from a normal `paco build`/`paco run` — a file whose name ends in \
+`_test.paco`. Tagging a function `#[test]` anywhere else would let test code \
+compile into a production binary undetected."""
+cause = "A function tagged `#[test]` is declared in a file whose name does not end in `_test.paco`."
+fix = "Move the function into a `_test.paco` file, or remove the `#[test]` attribute if it is not meant to be a test case."
+spec_ref = "openspec/changes/unit-testing/specs/compiler/unit-testing/spec.md"
+introduced_in = "unit-testing"
+status = "active"
+lint = false
+
+[E0001]
+message_template = "main function was not found"
+severity = "error"
+explanation = """
+A program built or run as an executable starts at a top-level `fn main`. The entry file declares no such function."""
+cause = "The file passed to `paco run`/`paco build` has no top-level `fn main`."
+fix = "Add `fn main() { ... }` (or `fn main() -> i64`) to the entry file."
+spec_ref = "docs/design/spec.md#2-basic-syntax-and-mental-model-features-1-and-4"
+introduced_in = "phase-1"
+status = "active"
+lint = false
+
+[E0100]
+message_template = "invalid character `{ch}`"
+severity = "error"
+explanation = """
+The lexer found a character that begins no Paco token. Outside string and character literals and comments, source text is limited to identifiers, numbers, operators and punctuation."""
+cause = "A stray character (for example `$`, `@` or a non-ASCII symbol) appears outside a literal or comment."
+fix = "Remove the character, or move it inside a string literal or a comment."
+spec_ref = "docs/grammar/grammar.ebnf"
+introduced_in = "phase-1"
+status = "active"
+lint = false
+
+[E0101]
+message_template = "unterminated string"
+severity = "error"
+explanation = """
+A string or character literal was opened with a quote that is never closed before the end of the file."""
+cause = "The closing `\"` (or `'`) of a literal is missing."
+fix = "Close the literal with the matching quote, escaping any quote that belongs inside it (`\\\"`)."
+spec_ref = "docs/grammar/grammar.ebnf"
+introduced_in = "phase-1"
+status = "active"
+lint = false
+
+[E0102]
+message_template = "unterminated block comment"
+severity = "error"
+explanation = """
+A `/*` block comment runs to the end of the file without its closing `*/`."""
+cause = "A block comment was opened and never closed."
+fix = "Add the closing `*/`."
+spec_ref = "docs/grammar/grammar.ebnf"
+introduced_in = "phase-1"
+status = "active"
+lint = false
+
+[E0110]
+message_template = "expected item declaration"
+severity = "error"
+explanation = """
+At the top level of a file, and inside `methods` blocks, only items may appear: `fn`, `struct`, `enum`, `trait`, `methods`, `const`, `use`, `extern`, with an optional `pub`. `module` may appear only as the first declaration."""
+cause = "A statement or expression was written at item level, a `module` declaration was not first, or `unsafe` was not followed by `fn`."
+fix = "Move the code into a function body, put `module <name>;` first, or complete the item declaration."
+spec_ref = "docs/grammar/grammar.ebnf"
+adr_ref = "docs/design/decisions/0015-modules-and-visibility.md"
+introduced_in = "phase-1"
+status = "active"
+lint = false
+
+[E0111]
+message_template = "expected expression"
+severity = "error"
+explanation = """
+The parser needed an expression at this point — an operand, the right-hand side of `=`, an argument — and found a token that cannot begin one."""
+cause = "A token that cannot start an expression appears where a value is required, or a qualified struct literal was written with a non-path prefix."
+fix = "Supply the missing expression, or remove the stray token."
+spec_ref = "docs/grammar/grammar.ebnf"
+introduced_in = "phase-1"
+status = "active"
+lint = false
+
+[E0112]
+message_template = "expected {token}"
+severity = "error"
+explanation = """
+A specific token was required here and a different one was found: most often the `,` that separates struct fields, enum variants, match arms and arguments, or a closing delimiter."""
+cause = "A separator or delimiter the grammar requires at this position is missing or misspelled."
+fix = "Insert the expected token; for a missing `,` the diagnostic's suggestion shows where it goes."
+spec_ref = "docs/grammar/grammar.ebnf"
+introduced_in = "phase-1"
+status = "active"
+lint = false
+
+[E0113]
+message_template = "expected pattern"
+severity = "error"
+explanation = """
+A pattern was required — in a `let`, a `match` arm, a `for` loop or a closure parameter — and the token found cannot begin one."""
+cause = "A token that cannot start a pattern appears where a pattern is required."
+fix = "Write a valid pattern: a binding name, `_`, a literal, a range, a tuple, a struct or an enum variant pattern."
+spec_ref = "docs/grammar/grammar.ebnf"
+introduced_in = "phase-1"
+status = "active"
+lint = false
+
+[E0201]
+message_template = "name not found `{name}`"
+severity = "error"
+explanation = """
+A name was used that no binding, item, import or prelude entry in scope defines."""
+cause = "The name is misspelled, not yet declared, declared in a scope that has ended, or belongs to a module this file does not import."
+fix = "Declare the name, fix its spelling, or add the `use` that brings its module into scope."
+spec_ref = "docs/design/spec.md#13-modules-visibility-and-tooling"
+adr_ref = "docs/design/decisions/0015-modules-and-visibility.md"
+introduced_in = "phase-2"
+status = "active"
+lint = false
+
+[E0302]
+message_template = "pattern does not match the scrutinee type"
+severity = "error"
+explanation = """
+A pattern's shape must agree with the type of the value it is matched against: an enum pattern needs an enum value of that enum, and a range pattern needs an integer."""
+cause = "The pattern names a different enum, or uses an enum or range pattern against a value of an incompatible type."
+fix = "Match against the scrutinee's own type: use its enum's variants, or a pattern that fits its type."
+spec_ref = "docs/design/spec.md#5-pattern-matching-and-strong-enums-features-8-and-9"
+introduced_in = "phase-3"
+status = "active"
+lint = false
+
+[E0303]
+message_template = "{construct} condition must be bool, found {found}"
+severity = "error"
+explanation = """
+`if`, `while` and match guards branch on a `bool`. Paco has no truthiness: integers, strings and options are not implicitly converted."""
+cause = "The condition of an `if` or `while`, or a match guard, has a non-`bool` type."
+fix = "Write an explicit comparison, such as `n != 0` or `opt.is_some()`."
+spec_ref = "docs/design/spec.md#2-basic-syntax-and-mental-model-features-1-and-4"
+introduced_in = "phase-2"
+status = "active"
+lint = false
+
+[E0304]
+message_template = "{construct} have incompatible types: {first} and {second}"
+severity = "error"
+explanation = """
+An `if`/`else` or a `match` used as a value must produce one type. Every branch or arm is joined to a single result type."""
+cause = "Two branches (or arms) evaluate to types that cannot be unified."
+fix = "Make every branch produce the same type, converting explicitly where needed."
+spec_ref = "docs/design/spec.md#5-pattern-matching-and-strong-enums-features-8-and-9"
+introduced_in = "phase-2"
+status = "active"
+lint = false
+
+[E0305]
+message_template = "wrong number of fields or arguments: expected {expected}, found {found}"
+severity = "error"
+explanation = """
+A pattern or built-in call must supply exactly the fields or arguments its target declares: a tuple variant pattern lists every field, a struct pattern mentions every field or ends in `..`, and `grad` takes a function and its inputs."""
+cause = "The count of fields or arguments differs from the declaration."
+fix = "List every field (or add `..` in a struct pattern), or pass the declared number of arguments."
+spec_ref = "docs/design/spec.md#5-pattern-matching-and-strong-enums-features-8-and-9"
+introduced_in = "phase-3"
+status = "active"
+lint = false
+
+[E0306]
+message_template = "type is not supported yet: {name}"
+severity = "error"
+explanation = """
+The type checker recognises the syntax of this type, but no rule assigns it a meaning in the current compiler."""
+cause = "A type form or name was used that the type checker does not yet implement."
+fix = "Use a supported type; see the specification for the types available."
+spec_ref = "docs/design/spec.md"
+introduced_in = "phase-2"
+status = "active"
+lint = false
+
+[E0307]
+message_template = "cannot mutate immutable `{name}`"
+severity = "error"
+explanation = """
+Mutability belongs to the binding. Assigning to a binding, taking `&mut` of it, or calling a `&mut self` method on it requires `let mut`."""
+cause = "The binding (or the place behind it) was declared without `mut`."
+fix = "Declare the binding with `let mut`, or borrow it mutably from a mutable owner."
+spec_ref = "docs/design/spec.md#3-ownership-borrowing-and-lifetimes-features-5-and-6"
+adr_ref = "docs/design/decisions/0008-struct-mutability.md"
+introduced_in = "phase-2"
+status = "active"
+lint = false
+
+[E0308]
+message_template = "{keyword} cannot be used outside of a loop"
+severity = "error"
+explanation = """
+`break` and `continue` transfer control within the innermost enclosing `loop`, `while` or `for`. Outside a loop they have no target."""
+cause = "`break` or `continue` appears in code that is not inside a loop body."
+fix = "Remove it, or restructure the code so it sits inside the loop it refers to; use `return` to leave a function."
+spec_ref = "docs/design/spec.md#2-basic-syntax-and-mental-model-features-1-and-4"
+introduced_in = "phase-2"
+status = "active"
+lint = false
+
+[E0310]
+message_template = "duplicate type `{name}`"
+severity = "error"
+explanation = """
+Each struct, enum and trait name is declared once per module; a second declaration would make every use of the name ambiguous."""
+cause = "Two type or trait declarations in the same module share a name."
+fix = "Rename or remove one of the declarations."
+spec_ref = "docs/design/spec.md#13-modules-visibility-and-tooling"
+introduced_in = "phase-3"
+status = "active"
+lint = false
+
+[E0311]
+message_template = "unknown or duplicate field `{field}`"
+severity = "error"
+explanation = """
+A struct declares each field once, struct patterns and literals may only name fields the struct declares, and a struct literal's target must be a struct type."""
+cause = "A field name is repeated in a declaration, names no field of the struct, or the literal targets a non-struct type."
+fix = "Remove the duplicate, fix the field name, or construct the value with the right type."
+spec_ref = "docs/design/spec.md#5-pattern-matching-and-strong-enums-features-8-and-9"
+introduced_in = "phase-3"
+status = "active"
+lint = false
+
+[E0313]
+message_template = "duplicate enum variant `{name}`"
+severity = "error"
+explanation = """
+Each variant of an enum is declared once; a second variant with the same name would make constructors and patterns ambiguous."""
+cause = "Two variants in one enum share a name."
+fix = "Rename or remove one of the variants."
+spec_ref = "docs/design/spec.md#5-pattern-matching-and-strong-enums-features-8-and-9"
+introduced_in = "phase-3"
+status = "active"
+lint = false
+
+[E0314]
+message_template = "method or variant `{name}` not found"
+severity = "error"
+explanation = """
+A method call, a variant pattern or an associated item named something the target type does not declare, or declared the same method twice."""
+cause = "The type has no method or variant with this name, or a method was defined twice for the same type."
+fix = "Fix the name, add the method to the type, or remove the duplicate definition."
+spec_ref = "docs/design/spec.md#6-traits-and-implicit-interfaces-features-3-and-part-of-2"
+adr_ref = "docs/design/decisions/0002-struct-methods.md"
+introduced_in = "phase-3"
+status = "active"
+lint = false
+
+[E0315]
+message_template = "recursive by-value field in `{name}`"
+severity = "error"
+explanation = """
+A struct that contains itself by value would have infinite size. Recursion must go through an owning indirection such as `Rc<T>` or `Vec<T>`."""
+cause = "A struct field's type contains the struct itself, directly or through other by-value fields."
+fix = "Wrap the recursive field in `Rc<T>`, `Vec<T>` or `Option<Rc<T>>`."
+spec_ref = "docs/design/spec.md#3-ownership-borrowing-and-lifetimes-features-5-and-6"
+adr_ref = "docs/design/decisions/0001-memory-model.md"
+introduced_in = "phase-3"
+status = "active"
+lint = false
+
+[E0316]
+message_template = "generic arity mismatch for `{name}`: expected {expected}, found {found}"
+severity = "error"
+explanation = """
+A generic type or function is applied to exactly the number of type arguments it declares (at least the fixed ones, when it ends in a const pack)."""
+cause = "Too many or too few type arguments were supplied."
+fix = "Supply one argument per declared generic parameter."
+spec_ref = "docs/design/spec.md#9-ergonomics--performance-feature-10"
+adr_ref = "docs/design/decisions/0023-const-generics.md"
+introduced_in = "phase-3"
+status = "active"
+lint = false
+
+[E0317]
+message_template = "duplicate constant `{name}`"
+severity = "error"
+explanation = """
+Each `const` name is declared once per module."""
+cause = "Two `const` declarations in the same module share a name."
+fix = "Rename or remove one of the constants."
+spec_ref = "docs/design/spec.md#17-constants-and-compile-time-values"
+adr_ref = "docs/design/decisions/0016-constants-and-global-state.md"
+introduced_in = "phase-6"
+status = "active"
+lint = false
+
+[E0318]
+message_template = "const initializer is not evaluable at compile time"
+severity = "error"
+explanation = """
+A `const` is evaluated during compilation and has no address, so its initializer may only use literals, other constants and operators on them."""
+cause = "The initializer calls a function, reads a variable, or uses another construct that needs run time."
+fix = "Use a compile-time expression, or make the value a `let` binding inside a function."
+spec_ref = "docs/design/spec.md#17-constants-and-compile-time-values"
+adr_ref = "docs/design/decisions/0016-constants-and-global-state.md"
+introduced_in = "phase-6"
+status = "active"
+lint = false
+
+[E0319]
+message_template = "unresolved identifier `{name}`"
+severity = "error"
+explanation = """
+The type checker found no binding, constant, function or variant for this identifier in scope."""
+cause = "The identifier is misspelled, used before it is declared, or its scope has ended."
+fix = "Declare it in scope or fix the spelling."
+spec_ref = "docs/design/spec.md#2-basic-syntax-and-mental-model-features-1-and-4"
+introduced_in = "phase-2"
+status = "active"
+lint = false
+
+[E0320]
+message_template = "duplicate method `{method}` in trait `{trait_name}`"
+severity = "error"
+explanation = """
+A trait declares each method once."""
+cause = "Two method signatures in one trait share a name."
+fix = "Rename or remove one of the signatures."
+spec_ref = "docs/design/spec.md#6-traits-and-implicit-interfaces-features-3-and-part-of-2"
+introduced_in = "phase-5"
+status = "active"
+lint = false
+
+[E0321]
+message_template = "duplicate associated type `{name}` in trait `{trait_name}`"
+severity = "error"
+explanation = """
+A trait declares each associated type once."""
+cause = "Two associated `type` declarations in one trait share a name."
+fix = "Rename or remove one of the declarations."
+spec_ref = "docs/design/spec.md#6-traits-and-implicit-interfaces-features-3-and-part-of-2"
+introduced_in = "phase-5"
+status = "active"
+lint = false
+
+[E0322]
+message_template = "`?` requires a `Result<T, E>` operand, found {found}"
+severity = "error"
+explanation = """
+`?` unwraps an `Ok` value or returns early with the `Err`. It is defined only for `Result`."""
+cause = "The operand of `?` is not a `Result`."
+fix = "Apply `?` to a `Result`, or handle the value with `match`."
+spec_ref = "docs/design/spec.md#4-explicit-errors-and-absence-feature-7"
+adr_ref = "docs/design/decisions/0007-error-conversion-from-trait.md"
+introduced_in = "phase-4"
+status = "active"
+lint = false
+
+[E0323]
+message_template = "`?` can only be used in a function returning `Result<U, E>`"
+severity = "error"
+explanation = """
+`?` may return early with an `Err`, so the enclosing function must itself return a `Result`."""
+cause = "`?` is used in a function whose return type is not `Result`."
+fix = "Change the function to return `Result<U, E>`, or handle the error with `match`."
+spec_ref = "docs/design/spec.md#4-explicit-errors-and-absence-feature-7"
+adr_ref = "docs/design/decisions/0007-error-conversion-from-trait.md"
+introduced_in = "phase-4"
+status = "active"
+lint = false
+
+[E0324]
+message_template = "no conversion from {from} to {to} exists"
+severity = "error"
+explanation = """
+When the operand's error type differs from the function's, `?` converts it with `From::from`. No `from` conversion is defined between these two types."""
+cause = "The error types differ and the destination type has no `from` accepting the source type."
+fix = "Add `fn from(e: Source) -> Self` to the destination error type, or map the error before `?`."
+spec_ref = "docs/design/spec.md#4-explicit-errors-and-absence-feature-7"
+adr_ref = "docs/design/decisions/0007-error-conversion-from-trait.md"
+introduced_in = "phase-4"
+status = "active"
+lint = false
+
+[E0325]
+message_template = "{what} requires an `unsafe` block"
+severity = "error"
+explanation = """
+Calling a foreign function, dereferencing a raw pointer and other operations the compiler cannot check must be written inside `unsafe { }`."""
+cause = "An unchecked operation appears outside an `unsafe` block."
+fix = "Wrap the operation in `unsafe { ... }` after confirming its safety conditions hold."
+spec_ref = "docs/design/spec.md#18-foreign-function-interface"
+adr_ref = "docs/design/decisions/0017-ffi-and-unsafe.md"
+introduced_in = "phase-7"
+status = "active"
+lint = false
+
+[E0326]
+message_template = "`yield` is only allowed inside an `iter fn` body"
+severity = "error"
+explanation = """
+`yield` suspends a generator. Only an `iter fn` body runs as a generator."""
+cause = "`yield` appears in an ordinary function or closure."
+fix = "Declare the function as `iter fn`, or return a value instead of yielding it."
+spec_ref = "docs/design/spec.md#8-concurrency-tasks-generators-and-channels-features-3-11-12"
+adr_ref = "docs/design/decisions/0004-concurrency.md"
+introduced_in = "phase-8"
+status = "active"
+lint = false
+
+[E0327]
+message_template = "malformed `select`"
+severity = "error"
+explanation = """
+A `select` needs at least one arm, and an arm that binds a received value must bind it to a plain identifier."""
+cause = "The `select` has no arms, or an arm's binding target is not an identifier."
+fix = "Add at least one `.recv()` arm and bind received values to identifiers."
+spec_ref = "docs/design/spec.md#8-concurrency-tasks-generators-and-channels-features-3-11-12"
+adr_ref = "docs/design/decisions/0004-concurrency.md"
+introduced_in = "phase-8"
+status = "active"
+lint = false
+
+[E0328]
+message_template = "`{name}` is not a Paco type; use `{replacement}`"
+severity = "error"
+explanation = """
+Paco integer types always state their width. There is no platform-sized `int` or `uint`."""
+cause = "`int` or `uint` was used as a type."
+fix = "Use `i64` for `int` and `u64` for `uint`, or another explicit width."
+spec_ref = "docs/design/spec.md#2-basic-syntax-and-mental-model-features-1-and-4"
+introduced_in = "phase-6"
+status = "active"
+lint = false
+
+[E0329]
+message_template = "integer literal `{value}` does not fit in `{type_name}`"
+severity = "error"
+explanation = """
+An integer literal must be representable in the type it is given; the compiler never truncates a literal silently."""
+cause = "The literal is outside the range of its expected integer type."
+fix = "Use a value within range, or a wider type."
+spec_ref = "docs/design/spec.md#9-ergonomics--performance-feature-10"
+introduced_in = "phase-6"
+status = "active"
+lint = false
+
+[E0330]
+message_template = "cannot cast {from} to {to}: `as` only converts between numeric primitive types"
+severity = "error"
+explanation = """
+`as` converts between integer, float and `char` values. It does not convert strings, aggregates or references."""
+cause = "One side of the `as` cast is not a numeric primitive."
+fix = "Use a conversion function (`to_string`, `From`) instead of `as`."
+spec_ref = "docs/design/spec.md#9-ergonomics--performance-feature-10"
+adr_ref = "docs/design/decisions/0014-reduced-precision-floats.md"
+introduced_in = "phase-6"
+status = "active"
+lint = false
+
+[E0331]
+message_template = "invalid slice index"
+severity = "error"
+explanation = """
+A `[]T` is indexed with exactly one `i64` index."""
+cause = "A slice was indexed with several indices, or with a non-`i64` index."
+fix = "Index with a single `i64`, converting with `as` if needed."
+spec_ref = "docs/design/spec.md#3-ownership-borrowing-and-lifetimes-features-5-and-6"
+introduced_in = "phase-6"
+status = "active"
+lint = false
+
+[E0332]
+message_template = "type `{type_name}` does not support indexing"
+severity = "error"
+explanation = """
+Indexing a non-slice type calls its `fn index(&self, i: Idx) -> &Output` method. The type has none."""
+cause = "A value whose type defines no `index` method was indexed with `[]`."
+fix = "Define `index` on the type, or call a method that returns the element."
+spec_ref = "docs/design/spec.md#7-metaprogramming-special-traits--comptime-feature-2"
+introduced_in = "phase-6"
+status = "active"
+lint = false
+
+[E0333]
+message_template = "`{name}` is private in `{module}`"
+severity = "error"
+explanation = """
+Items are private to their module unless declared `pub`."""
+cause = "A non-`pub` function or type of another module was referenced."
+fix = "Mark the item `pub` in its module, or use a public alternative."
+spec_ref = "docs/design/spec.md#13-modules-visibility-and-tooling"
+adr_ref = "docs/design/decisions/0015-modules-and-visibility.md"
+introduced_in = "phase-6"
+status = "active"
+lint = false
+
+[E0334]
+message_template = "`{type_name}` has no `{method}` method; this operator requires one"
+severity = "error"
+explanation = """
+Operators on user types dispatch to a method of the matching operator trait (`add`, `sub`, `mul`, `div`, `rem`, `neg`, `eq`)."""
+cause = "An operator was applied to a type that does not define the corresponding method."
+fix = "Define the operator's method on the type."
+spec_ref = "docs/design/spec.md#7-metaprogramming-special-traits--comptime-feature-2"
+adr_ref = "docs/design/decisions/0022-prelude.md"
+introduced_in = "phase-6"
+status = "active"
+lint = false
+
+[E0401]
+message_template = "non-exhaustive match: missing `{witness}`"
+severity = "error"
+explanation = """
+A `match` must handle every possible value of its scrutinee. The compiler found a value no arm covers."""
+cause = "No arm (and no wildcard) covers the reported value, or the match has no arms."
+fix = "Add an arm for the missing case, or a `_` arm."
+spec_ref = "docs/design/spec.md#5-pattern-matching-and-strong-enums-features-8-and-9"
+introduced_in = "phase-3"
+status = "active"
+lint = false
+
+[E0402]
+message_template = "unreachable match arm: `{witness}` is already covered"
+severity = "error"
+explanation = """
+Arms are tried in order; an arm whose every value is matched by earlier arms can never run."""
+cause = "An earlier arm (often a wildcard or binding) already covers this arm's pattern."
+fix = "Remove the arm, or move it before the arm that covers it."
+spec_ref = "docs/design/spec.md#5-pattern-matching-and-strong-enums-features-8-and-9"
+introduced_in = "phase-3"
+status = "active"
+lint = false

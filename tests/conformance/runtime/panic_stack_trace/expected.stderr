@@ -1,0 +1,4 @@
+panic at input.paco:3:9: deep failure
+   at b (input.paco:3:9)
+   at a (input.paco:10:5)
+   at main (input.paco:15:11)

@@ -1,0 +1,80 @@
+// Fits the launch velocity of a projectile so that, after a fixed number of
+// Euler steps, it lands on a target point: plain gradient descent, with the
+// gradient of the whole simulation computed by `stdlib::autodiff::grad`.
+
+use stdlib::autodiff;
+
+const STEPS: i64 = 40;
+const DT: f64 = 0.05;
+const TARGET_X: f64 = 6.0;
+const TARGET_Y: f64 = 1.5;
+
+struct Vec2 {
+    x: f64,
+    y: f64,
+    type Tangent = Vec2;
+
+    fn zero_tangent(&self) -> Vec2 {
+        Vec2 { x: 0.0, y: 0.0 }
+    }
+
+    fn move_by(&mut self, offset: &Vec2) {
+        self.x = self.x + offset.x;
+        self.y = self.y + offset.y
+    }
+}
+
+struct Projectile {
+    pos: Vec2,
+    vel: Vec2,
+
+    fn step(&mut self, dt: f64) {
+        self.pos.x = self.pos.x + self.vel.x * dt;
+        self.pos.y = self.pos.y + self.vel.y * dt;
+        self.vel.x = self.vel.x - 0.1 * self.vel.x * dt;
+        self.vel.y = self.vel.y - 9.81 * dt
+    }
+}
+
+fn miss(velocity: Vec2) -> f64 {
+    let mut projectile = Projectile { pos: Vec2 { x: 0.0, y: 0.0 }, vel: velocity };
+    for i in 0..STEPS {
+        projectile.step(DT)
+    }
+    let dx = projectile.pos.x - TARGET_X;
+    let dy = projectile.pos.y - TARGET_Y;
+    dx * dx + dy * dy
+}
+
+#[differentiable]
+fn loss(velocity: Vec2) -> f64 {
+    miss(velocity)
+}
+
+/// A central finite difference agrees with `analytic` to a relative
+/// `0.000001` (step `0.000001`).
+fn agrees(analytic: f64, numeric: f64) -> bool {
+    (analytic - numeric).abs() <= 0.000001 * (1.0 + numeric.abs())
+}
+
+fn main() {
+    let h = 0.000001;
+    let mut velocity = Vec2 { x: 2.0, y: 4.0 };
+    let (first, gradient) = autodiff::grad(loss, Vec2 { x: velocity.x, y: velocity.y });
+    let numeric_x = (miss(Vec2 { x: 2.0 + h, y: 4.0 }) - miss(Vec2 { x: 2.0 - h, y: 4.0 })) / (2.0 * h);
+    let numeric_y = (miss(Vec2 { x: 2.0, y: 4.0 + h }) - miss(Vec2 { x: 2.0, y: 4.0 - h })) / (2.0 * h);
+    print(agrees(gradient.x, numeric_x));
+    print(agrees(gradient.y, numeric_y));
+    let mut previous = first;
+    let mut decreasing = true;
+    for epoch in 0..12 {
+        let (current, g) = autodiff::grad(loss, Vec2 { x: velocity.x, y: velocity.y });
+        print(current);
+        decreasing = decreasing && current <= previous;
+        previous = current;
+        velocity.move_by(&Vec2 { x: -0.05 * g.x, y: -0.05 * g.y })
+    }
+    print(decreasing);
+    print(velocity.x);
+    print(velocity.y);
+}

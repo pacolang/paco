@@ -1,0 +1,28 @@
+[package]
+name = "paco-comptime"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+autotests = false
+
+[dependencies]
+paco-diag.workspace = true
+paco-mir.workspace = true
+paco-runtime.workspace = true
+paco-span.workspace = true
+paco-syntax.workspace = true
+paco-types.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+clap.workspace = true
+paco-borrow.workspace = true
+paco-driver = { path = "../paco-driver", default-features = false }
+tempfile.workspace = true
+
+[[test]]
+name = "main"
+path = "tests/main.rs"

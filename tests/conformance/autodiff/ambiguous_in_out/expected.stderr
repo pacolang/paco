@@ -1,0 +1,1 @@
+error[PACO-E0813] input.paco:4:1: `#[differentiable]` function `swap` returns `()`, so its result is the final value of its one differentiable `&mut` parameter, but it has `x` and `y`

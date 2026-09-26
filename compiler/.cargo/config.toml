@@ -1,0 +1,13 @@
+[env]
+PACO_CACHE = { value = "target/paco-cache", relative = true }
+
+# `paco-codegen-cranelift`'s own tests pull in `paco-runtime-ffi` directly,
+# whose `paco_rt_main` references `__paco_entry`/`__paco_entry_returns_value`
+# (real Paco programs, linked separately by `paco-link`, always define
+# them). Give MSVC's `link.exe` a default for the two so linking this
+# crate's own test binaries doesn't need them resolved.
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+    "-C", "link-arg=/alternatename:__paco_entry=paco_rt_no_program",
+    "-C", "link-arg=/alternatename:__paco_entry_returns_value=paco_rt_no_program_value",
+]

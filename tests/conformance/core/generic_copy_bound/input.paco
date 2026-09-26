@@ -1,0 +1,31 @@
+fn dup<T: Copy>(x: T) -> T {
+    let y = x;
+    let z = x;
+    z
+}
+
+fn first<T: Copy>(xs: &[]T) -> T {
+    let v = xs[0];
+    let w = v;
+    v
+}
+
+struct Pair<T: Copy> {
+    a: T,
+
+    fn twice(&self) -> (T, T) {
+        let v = self.a;
+        (v, v)
+    }
+}
+
+fn main() {
+    print(dup(3));
+    print(dup(2.5));
+    let mut xs: []i64 = slice_of_zeros<i64>(2);
+    xs[0] = 7;
+    print(first(&xs));
+    let p = Pair { a: 4 };
+    let (l, r) = p.twice();
+    print(l + r);
+}

@@ -1,0 +1,31 @@
+module core;
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+
+    pub fn unwrap(self) -> T {
+        match self {
+            Result::Ok(value) => value,
+            Result::Err(_) => panic("called `Result::unwrap()` on an `Err` value"),
+        }
+    }
+
+    pub fn expect(self, message: string) -> T {
+        match self {
+            Result::Ok(value) => value,
+            Result::Err(_) => panic(message),
+        }
+    }
+
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Result::Ok(_) => true,
+            Result::Err(_) => false,
+        }
+    }
+
+    pub fn is_err(&self) -> bool {
+        !self.is_ok()
+    }
+}

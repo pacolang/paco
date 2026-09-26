@@ -1,0 +1,16 @@
+use stdlib::autodiff;
+use boxmod;
+
+#[differentiable]
+fn loss(b: boxmod::Box<f32>) -> f32 {
+    let two: f32 = 2.0;
+    two * b.get()
+}
+
+fn main() {
+    let v: f32 = 3.0;
+    let (value, gradient) = autodiff::grad(loss, boxmod::Box { v: v });
+    print(value);
+    print(gradient.get());
+    print(gradient.doubled());
+}

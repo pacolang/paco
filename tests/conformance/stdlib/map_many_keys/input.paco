@@ -1,0 +1,120 @@
+use stdlib::string;
+
+fn integer_keys(count: i64) -> i64 {
+    let mut m: Map<i64, i64> = Map::new();
+    for i in 0..count {
+        m.insert(i * 1024, i);
+    }
+    let mut total: i64 = 0;
+    for i in 0..count {
+        match m.get(i * 1024) {
+            Some(v) => total = total + v,
+            None => total = total - 1000000,
+        }
+    }
+    if m.contains_key(3) || m.len() != count {
+        return -1;
+    }
+    total
+}
+
+fn updates() -> i64 {
+    let mut m: Map<u8, i64> = Map::new();
+    for i in 0..100 {
+        let key = (i % 7) as u8;
+        let old = match m.get(key) {
+            Some(v) => v,
+            None => 0,
+        };
+        m.insert(key, old + i);
+    }
+    let three: u8 = 3;
+    m.len() * 1000000 + match m.get(three) { Some(v) => v, None => -1 }
+}
+
+fn string_keys() -> i64 {
+    let mut m: Map<string, i64> = Map::new();
+    let words = "the quick brown fox jumps over the lazy dog the end";
+    let mut start: i64 = 0;
+    let bytes = words.as_bytes();
+    for i in 0..(bytes.len() + 1) {
+        if i == bytes.len() || bytes[i] as i64 == 32 {
+            match string_from_bytes(&bytes, start, i) {
+                Some(word) => {
+                    let seen = match m.get(word) {
+                        Some(n) => n,
+                        None => 0,
+                    };
+                    let key = match string_from_bytes(&bytes, start, i) {
+                        Some(again) => again,
+                        None => "",
+                    };
+                    m.insert(key, seen + 1);
+                }
+                None => {}
+            }
+            start = i + 1;
+        }
+    }
+    m.len() * 100 + match m.get("the") { Some(n) => n, None => 0 }
+}
+
+fn char_set() -> i64 {
+    let mut s: Set<char> = Set::new();
+    s.insert('a');
+    s.insert('b');
+    s.insert('a');
+    let mut present: i64 = 0;
+    if s.contains('a') {
+        present = present + 1;
+    }
+    if s.contains('z') {
+        present = present + 10;
+    }
+    s.len() * 100 + present
+}
+
+fn word_lengths() -> i64 {
+    let mut m: Map<string, i64> = Map::new();
+    let words = "a bb a ccc bb a";
+    let bytes = words.as_bytes();
+    let mut start: i64 = 0;
+    for i in 0..(bytes.len() + 1) {
+        if i == bytes.len() || bytes[i] as i64 == 32 {
+            match string_from_bytes(&bytes, start, i) {
+                Some(word) => {
+                    let count = m.get_or_insert(word, 0);
+                    *count = *count + 1;
+                }
+                None => {}
+            }
+            start = i + 1;
+        }
+    }
+    let a = match m.get("a") { Some(n) => n, None => 0 };
+    let bb = match m.get("bb") { Some(n) => n, None => 0 };
+    m.len() * 100 + a * 10 + bb
+}
+
+fn sorted_digest() -> i64 {
+    let mut v: Vec<i64> = Vec::new();
+    for i in 0..50 {
+        v.push((i * 37) % 50 - 25);
+    }
+    v.sort();
+    let mut f: []f64 = slice_of_zeros<f64>(3);
+    f[0] = 1.5;
+    f[1] = -0.5;
+    f[2] = 0.25;
+    f.sort();
+    v[0] * 1000 + v[49] + (f[0] * 10.0) as i64
+}
+
+fn main() {
+    print(integer_keys(300));
+    print(updates());
+    print(string_keys());
+    print(char_set());
+    print(word_lengths());
+    print(sorted_digest());
+}

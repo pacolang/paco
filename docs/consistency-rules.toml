@@ -1,0 +1,69 @@
+# Canonical-syntax rules, checked mechanically by scripts/check_docs_consistency.py.
+#
+# Each rule forbids a spelling that is NOT Paco and names the one that is. The
+# point is to catch documentation drifting toward another language's syntax —
+# in practice, toward Rust, since that is the strongest habit both humans and
+# models bring to this repository.
+#
+# `except_in` exists so an ADR's "Considered options" section can *show* the
+# rejected spelling while explaining why it was rejected.
+
+[[rule]]
+id = "receiver-order"
+forbidden = 'self&mut\b|self&(?!mut)'
+canonical = "&self, &mut self"
+message = "Receivers put the borrow sigil before `self` (ADR 0020), matching every other borrow position in the language."
+except_in = [
+  "docs/design/decisions/0020-rust-alignment-and-slices.md",
+  "docs/design/decisions/0002-struct-methods.md",
+  "docs/design/decisions/0008-struct-mutability.md",
+  "docs/compiler/architecture.md",
+]
+
+[[rule]]
+id = "attribute-syntax"
+forbidden = '(?<![\[`])@(derive|test|bench|should_panic|allow|repr)\b'
+canonical = "#[derive(...)], #[test], #[repr(C)]"
+message = "Attributes are `#[name(...)]` (ADR 0020). `@` means pattern binding only (`n @ 1..=9`)."
+except_in = ["docs/design/decisions/0020-rust-alignment-and-slices.md"]
+
+[[rule]]
+id = "string-type-name"
+forbidden = '\bString::|: String\b|&String\b'
+canonical = "string (the primitive), StringBuf (the builder)"
+message = "There is no type called `String`. The owned immutable UTF-8 primitive is `string`; the growable builder is `StringBuf` (spec §10)."
+except_in = []
+
+[[rule]]
+id = "rust-slice-syntax"
+forbidden = '&\[[A-Za-z_][A-Za-z0-9_]*\]'
+canonical = "&[]T"
+message = "A slice type is `[]T`; a view of one is `&[]T` (ADR 0020). `&[T]` is Rust's spelling, not Paco's."
+except_in = []
+
+[[rule]]
+id = "selective-import"
+forbidden = 'use\s+[\w:./]+::\{'
+canonical = "use std::io  (then io::read_file(...))"
+message = "Imports bind whole modules and call sites stay qualified (ADR 0015). There is no selective or wildcard import."
+except_in = ["docs/design/decisions/0015-modules-and-visibility.md"]
+
+[[rule]]
+id = "impl-block"
+forbidden = '^\s*impl\s+[A-Z]'
+canonical = "methods T { ... }"
+message = "Methods live inside the type's block; `methods T {}` extends a type from another module (ADR 0002). There is no `impl`."
+except_in = []
+
+[[rule]]
+id = "no-mutable-globals"
+forbidden = 'static\s+mut\b'
+canonical = "Arc<Mutex<T>>"
+message = "Paco has no mutable global state (ADR 0016). Shared mutable state goes behind Arc<Mutex<T>>."
+except_in = [
+  "docs/design/decisions/0016-constants-and-global-state.md",
+  "docs/design/spec.md",
+  "docs/grammar/grammar.ebnf",
+  "context.md",
+  "AGENTS.md",
+]

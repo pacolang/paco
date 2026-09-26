@@ -1,0 +1,6 @@
+use stdlib::io;
+use example.com/team/json as parser;
+
+fn main() {
+    print("ok")
+}

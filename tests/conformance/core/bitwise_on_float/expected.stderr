@@ -1,0 +1,4 @@
+error[PACO-E0301] input.paco:2:13: type mismatch: `^` requires two operands of the same integer type, found float and float
+error[PACO-E0301] input.paco:3:13: type mismatch: `&` requires two operands of the same integer type, found bool and bool
+error[PACO-E0301] input.paco:5:13: type mismatch: `<<` requires integer operands, found float and i64
+error[PACO-E0301] input.paco:6:13: type mismatch: `~` requires an integer operand, found float

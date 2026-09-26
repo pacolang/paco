@@ -1,0 +1,17 @@
+use stdlib::string;
+
+fn main() {
+    let s: string = "café";
+    let mut byte_count: i64 = 0;
+    for b in s.bytes() {
+        byte_count = byte_count + 1
+    }
+    let mut char_count: i64 = 0;
+    for c in s.chars() {
+        char_count = char_count + 1
+    }
+    print(byte_count);
+    print(char_count);
+    let first_byte: byte = s.as_bytes()[0];
+    print(first_byte)
+}

@@ -1,0 +1,40 @@
+use stdlib::autodiff;
+
+/// Central finite differences: step `0.000001`, relative tolerance
+/// `0.000001` for `f64` (the widths' values are documented in
+/// `paco-test-harness`).
+fn agrees(analytic: float, numeric: float) -> bool {
+    (analytic - numeric).abs() <= 0.000001 * (1.0 + numeric.abs())
+}
+
+#[differentiable]
+fn step(x: &mut float) {
+    *x = *x * *x
+}
+
+fn stretched_value(x: float, y: float) -> float {
+    let mut z = y;
+    z = z * x + z;
+    z * z
+}
+
+#[differentiable]
+fn stretched(x: float, y: &mut float) -> float {
+    *y = *y * x + *y;
+    *y * *y
+}
+
+fn main() {
+    let h = 0.000001;
+    let mut x = 3.0;
+    let (value, gradient) = autodiff::grad(step, &mut x);
+    print(value);
+    print(gradient);
+    print(x);
+    let mut y = 2.0;
+    let (s, (dx, dy)) = autodiff::grad(stretched, (1.5, &mut y));
+    print(s);
+    print(y);
+    print(agrees(dx, (stretched_value(1.5 + h, 2.0) - stretched_value(1.5 - h, 2.0)) / (2.0 * h)));
+    print(agrees(dy, (stretched_value(1.5, 2.0 + h) - stretched_value(1.5, 2.0 - h)) / (2.0 * h)));
+}

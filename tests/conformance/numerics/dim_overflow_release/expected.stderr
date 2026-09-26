@@ -1,0 +1,4 @@
+panic at input.paco:5:20: dimension `D` = `4000000000 * 4000000000` overflows i64 or divides by zero
+   at Grid::first_extent::f32_pack1_dexpr4000000000*4000000000 (input.paco:5:20)
+   at square::d4000000000 (input.paco:11:5)
+   at main (input.paco:16:11)

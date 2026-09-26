@@ -1,0 +1,105 @@
+use stdlib::autodiff;
+
+/// Central finite differences: step `0.000001`, relative tolerance
+/// `0.000001` for `f64` (the widths' values are documented in
+/// `paco-test-harness`).
+fn agrees(analytic: float, numeric: float) -> bool {
+    (analytic - numeric).abs() <= 0.000001 * (1.0 + numeric.abs())
+}
+
+fn f_sqrt(x: float) -> float { x.sqrt() }
+fn f_exp(x: float) -> float { x.exp() }
+fn f_ln(x: float) -> float { x.ln() }
+fn f_sin(x: float) -> float { x.sin() }
+fn f_cos(x: float) -> float { x.cos() }
+fn f_tanh(x: float) -> float { x.tanh() }
+fn f_abs(x: float) -> float { x.abs() }
+fn f_powf(x: float) -> float { x.powf(2.5) }
+fn f_base(x: float) -> float { 2.0.powf(x) }
+fn f_min(x: float) -> float { x.min(1.0) * x }
+fn f_max(x: float) -> float { x.max(1.0) * x }
+fn f_casts(x: float) -> float {
+    let narrow = x as f32;
+    let back = (narrow * narrow) as float;
+    back + (x as i64) as float
+}
+
+#[differentiable]
+fn d_sqrt(x: float) -> float { f_sqrt(x) }
+#[differentiable]
+fn d_exp(x: float) -> float { f_exp(x) }
+#[differentiable]
+fn d_ln(x: float) -> float { f_ln(x) }
+#[differentiable]
+fn d_sin(x: float) -> float { f_sin(x) }
+#[differentiable]
+fn d_cos(x: float) -> float { f_cos(x) }
+#[differentiable]
+fn d_tanh(x: float) -> float { f_tanh(x) }
+#[differentiable]
+fn d_abs(x: float) -> float { f_abs(x) }
+#[differentiable]
+fn d_powf(x: float) -> float { f_powf(x) }
+#[differentiable]
+fn d_base(x: float) -> float { f_base(x) }
+#[differentiable]
+fn d_min(x: float) -> float { f_min(x) }
+#[differentiable]
+fn d_max(x: float) -> float { f_max(x) }
+#[differentiable]
+fn d_casts(x: float) -> float { f_casts(x) }
+
+#[differentiable]
+fn integer_path(x: float) -> float {
+    (x as i64) as float
+}
+
+fn numeric(which: i64, x: float) -> float {
+    let h = 0.000001;
+    if which == 0 { (f_sqrt(x + h) - f_sqrt(x - h)) / (2.0 * h) }
+    else if which == 1 { (f_exp(x + h) - f_exp(x - h)) / (2.0 * h) }
+    else if which == 2 { (f_ln(x + h) - f_ln(x - h)) / (2.0 * h) }
+    else if which == 3 { (f_sin(x + h) - f_sin(x - h)) / (2.0 * h) }
+    else if which == 4 { (f_cos(x + h) - f_cos(x - h)) / (2.0 * h) }
+    else if which == 5 { (f_tanh(x + h) - f_tanh(x - h)) / (2.0 * h) }
+    else if which == 6 { (f_abs(x + h) - f_abs(x - h)) / (2.0 * h) }
+    else if which == 7 { (f_powf(x + h) - f_powf(x - h)) / (2.0 * h) }
+    else if which == 8 { (f_base(x + h) - f_base(x - h)) / (2.0 * h) }
+    else if which == 9 { (f_min(x + h) - f_min(x - h)) / (2.0 * h) }
+    else { (f_max(x + h) - f_max(x - h)) / (2.0 * h) }
+}
+
+fn analytic(which: i64, x: float) -> float {
+    if which == 0 { let (v, d) = autodiff::grad(d_sqrt, x); d }
+    else if which == 1 { let (v, d) = autodiff::grad(d_exp, x); d }
+    else if which == 2 { let (v, d) = autodiff::grad(d_ln, x); d }
+    else if which == 3 { let (v, d) = autodiff::grad(d_sin, x); d }
+    else if which == 4 { let (v, d) = autodiff::grad(d_cos, x); d }
+    else if which == 5 { let (v, d) = autodiff::grad(d_tanh, x); d }
+    else if which == 6 { let (v, d) = autodiff::grad(d_abs, x); d }
+    else if which == 7 { let (v, d) = autodiff::grad(d_powf, x); d }
+    else if which == 8 { let (v, d) = autodiff::grad(d_base, x); d }
+    else if which == 9 { let (v, d) = autodiff::grad(d_min, x); d }
+    else { let (v, d) = autodiff::grad(d_max, x); d }
+}
+
+fn main() {
+    let mut points: []f64 = slice_of_zeros<f64>(3);
+    points[0] = 0.3;
+    points[1] = 1.7;
+    points[2] = 2.6;
+    for which in 0..11 {
+        let mut all = true;
+        for i in 0..points.len() {
+            all = all && agrees(analytic(which, points[i]), numeric(which, points[i]))
+        }
+        print(all);
+    }
+    let (n, d) = autodiff::grad(d_abs, -1.5);
+    print(d);
+    let (c, dc) = autodiff::grad(d_casts, 1.5);
+    print(dc);
+    let (i, di) = autodiff::grad(integer_path, 2.7);
+    print(i);
+    print(di);
+}

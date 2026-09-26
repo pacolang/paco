@@ -1,0 +1,4 @@
+error[PACO-E0343] input.paco:140:1: the dimension `n` would become `Dyn` implicitly (returned where the signature says `Dyn`, dimension 0)
+  note at input.paco:141:5: `n` is bound here
+  fix 1: name the extent in the signature: `?n`
+  fix 2: forget the name explicitly with `.erase_dims()`

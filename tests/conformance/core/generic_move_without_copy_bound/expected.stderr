@@ -1,0 +1,1 @@
+error[use-after-move] input.paco:3:5: use of moved value `x`

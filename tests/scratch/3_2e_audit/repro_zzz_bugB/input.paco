@@ -1,0 +1,68 @@
+use stdlib::autodiff;
+
+pub struct T2<T: Numeric + Add + Copy, const D: int> {
+    v: []T,
+    type Tangent = T2<T, D>;
+
+    pub fn zeros(len: i64) -> T2<T, D> {
+        T2 { v: slice_of_zeros<T>(len) }
+    }
+
+    pub fn zero_tangent(&self) -> T2<T, D> {
+        T2 { v: slice_of_zeros<T>(self.v.len()) }
+    }
+
+    pub fn move_by(&mut self, offset: &T2<T, D>) {
+        for i in 0..self.v.len() {
+            self.v[i] = self.v[i] + offset.v[i]
+        }
+    }
+
+    pub fn at(&self, i: i64) -> T {
+        self.v[i]
+    }
+}
+
+methods<T: Numeric + Add + Copy, const D: int> T2<T, D> {
+    pub fn sum(&self) -> T {
+        let mut total = self.v[0];
+        for i in 1..self.v.len() {
+            total = total + self.v[i]
+        }
+        total
+    }
+
+    pub fn checked_add(&self, other: &T2<T, D>) -> Result<T2<T, D>, i64> {
+        let mut out = T2<T, D>::zeros(self.v.len());
+        for i in 0..self.v.len() {
+            out.v[i] = self.v[i] + other.v[i]
+        }
+        Result::Ok(out)
+    }
+
+    // No #[derivative] registered anywhere in this file: this must be
+    // differentiated directly through its body (the "Nested" path), which
+    // is exactly what T2::sum above also relies on (no custom derivative
+    // needed for a plain struct-body/methods<> method).
+    pub fn add(&self, other: &T2<T, D>) -> T2<T, D> {
+        match self.checked_add(other) {
+            Result::Ok(t) => t,
+            Result::Err(e) => panic("add failed"),
+        }
+    }
+}
+
+#[differentiable]
+fn loss(t: T2<f32, 2>) -> f32 {
+    let u = T2<f32, 2>::zeros(2);
+    let s = t.add(&u);
+    s.sum()
+}
+
+fn main() {
+    let t = T2<f32, 2>::zeros(2);
+    let (n, ga) = autodiff::grad(loss, t);
+    print(n);
+    print(ga.at(0));
+    print(ga.at(1));
+}

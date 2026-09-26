@@ -1,0 +1,1 @@
+cannot resolve domain-shaped `use example.com.team.json`: no matching entry in `paco.mod` (add one and run `paco get`), or it has not been fetched yet (run `paco get`)

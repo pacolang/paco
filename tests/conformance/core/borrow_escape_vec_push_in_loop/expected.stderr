@@ -1,0 +1,1 @@
+error[lifetime-error] input.paco:5:17: borrow of local `t` is stored in `v`, which outlives it; `t` is dropped at the end of this scope

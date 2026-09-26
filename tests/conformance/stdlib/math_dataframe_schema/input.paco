@@ -1,0 +1,21 @@
+use stdlib::math;
+
+#[derive(Schema)]
+struct LogRow {
+    timestamp: i64,
+    level: string,
+    message: string,
+}
+
+fn main() {
+    let mut df = math::DataFrame<LogRow>::new();
+    df.push(LogRow { timestamp: 1_000, level: "INFO", message: "started" });
+    df.push(LogRow { timestamp: 2_000, level: "WARN", message: "slow" });
+
+    let ts: Vec<i64> = LogRow::timestamp(&df);
+    let levels: Vec<string> = LogRow::level(&df);
+    print(df.len());
+    print(ts[0] + ts[1]);
+    print(levels[1]);
+    print(LogRow::message(&df)[0])
+}

@@ -1,0 +1,16 @@
+fn b(n: i64) -> i64 {
+    if n > 0 {
+        panic("deep failure");
+    }
+    n
+}
+
+fn a(n: i64) -> i64 {
+    let doubled = n * 2;
+    b(doubled) + 1
+}
+
+fn main() {
+    print("before");
+    print(a(3));
+}

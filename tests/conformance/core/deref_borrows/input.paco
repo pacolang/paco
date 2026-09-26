@@ -1,0 +1,40 @@
+struct P {
+    x: i64,
+}
+
+fn set(n: &mut i64) {
+    *n = 42
+}
+
+fn next(n: &i64) -> i64 {
+    *n + 1
+}
+
+fn add_to(total: &mut float, by: &float) {
+    *total = *total + *by
+}
+
+fn move_point(p: &mut P) {
+    (*p).x = 7
+}
+
+fn main() {
+    let mut x = 1;
+    set(&mut x);
+    print(x);
+    print(next(&x));
+
+    let mut acc = 1.5;
+    let step = 2.0;
+    add_to(&mut acc, &step);
+    print(acc);
+
+    let mut y = 10;
+    let r = &mut y;
+    *r = *r * 3;
+    print(y);
+
+    let mut p = P { x: 0 };
+    move_point(&mut p);
+    print(p.x)
+}

@@ -1,0 +1,1 @@
+error[PACO-E0302] input.paco:5:11: `n` has type i64 and cannot be called

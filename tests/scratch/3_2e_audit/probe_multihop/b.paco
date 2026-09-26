@@ -1,0 +1,24 @@
+module b;
+
+use a;
+
+// Registers the derivative for `a::T2::add` from a second, non-root module
+// that only imports `a` (does not define `T2` or `add` itself). Only public
+// API of `a::T2` is used here so the pullback never touches a private field.
+pub struct AddPullback<T: Numeric + Add + Copy, const D: int> {
+    type Seed = a::T2<T, D>;
+    type Gradients = (a::T2<T, D>, a::T2<T, D>);
+
+    pub fn pullback(self, seed: a::T2<T, D>) -> (a::T2<T, D>, a::T2<T, D>) {
+        let mut x = a::T2<T, D>::zeros(seed.len());
+        x.move_by(&seed);
+        let mut y = a::T2<T, D>::zeros(seed.len());
+        y.move_by(&seed);
+        (x, y)
+    }
+}
+
+#[derivative(of = a::T2::add)]
+pub fn add_derivative<T: Numeric + Add + Copy, const D: int>(x: a::T2<T, D>, y: &a::T2<T, D>) -> (a::T2<T, D>, AddPullback<T, D>) {
+    (x.add(y), AddPullback { })
+}

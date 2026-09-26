@@ -1,0 +1,30 @@
+use stdlib::autodiff;
+
+#[differentiable]
+fn cube(x: float) -> float {
+    x * x * x
+}
+
+#[differentiable]
+fn quotient(x: float, y: float) -> float {
+    x / y
+}
+
+#[differentiable]
+fn negated(x: float, y: float) -> float {
+    -(x - y)
+}
+
+fn main() {
+    let (value, gradient) = autodiff::grad(cube, 3.0);
+    print(value);
+    print(gradient);
+    let (q, (dx, dy)) = autodiff::grad(quotient, (3.0, 2.0));
+    print(q);
+    print(dx);
+    print(dy);
+    let (n, (nx, ny)) = autodiff::grad(negated, (3.0, 2.0));
+    print(n);
+    print(nx);
+    print(ny);
+}

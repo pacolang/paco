@@ -1,0 +1,9 @@
+struct H { r: &i64 }
+fn set(h: &mut H) { print(*h.r); }
+fn main() {
+    let mut a = 1;
+    let mut h = H { r: &a };
+    let m = &mut a;
+    set(&mut h);
+    print(*m);
+}

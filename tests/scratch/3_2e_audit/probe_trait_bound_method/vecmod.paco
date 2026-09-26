@@ -1,0 +1,98 @@
+module vecmod;
+
+// Probe for task 3.2e: a #[derivative]-registered method reached only
+// through a trait bound (Paco has no `impl Trait for Type` -- satisfaction
+// is implicit -- so the closest analog of "dispatch via a separate trait
+// impl" is calling the method through a generically trait-bounded function
+// rather than directly on the concrete type).
+pub trait Addable<T> {
+    fn combine(&self, other: &T) -> T;
+}
+
+pub struct T2<T: Numeric + Add + Copy, const D: int> {
+    v: []T,
+    type Tangent = T2<T, D>;
+
+    pub fn zeros(len: i64) -> T2<T, D> {
+        T2 { v: slice_of_zeros<T>(len) }
+    }
+
+    pub fn zero_tangent(&self) -> T2<T, D> {
+        T2 { v: slice_of_zeros<T>(self.v.len()) }
+    }
+
+    pub fn move_by(&mut self, offset: &T2<T, D>) {
+        for i in 0..self.v.len() {
+            self.v[i] = self.v[i] + offset.v[i]
+        }
+    }
+
+    pub fn at(&self, i: i64) -> T {
+        self.v[i]
+    }
+}
+
+methods<T: Numeric + Add + Copy, const D: int> T2<T, D> {
+    pub fn sum(&self) -> T {
+        let mut total = self.v[0];
+        for i in 1..self.v.len() {
+            total = total + self.v[i]
+        }
+        total
+    }
+
+    // Satisfies `Addable<T2<T, D>>` implicitly -- no impl block in Paco.
+    pub fn combine(&self, other: &T2<T, D>) -> T2<T, D> {
+        let mut out = T2<T, D>::zeros(self.v.len());
+        for i in 0..self.v.len() {
+            out.v[i] = self.v[i] + other.v[i]
+        }
+        out
+    }
+}
+
+pub struct SumPullback<T: Copy, const D: int> {
+    len: i64,
+    type Seed = T;
+    type Gradients = T2<T, D>;
+
+    pub fn pullback(self, seed: T) -> T2<T, D> {
+        let mut out = slice_of_zeros<T>(self.len);
+        for i in 0..self.len {
+            out[i] = seed
+        }
+        T2 { v: out }
+    }
+}
+
+#[derivative(of = T2::sum)]
+pub fn sum_derivative<T: Numeric + Add + Copy, const D: int>(t: T2<T, D>) -> (T, SumPullback<T, D>) {
+    (t.sum(), SumPullback { len: t.v.len() })
+}
+
+pub struct CombinePullback<T, const D: int> {
+    type Seed = T2<T, D>;
+    type Gradients = (T2<T, D>, T2<T, D>);
+
+    pub fn pullback(self, seed: T2<T, D>) -> (T2<T, D>, T2<T, D>) {
+        let mut a = T2<T, D>::zeros(seed.v.len());
+        let mut b = T2<T, D>::zeros(seed.v.len());
+        for i in 0..seed.v.len() {
+            a.v[i] = seed.v[i];
+            b.v[i] = seed.v[i]
+        }
+        (a, b)
+    }
+}
+
+#[derivative(of = T2::combine)]
+pub fn combine_derivative<T: Numeric + Add + Copy, const D: int>(a: T2<T, D>, b: &T2<T, D>) -> (T2<T, D>, CombinePullback<T, D>) {
+    (a.combine(b), CombinePullback { })
+}
+
+// The differentiated call site: reach `combine` only via the trait bound,
+// never by naming `T2::combine` or `.combine` on a concrete `T2` directly
+// at the `#[differentiable]` call site in input.paco.
+pub fn combine_via_trait<X: Addable<X>>(a: &X, b: &X) -> X {
+    a.combine(b)
+}

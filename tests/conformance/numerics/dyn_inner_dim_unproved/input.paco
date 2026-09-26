@@ -1,0 +1,37 @@
+use stdlib::dims;
+
+struct Grid<T: Numeric, const D: int...> {
+    data: []T,
+
+    pub fn zeros() -> Self {
+        let dims = D;
+        Grid { data: slice_of_zeros<T>(product(&dims)) }
+    }
+
+    pub fn len(&self) -> i64 {
+        self.data.len()
+    }
+
+    pub fn extent(&self, axis: i64) -> i64 {
+        let dims = D;
+        dims[axis]
+    }
+}
+
+fn product(dims: &[]i64) -> i64 {
+    let mut count = 1;
+    for i in 0..dims.len() {
+        count = count * dims[i];
+    }
+    count
+}
+
+fn matmul<dim M, dim K, dim N>(a: &Grid<f32, M, K>, b: &Grid<f32, K, N>) -> Grid<f32, M, N> {
+    Grid<f32, M, N>::zeros()
+}
+
+fn main() {
+    let a = Grid<f32, 4, Dyn>::zeros();
+    let b = Grid<f32, Dyn, 3>::zeros();
+    print(matmul(&a, &b).len());
+}

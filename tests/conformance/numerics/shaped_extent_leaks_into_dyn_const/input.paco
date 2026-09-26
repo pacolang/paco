@@ -1,0 +1,40 @@
+// A regression for a bug found while giving `numerics::Tensor` a
+// `stdlib::dims::Shaped`-satisfying `extent` method (`extract-domain-libraries`
+// task 3.2c): once a type has *any* method literally named
+// `extent(&self, axis: i64) -> i64`, binding one of its `Dyn`-shaped values
+// to a plain local opens that `Dyn` position into an anonymous atom backed
+// by a real run-time extent (so `x.dim(0)` can read it later) — even when
+// nothing ever calls `.dim()`. That atom's symbolic name then kept flowing
+// into every further generic call the value was passed to, so a `const M:
+// int` parameter that is still `Dyn` at this position silently received the
+// real extent instead of the `-1` sentinel idiomatic generic code branches
+// on to detect "this position is Dyn" (mirroring `Tensor::checked_matmul`'s
+// own `M < 0` reconstruction of a `Dyn`-shaped result).
+struct Box<T: Numeric, const D: int...> {
+    data: []T,
+    dyn_dim: i64,
+
+    fn zeros_with(dyn_dim: i64) -> Self {
+        Box { data: slice_of_zeros<T>(1), dyn_dim: dyn_dim }
+    }
+
+    // Satisfies `stdlib::dims::Shaped` structurally; nothing else in this
+    // program ever calls it or `.dim()` — its mere presence is the trigger.
+    fn extent(&self, axis: i64) -> i64 {
+        self.dyn_dim
+    }
+}
+
+methods<T: Numeric, const M: int, const K: int> Box<T, M, K> {
+    fn is_dyn_batch(&self) -> i64 {
+        if M < 0 { 1 } else { 0 }
+    }
+}
+
+fn main() {
+    let x0 = Box<f32, Dyn, 3>::zeros_with(2);
+    // Nothing more than binding `x0` (whose leading axis is `Dyn`) to a
+    // plain local is needed to trigger the leak.
+    let x = x0;
+    print(x.is_dyn_batch());
+}

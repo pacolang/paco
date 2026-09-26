@@ -1,0 +1,86 @@
+module vecmod;
+
+// A generic differentiable struct with two `#[derivative]` registrations,
+// declared in its own module and consumed only from `input.paco` (a
+// regression for `extract-domain-libraries` task 3.2d: a real library with
+// more than one differentiable operation, used from anywhere else, hits
+// this the moment a returned gradient's own contents are read).
+pub struct T2<T: Numeric + Add + Copy, const D: int> {
+    v: []T,
+    type Tangent = T2<T, D>;
+
+    pub fn zeros(len: i64) -> T2<T, D> {
+        T2 { v: slice_of_zeros<T>(len) }
+    }
+
+    pub fn zero_tangent(&self) -> T2<T, D> {
+        T2 { v: slice_of_zeros<T>(self.v.len()) }
+    }
+
+    pub fn move_by(&mut self, offset: &T2<T, D>) {
+        for i in 0..self.v.len() {
+            self.v[i] = self.v[i] + offset.v[i]
+        }
+    }
+
+    pub fn at(&self, i: i64) -> T {
+        self.v[i]
+    }
+}
+
+methods<T: Numeric + Add + Copy, const D: int> T2<T, D> {
+    pub fn sum(&self) -> T {
+        let mut total = self.v[0];
+        for i in 1..self.v.len() {
+            total = total + self.v[i]
+        }
+        total
+    }
+
+    pub fn add(&self, other: &T2<T, D>) -> T2<T, D> {
+        let mut out = T2<T, D>::zeros(self.v.len());
+        for i in 0..self.v.len() {
+            out.v[i] = self.v[i] + other.v[i]
+        }
+        out
+    }
+}
+
+pub struct SumPullback<T: Copy, const D: int> {
+    len: i64,
+    type Seed = T;
+    type Gradients = T2<T, D>;
+
+    pub fn pullback(self, seed: T) -> T2<T, D> {
+        let mut out = slice_of_zeros<T>(self.len);
+        for i in 0..self.len {
+            out[i] = seed
+        }
+        T2 { v: out }
+    }
+}
+
+#[derivative(of = T2::sum)]
+pub fn sum_derivative<T: Numeric + Add + Copy, const D: int>(t: T2<T, D>) -> (T, SumPullback<T, D>) {
+    (t.sum(), SumPullback { len: t.v.len() })
+}
+
+pub struct AddPullback<T, const D: int> {
+    type Seed = T2<T, D>;
+    type Gradients = (T2<T, D>, T2<T, D>);
+
+    pub fn pullback(self, seed: T2<T, D>) -> (T2<T, D>, T2<T, D>) {
+        let mut a = T2<T, D>::zeros(seed.v.len());
+        let mut b = T2<T, D>::zeros(seed.v.len());
+        for i in 0..seed.v.len() {
+            a.v[i] = seed.v[i];
+            b.v[i] = seed.v[i]
+        }
+        (a, b)
+    }
+}
+
+#[derivative(of = T2::add)]
+pub fn add_derivative<T: Numeric + Add + Copy, const D: int>(a: T2<T, D>, b: &T2<T, D>) -> (T2<T, D>, AddPullback<T, D>) {
+    (a.add(b), AddPullback { })
+}

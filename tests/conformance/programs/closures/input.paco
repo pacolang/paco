@@ -1,0 +1,48 @@
+fn fold_f(xs: &[]f64, init: f64, f: fn(f64, f64) -> f64) -> f64 {
+    let mut acc = init;
+    for i in 0..xs.len() {
+        acc = f(acc, xs[i]);
+    }
+    acc
+}
+
+fn fold_i(xs: &[]i64, init: i64, f: fn(i64, i64) -> i64) -> i64 {
+    let mut acc = init;
+    for i in 0..xs.len() {
+        acc = f(acc, xs[i]);
+    }
+    acc
+}
+
+fn map_into<T: Copy>(xs: &[]T, out: &mut []T, f: fn(T) -> T) {
+    for i in 0..xs.len() {
+        out[i] = f(xs[i]);
+    }
+}
+
+fn compose(f: fn(f64) -> f64, g: fn(f64) -> f64) -> fn(f64) -> f64 {
+    |x| g(f(x))
+}
+
+fn main() {
+    let n: i64 = 5000;
+    let mut xs: []f64 = slice_of_zeros<f64>(n);
+    let mut ys: []f64 = slice_of_zeros<f64>(n);
+    let mut is: []i64 = slice_of_zeros<i64>(n);
+    for i in 0..n {
+        xs[i] = (i % 1000) as f64 * 0.001;
+        is[i] = i % 977;
+    }
+    let scale = 1.5;
+    let offset = 0.25;
+    let mut total = 0.0;
+    let mut itotal: i64 = 0;
+    for round in 0..4 {
+        let pipeline = compose(|x| x * scale, |x| x + offset);
+        map_into(&xs, &mut ys, pipeline);
+        total = total + fold_f(&ys, 0.0, |a, b| a + b);
+        itotal = itotal + fold_i(&is, 0, |a, b| if a > b { a - b } else { a + b });
+    }
+    print(total);
+    print(itotal);
+}

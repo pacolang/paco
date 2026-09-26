@@ -1,0 +1,2 @@
+error[PACO-E0340] input.paco:10:13: `Plain` does not satisfy `Copy`, required by `T` in `dup`
+error[PACO-E0340] input.paco:12:13: `[]i64` does not satisfy `Copy`, required by `T` in `dup`

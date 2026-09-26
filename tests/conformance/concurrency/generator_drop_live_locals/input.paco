@@ -1,0 +1,53 @@
+struct Guard {
+    name: string,
+
+    fn drop(&mut self) {
+        print(string_concat(&"close ", &self.name));
+    }
+}
+
+iter fn counted(label: string, limit: i64) -> i64 {
+    let guard = Guard { name: label };
+    let shared = Rc::new(Guard { name: "shared" });
+    let alias = shared.clone();
+    let (tx, rx) = channel<i64>(capacity: 1);
+    let mut i: i64 = 0;
+    while i < limit {
+        let step = Guard { name: "step" };
+        yield i;
+        i = i + 1;
+    }
+}
+
+fn make(label: string) -> Generator<i64> {
+    let full = string_concat(&label, &"-made");
+    counted(full, 5)
+}
+
+fn main() {
+    let g = counted("partial", 5);
+    match g.next() {
+        Option::Some(value) => print(value),
+        Option::None => print(-1),
+    }
+    let made = make("far");
+    match made.next() {
+        Option::Some(value) => print(value),
+        Option::None => print(-1),
+    }
+    match made.next() {
+        Option::Some(value) => print(value),
+        Option::None => print(-1),
+    }
+    let unstarted = counted("unstarted", 3);
+    let finished = counted("finished", 1);
+    match finished.next() {
+        Option::Some(value) => print(value),
+        Option::None => print(-1),
+    }
+    match finished.next() {
+        Option::Some(value) => print(value),
+        Option::None => print(-1),
+    }
+    print("end");
+}

@@ -1,0 +1,31 @@
+struct Counter {
+    n: i64,
+
+    fn bump(&mut self) {
+        self.n = self.n + 1
+    }
+
+    fn get(&self) -> i64 {
+        self.n
+    }
+}
+
+fn bump_twice(c: &mut Counter) {
+    c.bump();
+    c.bump()
+}
+
+fn main() {
+    let mut b = Counter { n: 1 };
+    let r = &mut b;
+    r.bump();
+    r.bump();
+    print(r.get());
+    bump_twice(r);
+    print(r.get());
+    print(b.n);
+
+    let s = &b;
+    print(s.get());
+    print(b.get())
+}

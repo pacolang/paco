@@ -1,0 +1,58 @@
+fn mix_i8(a: i8, b: i8) -> i8 {
+    a * b - a / b + a % b
+}
+
+fn mix_i16(a: i16, b: i16) -> i16 {
+    a * b - a / b + a % b
+}
+
+fn mix_i32(a: i32, b: i32) -> i32 {
+    a * b - a / b + a % b
+}
+
+fn mix_i64(a: i64, b: i64) -> i64 {
+    a * b - a / b + a % b
+}
+
+fn mix_u8(a: u8, b: u8) -> u8 {
+    a * b - a / b + a % b
+}
+
+fn mix_u16(a: u16, b: u16) -> u16 {
+    a * b - a / b + a % b
+}
+
+fn mix_u32(a: u32, b: u32) -> u32 {
+    a * b - a / b + a % b
+}
+
+fn mix_u64(a: u64, b: u64) -> u64 {
+    a * b - a / b + a % b
+}
+
+fn negate_i64(a: i64) -> i64 {
+    -a
+}
+
+fn narrow(a: i64) -> u8 {
+    a as u8
+}
+
+fn widen(a: i8) -> i64 {
+    a as i64
+}
+
+fn main() {
+    print(mix_i8((0 - 11) as i8, 3 as i8));
+    print(mix_i16((0 - 300) as i16, 7 as i16));
+    print(mix_i32(123456 as i32, (0 - 17) as i32));
+    print(mix_i64(9000000000, 13));
+    print(mix_u8(12 as u8, 5 as u8));
+    print(mix_u16(250 as u16, 9 as u16));
+    print(mix_u32(4000000 as u32, 1000 as u32));
+    print(mix_u64(9000000000000000000 as u64, 2 as u64));
+    print(negate_i64(0 - 9223372036854775807));
+    print(narrow(300));
+    print(widen((0 - 128) as i8));
+    print(mix_i64(-7, 2) < mix_i64(7, 2));
+}

@@ -1,0 +1,2 @@
+error[PACO-E0336] input.paco:22:1: return shape mismatch: dimension 0 expected `2 * N + 1`, found `2 * N` (expected `Grid<f32, 2 * N + 1>`, found `Grid<f32, 2 * N>`)
+  note at input.paco:22:9: `N` is a dimension parameter of this item

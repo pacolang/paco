@@ -1,0 +1,6 @@
+fn main() {
+    let mut y = 1;
+    let r = &mut y;
+    *r = 5;
+    print(y);
+}

@@ -1,0 +1,11 @@
+fn main() {
+    let c: Cell<i64> = Cell::new(7);
+    print(c.get());
+    c.set(8);
+    print(c.get());
+
+    let rc: RefCell<i64> = RefCell::new(1);
+    print(rc.get());
+    rc.set(2);
+    print(rc.get())
+}

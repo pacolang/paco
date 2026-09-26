@@ -1,0 +1,17 @@
+struct Grid<T: Numeric, const D: int...> {
+    data: []T,
+
+    pub fn first_extent() -> i64 {
+        let dims = D;
+        dims[0]
+    }
+}
+
+fn square<const N: int>() -> i64 {
+    Grid<f32, N * N>::first_extent()
+}
+
+fn main() {
+    print(square<3>());
+    print(square<4000000000>());
+}

@@ -1,0 +1,9 @@
+struct Point {
+    x: i64,
+}
+
+fn main() {
+    let mut points: Vec<Point> = Vec::new();
+    points.push(Point { x: 1 });
+    points.sort();
+}

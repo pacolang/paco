@@ -1,0 +1,6 @@
+error[PACO-E0342] input.paco:143:13: cannot prove these dimensions are equal: dimension 0 expected `a.dim0`, found `b.dim0` (expected `&Grid<f32, a.dim0, 784>`, found `&Grid<f32, b.dim0, 784>`)
+  note at input.paco:141:9: `a.dim0` is the extent of `a` along axis 0, bound here
+  note at input.paco:142:9: `b.dim0` is the extent of `b` along axis 0, bound here
+  note: `a.dim0` and `b.dim0` are run-time extents with different names; nothing proves them equal
+  fix 1: refine both operands once with `with_dims`: `let n = a.dim(0); let a: Grid<f32, n, 784> = a.with_dims().unwrap(); let b: Grid<f32, n, 784> = b.with_dims().unwrap();`
+  fix 2: use `a.checked_add(&b)`, which returns `Result`

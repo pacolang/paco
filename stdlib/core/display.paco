@@ -1,0 +1,31 @@
+module core;
+
+pub methods i64 {
+    pub fn display(&self) -> string {
+        int_to_string(self)
+    }
+}
+
+pub methods bool {
+    pub fn display(&self) -> string {
+        bool_to_string(self)
+    }
+}
+
+pub methods float {
+    pub fn display(&self) -> string {
+        float_to_string(self)
+    }
+}
+
+pub methods char {
+    pub fn display(&self) -> string {
+        char_to_string(self)
+    }
+}
+
+pub methods string {
+    pub fn display(&self) -> string {
+        self
+    }
+}

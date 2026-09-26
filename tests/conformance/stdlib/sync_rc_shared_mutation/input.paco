@@ -1,0 +1,8 @@
+fn main() {
+    let shared = Rc::new(RefCell::new(10));
+    let handle = shared.clone();
+    let inner = handle.get();
+    inner.set(99);
+    print(shared.get().get());
+    print(handle.get().get())
+}

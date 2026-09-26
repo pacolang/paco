@@ -1,0 +1,27 @@
+fn main() {
+    let n: i64 = 48;
+    let mut a: []f64 = slice_of_zeros<f64>(n * n);
+    let mut b: []f64 = slice_of_zeros<f64>(n * n);
+    let mut c: []f64 = slice_of_zeros<f64>(n * n);
+    for i in 0..n {
+        for j in 0..n {
+            a[i * n + j] = ((i * 7 + j * 3) % 17) as f64 * 0.25;
+            b[i * n + j] = ((i * 5 + j * 11) % 13) as f64 * 0.5;
+        }
+    }
+    for rep in 0..3 {
+        for i in 0..n {
+            for k in 0..n {
+                let aik = a[i * n + k];
+                for j in 0..n {
+                    c[i * n + j] = c[i * n + j] + aik * b[k * n + j];
+                }
+            }
+        }
+    }
+    let mut sum: f64 = 0.0;
+    for i in 0..(n * n) {
+        sum = sum + c[i];
+    }
+    print(sum);
+}

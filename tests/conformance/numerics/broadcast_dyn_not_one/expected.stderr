@@ -1,0 +1,2 @@
+error[PACO-E0346] input.paco:144:32: cannot prove this broadcast: dimension 0 `x.dim0` does not broadcast to `n`: a run-time extent is never treated as `1`
+  fix 1: compare at run time with `.checked_broadcast_to()`, which returns `Result`

@@ -1,0 +1,1 @@
+error[PACO-E0336] input.paco:15:11: shape mismatch: dimension 0 expected `768`, found `512` (expected `&Grid<768, 3072>`, found `&Grid<512, 3072>`)

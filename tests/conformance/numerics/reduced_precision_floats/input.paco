@@ -1,0 +1,25 @@
+fn scaled(x: float) -> i64 {
+    (x * 1048576.0) as i64
+}
+
+fn main() {
+    let a: bf16 = 1.5;
+    let c: f32 = a as f32;
+    let d: bf16 = (c * 3.0 as f32) as bf16;
+    print(scaled(d as float));
+
+    let tiny: bf16 = 0.001;
+    let mut acc: bf16 = 1.0;
+    for i in 0..10 {
+        acc = acc + tiny
+    }
+    print(acc == a - 0.5 as bf16);
+
+    let w: f8e4m3 = 0.3;
+    let wide: f32 = (w as f32) * c;
+    print(scaled(wide as float));
+
+    let h: f16 = 3.0;
+    print(scaled((h * h - h / h) as float));
+    print(-h < h)
+}

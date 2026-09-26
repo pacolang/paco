@@ -1,0 +1,923 @@
+fn run_i8(pair: i64, op: i64, flag: bool) -> i8 {
+    if pair == 0 {
+        let a: i8 = 126;
+        let b: i8 = 3;
+        if flag {
+            let one: i8 = 1;
+            let zero: i8 = 0;
+            return if flag_i8(a, b, op) { one } else { zero };
+        }
+        return ops_i8(a, b, op);
+    }
+    if pair == 1 {
+        let a: i8 = -127;
+        let b: i8 = 3;
+        if flag {
+            let one: i8 = 1;
+            let zero: i8 = 0;
+            return if flag_i8(a, b, op) { one } else { zero };
+        }
+        return ops_i8(a, b, op);
+    }
+    if pair == 2 {
+        let a: i8 = 5;
+        let b: i8 = 7;
+        if flag {
+            let one: i8 = 1;
+            let zero: i8 = 0;
+            return if flag_i8(a, b, op) { one } else { zero };
+        }
+        return ops_i8(a, b, op);
+    }
+    let none: i8 = 0;
+    none
+}
+
+fn ops_i8(a: i8, b: i8, op: i64) -> i8 {
+    if op == 0 { return a.wrapping_add(b); }
+    if op == 1 { return a.wrapping_sub(b); }
+    if op == 2 { return a.wrapping_mul(b); }
+    if op == 3 { return a.saturating_add(b); }
+    if op == 4 { return a.saturating_sub(b); }
+    if op == 5 { return a.saturating_mul(b); }
+    let checked = if op == 6 { a.checked_add(b) } else if op == 7 { a.checked_sub(b) } else { a.checked_mul(b) };
+    if op < 9 {
+        return match checked {
+            Some(v) => v,
+            None => a,
+        };
+    }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    r
+}
+
+fn flag_i8(a: i8, b: i8, op: i64) -> bool {
+    if op == 6 { return a.checked_add(b).is_none(); }
+    if op == 7 { return a.checked_sub(b).is_none(); }
+    if op == 8 { return a.checked_mul(b).is_none(); }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    o
+}
+
+fn run_i16(pair: i64, op: i64, flag: bool) -> i16 {
+    if pair == 0 {
+        let a: i16 = 32766;
+        let b: i16 = 3;
+        if flag {
+            let one: i16 = 1;
+            let zero: i16 = 0;
+            return if flag_i16(a, b, op) { one } else { zero };
+        }
+        return ops_i16(a, b, op);
+    }
+    if pair == 1 {
+        let a: i16 = -32767;
+        let b: i16 = 3;
+        if flag {
+            let one: i16 = 1;
+            let zero: i16 = 0;
+            return if flag_i16(a, b, op) { one } else { zero };
+        }
+        return ops_i16(a, b, op);
+    }
+    if pair == 2 {
+        let a: i16 = 5;
+        let b: i16 = 7;
+        if flag {
+            let one: i16 = 1;
+            let zero: i16 = 0;
+            return if flag_i16(a, b, op) { one } else { zero };
+        }
+        return ops_i16(a, b, op);
+    }
+    let none: i16 = 0;
+    none
+}
+
+fn ops_i16(a: i16, b: i16, op: i64) -> i16 {
+    if op == 0 { return a.wrapping_add(b); }
+    if op == 1 { return a.wrapping_sub(b); }
+    if op == 2 { return a.wrapping_mul(b); }
+    if op == 3 { return a.saturating_add(b); }
+    if op == 4 { return a.saturating_sub(b); }
+    if op == 5 { return a.saturating_mul(b); }
+    let checked = if op == 6 { a.checked_add(b) } else if op == 7 { a.checked_sub(b) } else { a.checked_mul(b) };
+    if op < 9 {
+        return match checked {
+            Some(v) => v,
+            None => a,
+        };
+    }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    r
+}
+
+fn flag_i16(a: i16, b: i16, op: i64) -> bool {
+    if op == 6 { return a.checked_add(b).is_none(); }
+    if op == 7 { return a.checked_sub(b).is_none(); }
+    if op == 8 { return a.checked_mul(b).is_none(); }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    o
+}
+
+fn run_i32(pair: i64, op: i64, flag: bool) -> i32 {
+    if pair == 0 {
+        let a: i32 = 2147483646;
+        let b: i32 = 3;
+        if flag {
+            let one: i32 = 1;
+            let zero: i32 = 0;
+            return if flag_i32(a, b, op) { one } else { zero };
+        }
+        return ops_i32(a, b, op);
+    }
+    if pair == 1 {
+        let a: i32 = -2147483647;
+        let b: i32 = 3;
+        if flag {
+            let one: i32 = 1;
+            let zero: i32 = 0;
+            return if flag_i32(a, b, op) { one } else { zero };
+        }
+        return ops_i32(a, b, op);
+    }
+    if pair == 2 {
+        let a: i32 = 5;
+        let b: i32 = 7;
+        if flag {
+            let one: i32 = 1;
+            let zero: i32 = 0;
+            return if flag_i32(a, b, op) { one } else { zero };
+        }
+        return ops_i32(a, b, op);
+    }
+    let none: i32 = 0;
+    none
+}
+
+fn ops_i32(a: i32, b: i32, op: i64) -> i32 {
+    if op == 0 { return a.wrapping_add(b); }
+    if op == 1 { return a.wrapping_sub(b); }
+    if op == 2 { return a.wrapping_mul(b); }
+    if op == 3 { return a.saturating_add(b); }
+    if op == 4 { return a.saturating_sub(b); }
+    if op == 5 { return a.saturating_mul(b); }
+    let checked = if op == 6 { a.checked_add(b) } else if op == 7 { a.checked_sub(b) } else { a.checked_mul(b) };
+    if op < 9 {
+        return match checked {
+            Some(v) => v,
+            None => a,
+        };
+    }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    r
+}
+
+fn flag_i32(a: i32, b: i32, op: i64) -> bool {
+    if op == 6 { return a.checked_add(b).is_none(); }
+    if op == 7 { return a.checked_sub(b).is_none(); }
+    if op == 8 { return a.checked_mul(b).is_none(); }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    o
+}
+
+fn run_i64(pair: i64, op: i64, flag: bool) -> i64 {
+    if pair == 0 {
+        let a: i64 = 9223372036854775806;
+        let b: i64 = 3;
+        if flag {
+            let one: i64 = 1;
+            let zero: i64 = 0;
+            return if flag_i64(a, b, op) { one } else { zero };
+        }
+        return ops_i64(a, b, op);
+    }
+    if pair == 1 {
+        let a: i64 = -9223372036854775807;
+        let b: i64 = 3;
+        if flag {
+            let one: i64 = 1;
+            let zero: i64 = 0;
+            return if flag_i64(a, b, op) { one } else { zero };
+        }
+        return ops_i64(a, b, op);
+    }
+    if pair == 2 {
+        let a: i64 = 5;
+        let b: i64 = 7;
+        if flag {
+            let one: i64 = 1;
+            let zero: i64 = 0;
+            return if flag_i64(a, b, op) { one } else { zero };
+        }
+        return ops_i64(a, b, op);
+    }
+    let none: i64 = 0;
+    none
+}
+
+fn ops_i64(a: i64, b: i64, op: i64) -> i64 {
+    if op == 0 { return a.wrapping_add(b); }
+    if op == 1 { return a.wrapping_sub(b); }
+    if op == 2 { return a.wrapping_mul(b); }
+    if op == 3 { return a.saturating_add(b); }
+    if op == 4 { return a.saturating_sub(b); }
+    if op == 5 { return a.saturating_mul(b); }
+    let checked = if op == 6 { a.checked_add(b) } else if op == 7 { a.checked_sub(b) } else { a.checked_mul(b) };
+    if op < 9 {
+        return match checked {
+            Some(v) => v,
+            None => a,
+        };
+    }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    r
+}
+
+fn flag_i64(a: i64, b: i64, op: i64) -> bool {
+    if op == 6 { return a.checked_add(b).is_none(); }
+    if op == 7 { return a.checked_sub(b).is_none(); }
+    if op == 8 { return a.checked_mul(b).is_none(); }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    o
+}
+
+fn run_u8(pair: i64, op: i64, flag: bool) -> u8 {
+    if pair == 0 {
+        let a: u8 = 254;
+        let b: u8 = 3;
+        if flag {
+            let one: u8 = 1;
+            let zero: u8 = 0;
+            return if flag_u8(a, b, op) { one } else { zero };
+        }
+        return ops_u8(a, b, op);
+    }
+    if pair == 1 {
+        let a: u8 = 1;
+        let b: u8 = 3;
+        if flag {
+            let one: u8 = 1;
+            let zero: u8 = 0;
+            return if flag_u8(a, b, op) { one } else { zero };
+        }
+        return ops_u8(a, b, op);
+    }
+    if pair == 2 {
+        let a: u8 = 5;
+        let b: u8 = 7;
+        if flag {
+            let one: u8 = 1;
+            let zero: u8 = 0;
+            return if flag_u8(a, b, op) { one } else { zero };
+        }
+        return ops_u8(a, b, op);
+    }
+    let none: u8 = 0;
+    none
+}
+
+fn ops_u8(a: u8, b: u8, op: i64) -> u8 {
+    if op == 0 { return a.wrapping_add(b); }
+    if op == 1 { return a.wrapping_sub(b); }
+    if op == 2 { return a.wrapping_mul(b); }
+    if op == 3 { return a.saturating_add(b); }
+    if op == 4 { return a.saturating_sub(b); }
+    if op == 5 { return a.saturating_mul(b); }
+    let checked = if op == 6 { a.checked_add(b) } else if op == 7 { a.checked_sub(b) } else { a.checked_mul(b) };
+    if op < 9 {
+        return match checked {
+            Some(v) => v,
+            None => a,
+        };
+    }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    r
+}
+
+fn flag_u8(a: u8, b: u8, op: i64) -> bool {
+    if op == 6 { return a.checked_add(b).is_none(); }
+    if op == 7 { return a.checked_sub(b).is_none(); }
+    if op == 8 { return a.checked_mul(b).is_none(); }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    o
+}
+
+fn run_u16(pair: i64, op: i64, flag: bool) -> u16 {
+    if pair == 0 {
+        let a: u16 = 65534;
+        let b: u16 = 3;
+        if flag {
+            let one: u16 = 1;
+            let zero: u16 = 0;
+            return if flag_u16(a, b, op) { one } else { zero };
+        }
+        return ops_u16(a, b, op);
+    }
+    if pair == 1 {
+        let a: u16 = 1;
+        let b: u16 = 3;
+        if flag {
+            let one: u16 = 1;
+            let zero: u16 = 0;
+            return if flag_u16(a, b, op) { one } else { zero };
+        }
+        return ops_u16(a, b, op);
+    }
+    if pair == 2 {
+        let a: u16 = 5;
+        let b: u16 = 7;
+        if flag {
+            let one: u16 = 1;
+            let zero: u16 = 0;
+            return if flag_u16(a, b, op) { one } else { zero };
+        }
+        return ops_u16(a, b, op);
+    }
+    let none: u16 = 0;
+    none
+}
+
+fn ops_u16(a: u16, b: u16, op: i64) -> u16 {
+    if op == 0 { return a.wrapping_add(b); }
+    if op == 1 { return a.wrapping_sub(b); }
+    if op == 2 { return a.wrapping_mul(b); }
+    if op == 3 { return a.saturating_add(b); }
+    if op == 4 { return a.saturating_sub(b); }
+    if op == 5 { return a.saturating_mul(b); }
+    let checked = if op == 6 { a.checked_add(b) } else if op == 7 { a.checked_sub(b) } else { a.checked_mul(b) };
+    if op < 9 {
+        return match checked {
+            Some(v) => v,
+            None => a,
+        };
+    }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    r
+}
+
+fn flag_u16(a: u16, b: u16, op: i64) -> bool {
+    if op == 6 { return a.checked_add(b).is_none(); }
+    if op == 7 { return a.checked_sub(b).is_none(); }
+    if op == 8 { return a.checked_mul(b).is_none(); }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    o
+}
+
+fn run_u32(pair: i64, op: i64, flag: bool) -> u32 {
+    if pair == 0 {
+        let a: u32 = 4294967294;
+        let b: u32 = 3;
+        if flag {
+            let one: u32 = 1;
+            let zero: u32 = 0;
+            return if flag_u32(a, b, op) { one } else { zero };
+        }
+        return ops_u32(a, b, op);
+    }
+    if pair == 1 {
+        let a: u32 = 1;
+        let b: u32 = 3;
+        if flag {
+            let one: u32 = 1;
+            let zero: u32 = 0;
+            return if flag_u32(a, b, op) { one } else { zero };
+        }
+        return ops_u32(a, b, op);
+    }
+    if pair == 2 {
+        let a: u32 = 5;
+        let b: u32 = 7;
+        if flag {
+            let one: u32 = 1;
+            let zero: u32 = 0;
+            return if flag_u32(a, b, op) { one } else { zero };
+        }
+        return ops_u32(a, b, op);
+    }
+    let none: u32 = 0;
+    none
+}
+
+fn ops_u32(a: u32, b: u32, op: i64) -> u32 {
+    if op == 0 { return a.wrapping_add(b); }
+    if op == 1 { return a.wrapping_sub(b); }
+    if op == 2 { return a.wrapping_mul(b); }
+    if op == 3 { return a.saturating_add(b); }
+    if op == 4 { return a.saturating_sub(b); }
+    if op == 5 { return a.saturating_mul(b); }
+    let checked = if op == 6 { a.checked_add(b) } else if op == 7 { a.checked_sub(b) } else { a.checked_mul(b) };
+    if op < 9 {
+        return match checked {
+            Some(v) => v,
+            None => a,
+        };
+    }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    r
+}
+
+fn flag_u32(a: u32, b: u32, op: i64) -> bool {
+    if op == 6 { return a.checked_add(b).is_none(); }
+    if op == 7 { return a.checked_sub(b).is_none(); }
+    if op == 8 { return a.checked_mul(b).is_none(); }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    o
+}
+
+fn run_u64(pair: i64, op: i64, flag: bool) -> u64 {
+    if pair == 0 {
+        let a_n: u64 = 1;
+        let a: u64 = ~a_n;
+        let b: u64 = 3;
+        if flag {
+            let one: u64 = 1;
+            let zero: u64 = 0;
+            return if flag_u64(a, b, op) { one } else { zero };
+        }
+        return ops_u64(a, b, op);
+    }
+    if pair == 1 {
+        let a: u64 = 1;
+        let b: u64 = 3;
+        if flag {
+            let one: u64 = 1;
+            let zero: u64 = 0;
+            return if flag_u64(a, b, op) { one } else { zero };
+        }
+        return ops_u64(a, b, op);
+    }
+    if pair == 2 {
+        let a: u64 = 5;
+        let b: u64 = 7;
+        if flag {
+            let one: u64 = 1;
+            let zero: u64 = 0;
+            return if flag_u64(a, b, op) { one } else { zero };
+        }
+        return ops_u64(a, b, op);
+    }
+    let none: u64 = 0;
+    none
+}
+
+fn ops_u64(a: u64, b: u64, op: i64) -> u64 {
+    if op == 0 { return a.wrapping_add(b); }
+    if op == 1 { return a.wrapping_sub(b); }
+    if op == 2 { return a.wrapping_mul(b); }
+    if op == 3 { return a.saturating_add(b); }
+    if op == 4 { return a.saturating_sub(b); }
+    if op == 5 { return a.saturating_mul(b); }
+    let checked = if op == 6 { a.checked_add(b) } else if op == 7 { a.checked_sub(b) } else { a.checked_mul(b) };
+    if op < 9 {
+        return match checked {
+            Some(v) => v,
+            None => a,
+        };
+    }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    r
+}
+
+fn flag_u64(a: u64, b: u64, op: i64) -> bool {
+    if op == 6 { return a.checked_add(b).is_none(); }
+    if op == 7 { return a.checked_sub(b).is_none(); }
+    if op == 8 { return a.checked_mul(b).is_none(); }
+    let (r, o) = if op == 9 { a.overflowing_add(b) } else if op == 10 { a.overflowing_sub(b) } else { a.overflowing_mul(b) };
+    o
+}
+
+fn main() {
+    print(run_i8(0, 0, false));
+    print(run_i8(0, 1, false));
+    print(run_i8(0, 2, false));
+    print(run_i8(0, 3, false));
+    print(run_i8(0, 4, false));
+    print(run_i8(0, 5, false));
+    print(run_i8(0, 6, false));
+    print(run_i8(0, 6, true));
+    print(run_i8(0, 7, false));
+    print(run_i8(0, 7, true));
+    print(run_i8(0, 8, false));
+    print(run_i8(0, 8, true));
+    print(run_i8(0, 9, false));
+    print(run_i8(0, 9, true));
+    print(run_i8(0, 10, false));
+    print(run_i8(0, 10, true));
+    print(run_i8(0, 11, false));
+    print(run_i8(0, 11, true));
+    print(run_i8(1, 0, false));
+    print(run_i8(1, 1, false));
+    print(run_i8(1, 2, false));
+    print(run_i8(1, 3, false));
+    print(run_i8(1, 4, false));
+    print(run_i8(1, 5, false));
+    print(run_i8(1, 6, false));
+    print(run_i8(1, 6, true));
+    print(run_i8(1, 7, false));
+    print(run_i8(1, 7, true));
+    print(run_i8(1, 8, false));
+    print(run_i8(1, 8, true));
+    print(run_i8(1, 9, false));
+    print(run_i8(1, 9, true));
+    print(run_i8(1, 10, false));
+    print(run_i8(1, 10, true));
+    print(run_i8(1, 11, false));
+    print(run_i8(1, 11, true));
+    print(run_i8(2, 0, false));
+    print(run_i8(2, 1, false));
+    print(run_i8(2, 2, false));
+    print(run_i8(2, 3, false));
+    print(run_i8(2, 4, false));
+    print(run_i8(2, 5, false));
+    print(run_i8(2, 6, false));
+    print(run_i8(2, 6, true));
+    print(run_i8(2, 7, false));
+    print(run_i8(2, 7, true));
+    print(run_i8(2, 8, false));
+    print(run_i8(2, 8, true));
+    print(run_i8(2, 9, false));
+    print(run_i8(2, 9, true));
+    print(run_i8(2, 10, false));
+    print(run_i8(2, 10, true));
+    print(run_i8(2, 11, false));
+    print(run_i8(2, 11, true));
+    print(run_i16(0, 0, false));
+    print(run_i16(0, 1, false));
+    print(run_i16(0, 2, false));
+    print(run_i16(0, 3, false));
+    print(run_i16(0, 4, false));
+    print(run_i16(0, 5, false));
+    print(run_i16(0, 6, false));
+    print(run_i16(0, 6, true));
+    print(run_i16(0, 7, false));
+    print(run_i16(0, 7, true));
+    print(run_i16(0, 8, false));
+    print(run_i16(0, 8, true));
+    print(run_i16(0, 9, false));
+    print(run_i16(0, 9, true));
+    print(run_i16(0, 10, false));
+    print(run_i16(0, 10, true));
+    print(run_i16(0, 11, false));
+    print(run_i16(0, 11, true));
+    print(run_i16(1, 0, false));
+    print(run_i16(1, 1, false));
+    print(run_i16(1, 2, false));
+    print(run_i16(1, 3, false));
+    print(run_i16(1, 4, false));
+    print(run_i16(1, 5, false));
+    print(run_i16(1, 6, false));
+    print(run_i16(1, 6, true));
+    print(run_i16(1, 7, false));
+    print(run_i16(1, 7, true));
+    print(run_i16(1, 8, false));
+    print(run_i16(1, 8, true));
+    print(run_i16(1, 9, false));
+    print(run_i16(1, 9, true));
+    print(run_i16(1, 10, false));
+    print(run_i16(1, 10, true));
+    print(run_i16(1, 11, false));
+    print(run_i16(1, 11, true));
+    print(run_i16(2, 0, false));
+    print(run_i16(2, 1, false));
+    print(run_i16(2, 2, false));
+    print(run_i16(2, 3, false));
+    print(run_i16(2, 4, false));
+    print(run_i16(2, 5, false));
+    print(run_i16(2, 6, false));
+    print(run_i16(2, 6, true));
+    print(run_i16(2, 7, false));
+    print(run_i16(2, 7, true));
+    print(run_i16(2, 8, false));
+    print(run_i16(2, 8, true));
+    print(run_i16(2, 9, false));
+    print(run_i16(2, 9, true));
+    print(run_i16(2, 10, false));
+    print(run_i16(2, 10, true));
+    print(run_i16(2, 11, false));
+    print(run_i16(2, 11, true));
+    print(run_i32(0, 0, false));
+    print(run_i32(0, 1, false));
+    print(run_i32(0, 2, false));
+    print(run_i32(0, 3, false));
+    print(run_i32(0, 4, false));
+    print(run_i32(0, 5, false));
+    print(run_i32(0, 6, false));
+    print(run_i32(0, 6, true));
+    print(run_i32(0, 7, false));
+    print(run_i32(0, 7, true));
+    print(run_i32(0, 8, false));
+    print(run_i32(0, 8, true));
+    print(run_i32(0, 9, false));
+    print(run_i32(0, 9, true));
+    print(run_i32(0, 10, false));
+    print(run_i32(0, 10, true));
+    print(run_i32(0, 11, false));
+    print(run_i32(0, 11, true));
+    print(run_i32(1, 0, false));
+    print(run_i32(1, 1, false));
+    print(run_i32(1, 2, false));
+    print(run_i32(1, 3, false));
+    print(run_i32(1, 4, false));
+    print(run_i32(1, 5, false));
+    print(run_i32(1, 6, false));
+    print(run_i32(1, 6, true));
+    print(run_i32(1, 7, false));
+    print(run_i32(1, 7, true));
+    print(run_i32(1, 8, false));
+    print(run_i32(1, 8, true));
+    print(run_i32(1, 9, false));
+    print(run_i32(1, 9, true));
+    print(run_i32(1, 10, false));
+    print(run_i32(1, 10, true));
+    print(run_i32(1, 11, false));
+    print(run_i32(1, 11, true));
+    print(run_i32(2, 0, false));
+    print(run_i32(2, 1, false));
+    print(run_i32(2, 2, false));
+    print(run_i32(2, 3, false));
+    print(run_i32(2, 4, false));
+    print(run_i32(2, 5, false));
+    print(run_i32(2, 6, false));
+    print(run_i32(2, 6, true));
+    print(run_i32(2, 7, false));
+    print(run_i32(2, 7, true));
+    print(run_i32(2, 8, false));
+    print(run_i32(2, 8, true));
+    print(run_i32(2, 9, false));
+    print(run_i32(2, 9, true));
+    print(run_i32(2, 10, false));
+    print(run_i32(2, 10, true));
+    print(run_i32(2, 11, false));
+    print(run_i32(2, 11, true));
+    print(run_i64(0, 0, false));
+    print(run_i64(0, 1, false));
+    print(run_i64(0, 2, false));
+    print(run_i64(0, 3, false));
+    print(run_i64(0, 4, false));
+    print(run_i64(0, 5, false));
+    print(run_i64(0, 6, false));
+    print(run_i64(0, 6, true));
+    print(run_i64(0, 7, false));
+    print(run_i64(0, 7, true));
+    print(run_i64(0, 8, false));
+    print(run_i64(0, 8, true));
+    print(run_i64(0, 9, false));
+    print(run_i64(0, 9, true));
+    print(run_i64(0, 10, false));
+    print(run_i64(0, 10, true));
+    print(run_i64(0, 11, false));
+    print(run_i64(0, 11, true));
+    print(run_i64(1, 0, false));
+    print(run_i64(1, 1, false));
+    print(run_i64(1, 2, false));
+    print(run_i64(1, 3, false));
+    print(run_i64(1, 4, false));
+    print(run_i64(1, 5, false));
+    print(run_i64(1, 6, false));
+    print(run_i64(1, 6, true));
+    print(run_i64(1, 7, false));
+    print(run_i64(1, 7, true));
+    print(run_i64(1, 8, false));
+    print(run_i64(1, 8, true));
+    print(run_i64(1, 9, false));
+    print(run_i64(1, 9, true));
+    print(run_i64(1, 10, false));
+    print(run_i64(1, 10, true));
+    print(run_i64(1, 11, false));
+    print(run_i64(1, 11, true));
+    print(run_i64(2, 0, false));
+    print(run_i64(2, 1, false));
+    print(run_i64(2, 2, false));
+    print(run_i64(2, 3, false));
+    print(run_i64(2, 4, false));
+    print(run_i64(2, 5, false));
+    print(run_i64(2, 6, false));
+    print(run_i64(2, 6, true));
+    print(run_i64(2, 7, false));
+    print(run_i64(2, 7, true));
+    print(run_i64(2, 8, false));
+    print(run_i64(2, 8, true));
+    print(run_i64(2, 9, false));
+    print(run_i64(2, 9, true));
+    print(run_i64(2, 10, false));
+    print(run_i64(2, 10, true));
+    print(run_i64(2, 11, false));
+    print(run_i64(2, 11, true));
+    print(run_u8(0, 0, false));
+    print(run_u8(0, 1, false));
+    print(run_u8(0, 2, false));
+    print(run_u8(0, 3, false));
+    print(run_u8(0, 4, false));
+    print(run_u8(0, 5, false));
+    print(run_u8(0, 6, false));
+    print(run_u8(0, 6, true));
+    print(run_u8(0, 7, false));
+    print(run_u8(0, 7, true));
+    print(run_u8(0, 8, false));
+    print(run_u8(0, 8, true));
+    print(run_u8(0, 9, false));
+    print(run_u8(0, 9, true));
+    print(run_u8(0, 10, false));
+    print(run_u8(0, 10, true));
+    print(run_u8(0, 11, false));
+    print(run_u8(0, 11, true));
+    print(run_u8(1, 0, false));
+    print(run_u8(1, 1, false));
+    print(run_u8(1, 2, false));
+    print(run_u8(1, 3, false));
+    print(run_u8(1, 4, false));
+    print(run_u8(1, 5, false));
+    print(run_u8(1, 6, false));
+    print(run_u8(1, 6, true));
+    print(run_u8(1, 7, false));
+    print(run_u8(1, 7, true));
+    print(run_u8(1, 8, false));
+    print(run_u8(1, 8, true));
+    print(run_u8(1, 9, false));
+    print(run_u8(1, 9, true));
+    print(run_u8(1, 10, false));
+    print(run_u8(1, 10, true));
+    print(run_u8(1, 11, false));
+    print(run_u8(1, 11, true));
+    print(run_u8(2, 0, false));
+    print(run_u8(2, 1, false));
+    print(run_u8(2, 2, false));
+    print(run_u8(2, 3, false));
+    print(run_u8(2, 4, false));
+    print(run_u8(2, 5, false));
+    print(run_u8(2, 6, false));
+    print(run_u8(2, 6, true));
+    print(run_u8(2, 7, false));
+    print(run_u8(2, 7, true));
+    print(run_u8(2, 8, false));
+    print(run_u8(2, 8, true));
+    print(run_u8(2, 9, false));
+    print(run_u8(2, 9, true));
+    print(run_u8(2, 10, false));
+    print(run_u8(2, 10, true));
+    print(run_u8(2, 11, false));
+    print(run_u8(2, 11, true));
+    print(run_u16(0, 0, false));
+    print(run_u16(0, 1, false));
+    print(run_u16(0, 2, false));
+    print(run_u16(0, 3, false));
+    print(run_u16(0, 4, false));
+    print(run_u16(0, 5, false));
+    print(run_u16(0, 6, false));
+    print(run_u16(0, 6, true));
+    print(run_u16(0, 7, false));
+    print(run_u16(0, 7, true));
+    print(run_u16(0, 8, false));
+    print(run_u16(0, 8, true));
+    print(run_u16(0, 9, false));
+    print(run_u16(0, 9, true));
+    print(run_u16(0, 10, false));
+    print(run_u16(0, 10, true));
+    print(run_u16(0, 11, false));
+    print(run_u16(0, 11, true));
+    print(run_u16(1, 0, false));
+    print(run_u16(1, 1, false));
+    print(run_u16(1, 2, false));
+    print(run_u16(1, 3, false));
+    print(run_u16(1, 4, false));
+    print(run_u16(1, 5, false));
+    print(run_u16(1, 6, false));
+    print(run_u16(1, 6, true));
+    print(run_u16(1, 7, false));
+    print(run_u16(1, 7, true));
+    print(run_u16(1, 8, false));
+    print(run_u16(1, 8, true));
+    print(run_u16(1, 9, false));
+    print(run_u16(1, 9, true));
+    print(run_u16(1, 10, false));
+    print(run_u16(1, 10, true));
+    print(run_u16(1, 11, false));
+    print(run_u16(1, 11, true));
+    print(run_u16(2, 0, false));
+    print(run_u16(2, 1, false));
+    print(run_u16(2, 2, false));
+    print(run_u16(2, 3, false));
+    print(run_u16(2, 4, false));
+    print(run_u16(2, 5, false));
+    print(run_u16(2, 6, false));
+    print(run_u16(2, 6, true));
+    print(run_u16(2, 7, false));
+    print(run_u16(2, 7, true));
+    print(run_u16(2, 8, false));
+    print(run_u16(2, 8, true));
+    print(run_u16(2, 9, false));
+    print(run_u16(2, 9, true));
+    print(run_u16(2, 10, false));
+    print(run_u16(2, 10, true));
+    print(run_u16(2, 11, false));
+    print(run_u16(2, 11, true));
+    print(run_u32(0, 0, false));
+    print(run_u32(0, 1, false));
+    print(run_u32(0, 2, false));
+    print(run_u32(0, 3, false));
+    print(run_u32(0, 4, false));
+    print(run_u32(0, 5, false));
+    print(run_u32(0, 6, false));
+    print(run_u32(0, 6, true));
+    print(run_u32(0, 7, false));
+    print(run_u32(0, 7, true));
+    print(run_u32(0, 8, false));
+    print(run_u32(0, 8, true));
+    print(run_u32(0, 9, false));
+    print(run_u32(0, 9, true));
+    print(run_u32(0, 10, false));
+    print(run_u32(0, 10, true));
+    print(run_u32(0, 11, false));
+    print(run_u32(0, 11, true));
+    print(run_u32(1, 0, false));
+    print(run_u32(1, 1, false));
+    print(run_u32(1, 2, false));
+    print(run_u32(1, 3, false));
+    print(run_u32(1, 4, false));
+    print(run_u32(1, 5, false));
+    print(run_u32(1, 6, false));
+    print(run_u32(1, 6, true));
+    print(run_u32(1, 7, false));
+    print(run_u32(1, 7, true));
+    print(run_u32(1, 8, false));
+    print(run_u32(1, 8, true));
+    print(run_u32(1, 9, false));
+    print(run_u32(1, 9, true));
+    print(run_u32(1, 10, false));
+    print(run_u32(1, 10, true));
+    print(run_u32(1, 11, false));
+    print(run_u32(1, 11, true));
+    print(run_u32(2, 0, false));
+    print(run_u32(2, 1, false));
+    print(run_u32(2, 2, false));
+    print(run_u32(2, 3, false));
+    print(run_u32(2, 4, false));
+    print(run_u32(2, 5, false));
+    print(run_u32(2, 6, false));
+    print(run_u32(2, 6, true));
+    print(run_u32(2, 7, false));
+    print(run_u32(2, 7, true));
+    print(run_u32(2, 8, false));
+    print(run_u32(2, 8, true));
+    print(run_u32(2, 9, false));
+    print(run_u32(2, 9, true));
+    print(run_u32(2, 10, false));
+    print(run_u32(2, 10, true));
+    print(run_u32(2, 11, false));
+    print(run_u32(2, 11, true));
+    print(run_u64(0, 0, false));
+    print(run_u64(0, 1, false));
+    print(run_u64(0, 2, false));
+    print(run_u64(0, 3, false));
+    print(run_u64(0, 4, false));
+    print(run_u64(0, 5, false));
+    print(run_u64(0, 6, false));
+    print(run_u64(0, 6, true));
+    print(run_u64(0, 7, false));
+    print(run_u64(0, 7, true));
+    print(run_u64(0, 8, false));
+    print(run_u64(0, 8, true));
+    print(run_u64(0, 9, false));
+    print(run_u64(0, 9, true));
+    print(run_u64(0, 10, false));
+    print(run_u64(0, 10, true));
+    print(run_u64(0, 11, false));
+    print(run_u64(0, 11, true));
+    print(run_u64(1, 0, false));
+    print(run_u64(1, 1, false));
+    print(run_u64(1, 2, false));
+    print(run_u64(1, 3, false));
+    print(run_u64(1, 4, false));
+    print(run_u64(1, 5, false));
+    print(run_u64(1, 6, false));
+    print(run_u64(1, 6, true));
+    print(run_u64(1, 7, false));
+    print(run_u64(1, 7, true));
+    print(run_u64(1, 8, false));
+    print(run_u64(1, 8, true));
+    print(run_u64(1, 9, false));
+    print(run_u64(1, 9, true));
+    print(run_u64(1, 10, false));
+    print(run_u64(1, 10, true));
+    print(run_u64(1, 11, false));
+    print(run_u64(1, 11, true));
+    print(run_u64(2, 0, false));
+    print(run_u64(2, 1, false));
+    print(run_u64(2, 2, false));
+    print(run_u64(2, 3, false));
+    print(run_u64(2, 4, false));
+    print(run_u64(2, 5, false));
+    print(run_u64(2, 6, false));
+    print(run_u64(2, 6, true));
+    print(run_u64(2, 7, false));
+    print(run_u64(2, 7, true));
+    print(run_u64(2, 8, false));
+    print(run_u64(2, 8, true));
+    print(run_u64(2, 9, false));
+    print(run_u64(2, 9, true));
+    print(run_u64(2, 10, false));
+    print(run_u64(2, 10, true));
+    print(run_u64(2, 11, false));
+    print(run_u64(2, 11, true));
+}

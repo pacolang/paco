@@ -1,0 +1,19 @@
+struct Field<T: Numeric, const D: int...> {
+    data: []T,
+
+    pub fn zeros() -> Self {
+        Field { data: slice_of_zeros<T>(0) }
+    }
+}
+
+methods<T: Numeric + Add, const D: int...> Field<T, D...> {
+    pub fn add(&self, other: &Self) -> Self {
+        Field { data: slice_of_zeros<T>(0) }
+    }
+}
+
+fn main() {
+    let a = Field<bf16, 128>::zeros();
+    let b = Field<f32, 128>::zeros();
+    let c = a + &b;
+}

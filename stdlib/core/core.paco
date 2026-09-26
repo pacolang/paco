@@ -1,0 +1,11 @@
+module core;
+
+// Built-in float math. Every float type with arithmetic (`f64`, `f32`, `f16`,
+// `bf16`) has these methods, computed by the compiler with the same result
+// in every build mode and at compile time; FP8 has none (`PACO-E0339`).
+//
+//     x.sqrt()  x.exp()  x.ln()  x.sin()  x.cos()  x.tanh()  x.abs()
+//     x.powf(y)  x.min(y)  x.max(y)
+//
+// `min` and `max` return NaN when either operand is NaN and order `-0.0`
+// below `0.0`. `f16` and `bf16` compute in `f64` and round to their width.

@@ -1,0 +1,20 @@
+use stdlib::blas;
+
+fn main() {
+    let mut a: []float = slice_of_zeros<float>(4);
+    a[0] = 1.0;
+    a[1] = 2.0;
+    a[2] = 3.0;
+    a[3] = 4.0;
+    let mut b: []float = slice_of_zeros<float>(4);
+    b[0] = 5.0;
+    b[1] = 6.0;
+    b[2] = 7.0;
+    b[3] = 8.0;
+    let mut c: []float = slice_of_zeros<float>(4);
+    blas::dgemm(&a, &b, &mut c, 2, 2, 2);
+    print(c[0]);
+    print(c[1]);
+    print(c[2]);
+    print(c[3])
+}

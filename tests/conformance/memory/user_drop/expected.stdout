@@ -1,0 +1,49 @@
+open outer
+open inner1
+open inner2
+leaving block
+close inner2
+close inner1
+open moved
+consume moved
+close moved
+open early-a
+open early-b
+consume early-b
+close early-b
+close early-a
+1
+open early-a
+open early-b
+early fallthrough
+close early-b
+close early-a
+0
+open slot-1
+open slot-2
+close slot-1
+after reassign
+open pair-first
+open pair-second
+open made
+open propagate
+open error
+close propagate
+failed with error
+close error
+close error
+open propagate
+close propagate
+6
+open shared
+open 0
+close 0
+open 1
+close 1
+end of main
+close shared
+close made
+close pair-first
+close pair-second
+close slot-2
+close outer

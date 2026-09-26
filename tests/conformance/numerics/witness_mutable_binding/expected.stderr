@@ -1,0 +1,2 @@
+error[PACO-E0345] input.paco:143:23: `n` is bound by `let mut`, so it cannot name a dimension: its value could change
+  note: bind it immutably: `let n = ...;`

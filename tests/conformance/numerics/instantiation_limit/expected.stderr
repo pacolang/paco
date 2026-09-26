@@ -1,0 +1,2 @@
+error[PACO-E0337] input.paco:18:33: `rows` exceeds its instantiation limit of 2 distinct const arguments; instantiated with <R = 1>, <R = 2>, <R = 3>
+  note: raise the limit with `#[instantiation_limit(N)]` on the item, or use `Dyn` for dimensions that vary

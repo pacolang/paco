@@ -1,0 +1,32 @@
+module autodiff;
+
+/// A value the compiler can differentiate. `Tangent` is the type of its
+/// gradient and must satisfy `Add`; `zero_tangent` is the gradient that
+/// changes nothing and `move_by` applies one. `f64`, `f32`, `f16` and `bf16`
+/// satisfy it with `Tangent = Self`; any other type satisfies it by having
+/// these items.
+pub trait Differentiable {
+    type Tangent;
+    fn zero_tangent(&self) -> Self::Tangent;
+    fn move_by(&mut self, offset: &Self::Tangent);
+}
+
+/// The backward half of a `#[derivative(of = f)]`: consumes the values the
+/// forward half kept and maps the gradient of `f`'s result (`Seed`) to the
+/// gradients of `f`'s differentiable parameters (`Gradients`, a tuple when
+/// there are several).
+pub trait Pullback {
+    type Seed;
+    type Gradients;
+    fn pullback(self, seed: Self::Seed) -> Self::Gradients;
+}
+
+/// Reverse-mode gradient of a `#[differentiable]` function: `grad(f, inputs)`
+/// returns `(f(inputs), gradients)`, where `inputs` is `f`'s argument (or a
+/// tuple of its arguments) and each gradient has its input's `Tangent` type.
+/// The compiler checks this signature and replaces every call, not the body
+/// written here.
+#[builtin(grad)]
+pub fn grad<F, I, R>(f: F, inputs: I) -> R {
+    panic("`grad` calls are replaced by the compiler")
+}

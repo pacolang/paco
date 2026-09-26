@@ -1,0 +1,6 @@
+fn main() {
+    let mut m: Map<f64, i64> = Map::new();
+    let key: f64 = 1.5;
+    m.insert(key, 1);
+    print(m.len());
+}

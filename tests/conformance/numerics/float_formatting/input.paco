@@ -1,0 +1,45 @@
+extern "C" {
+    fn exp(x: float) -> float;
+    fn cos(x: float) -> float;
+}
+
+fn halve(x: float, times: i64) -> float {
+    let mut v = x;
+    for i in 0..times {
+        v = v / 2.0;
+    }
+    v
+}
+
+fn main() {
+    let zero: float = 0.0;
+    print(0.1);
+    print(0.1 + 0.2);
+    print(1000000000000000000000.0);
+    print(100000000000000000000.0);
+    print(0.0000001);
+    print(0.000001);
+    print(0.0 - zero);
+    print(zero * (0.0 - 1.0));
+    let inf = unsafe { exp(710.0) };
+    print(inf);
+    print(unsafe { cos(1.0) });
+    print(zero - inf);
+    print(inf - inf);
+    print(9007199254740993.0);
+    print(123456789012345680000.0);
+    print(halve(1.0, 1074));
+    print(halve(1.0, 1022) - halve(1.0, 1074));
+    print(1.0);
+    print(2.5.display());
+    let third: f32 = 1.0 as f32 / 3.0 as f32;
+    print(third);
+    let tenth: f32 = 0.1;
+    print(tenth);
+    let h: f16 = 0.1;
+    print(h);
+    let b: bf16 = 0.1;
+    print(b);
+    let big: f16 = 65504.0;
+    print(big);
+}

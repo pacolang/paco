@@ -1,0 +1,3 @@
+error[PACO-E0342] input.paco:22:1: return cannot prove these dimensions are equal: dimension 0 expected `N`, found `(2 * N) / 2` (expected `Grid<f32, N>`, found `Grid<f32, (2 * N) / 2>`)
+  note at input.paco:22:10: `N` is a dimension parameter of this item
+  note: normal forms `N` and `(2 * N) / 2`; `/`, `%` and overflowing terms are opaque

@@ -1,0 +1,8 @@
+fn divide(a: i64, b: i64) -> i64 {
+    a / b
+}
+
+fn main() {
+    print(divide(10, 2));
+    print(divide(1, 0));
+}

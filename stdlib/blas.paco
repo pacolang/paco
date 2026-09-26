@@ -1,0 +1,52 @@
+module blas;
+
+use stdlib::math;
+use stdlib::numerics;
+
+extern "C" {
+    fn cblas_dgemm(
+        order: i32, transa: i32, transb: i32,
+        m: i32, n: i32, k: i32,
+        alpha: float,
+        a: *const float, lda: i32,
+        b: *const float, ldb: i32,
+        beta: float,
+        c: *mut float, ldc: i32
+    );
+}
+
+const ROW_MAJOR: i32 = 101;
+const NO_TRANS: i32 = 111;
+
+pub fn dgemm(a: &[]float, b: &[]float, c: &mut []float, m: i64, n: i64, k: i64) {
+    unsafe {
+        cblas_dgemm(
+            ROW_MAJOR, NO_TRANS, NO_TRANS,
+            m as i32, n as i32, k as i32,
+            1.0,
+            slice_as_ptr(a), k as i32,
+            slice_as_ptr(b), n as i32,
+            0.0,
+            slice_as_mut_ptr(c), n as i32
+        )
+    }
+}
+
+/// `a` (M×K) times `b` (K×N) through the system BLAS. The inner dimension
+/// is checked by the type; only a `Dyn` inner dimension is checked here.
+pub fn matmul<const M: int, const K: int, const N: int>(
+    a: &math::Matrix<float, M, K>,
+    b: &math::Matrix<float, K, N>,
+) -> Result<math::Matrix<float, M, N>, numerics::ShapeError> {
+    if a.cols() != b.rows() {
+        return Result::Err(numerics::ShapeError { axis: 0, expected: a.cols(), found: b.rows() })
+    }
+    match math::Matrix<float, M, N>::with_shape(a.rows(), b.cols()) {
+        Result::Ok(product) => {
+            let mut c = product;
+            dgemm(a.data(), b.data(), c.data_mut(), a.rows(), b.cols(), a.cols());
+            Result::Ok(c)
+        }
+        Result::Err(e) => Result::Err(e),
+    }
+}

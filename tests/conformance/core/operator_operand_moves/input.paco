@@ -1,0 +1,18 @@
+struct Bag {
+    items: Vec<i64>,
+
+    fn add(&self, other: Self) -> Self {
+        let mut items: Vec<i64> = Vec::new();
+        items.push(self.items.len() + other.items.len());
+        Bag { items: items }
+    }
+}
+
+fn main() {
+    let a = Bag { items: Vec::new() };
+    let b = Bag { items: Vec::new() };
+    let c = a + b;
+    print(a.items.len());
+    print(b.items.len());
+    print(c.items.len());
+}

@@ -1,0 +1,86 @@
+use stdlib::autodiff;
+
+/// A buffer-backed vector, the shape of a library tensor.
+struct Cells {
+    data: []f32,
+    type Tangent = Cells;
+
+    fn filled(len: i64, value: f32) -> Cells {
+        let mut data = slice_of_zeros<f32>(len);
+        for i in 0..len {
+            data[i] = value
+        }
+        Cells { data: data }
+    }
+
+    fn zero_tangent(&self) -> Cells {
+        Cells { data: slice_of_zeros<f32>(self.data.len()) }
+    }
+
+    fn move_by(&mut self, offset: &Cells) {
+        for i in 0..self.data.len() {
+            self.data[i] = self.data[i] + offset.data[i]
+        }
+    }
+}
+
+/// An operation with a hand-written derivative, as a library registers for
+/// its kernels: the body is not differentiated.
+fn scaled(c: &Cells, k: f32) -> Cells {
+    let mut data = slice_of_zeros<f32>(c.data.len());
+    for i in 0..c.data.len() {
+        data[i] = c.data[i] * k
+    }
+    Cells { data: data }
+}
+
+struct ScaledPullback {
+    input: Cells,
+    k: f32,
+    type Seed = Cells;
+    type Gradients = (Cells, f32);
+
+    fn pullback(self, seed: Cells) -> (Cells, f32) {
+        let mut gradient = slice_of_zeros<f32>(seed.data.len());
+        let mut dk: f32 = 0.0;
+        for i in 0..seed.data.len() {
+            gradient[i] = seed.data[i] * self.k;
+            dk = dk + seed.data[i] * self.input.data[i]
+        }
+        (Cells { data: gradient }, dk)
+    }
+}
+
+#[derivative(of = scaled)]
+fn scaled_derivative(c: &Cells, k: f32) -> (Cells, ScaledPullback) {
+    let mut kept = slice_of_zeros<f32>(c.data.len());
+    for i in 0..c.data.len() {
+        kept[i] = c.data[i]
+    }
+    (scaled(c, k), ScaledPullback { input: Cells { data: kept }, k: k })
+}
+
+fn sum_squares(c: &Cells) -> f32 {
+    let mut total: f32 = 0.0;
+    for i in 0..c.data.len() {
+        total = total + c.data[i] * c.data[i]
+    }
+    total
+}
+
+#[differentiable]
+fn loss(c: &Cells, k: f32) -> f32 {
+    let s = scaled(c, k);
+    sum_squares(&s)
+}
+
+fn main() {
+    let c = Cells::filled(3, 2.0 as f32);
+    let k: f32 = 1.5;
+    let (value, (gc, gk)) = autodiff::grad(loss, (&c, k));
+    print(value);
+    for i in 0..gc.data.len() {
+        print(gc.data[i])
+    }
+    print(gk);
+}

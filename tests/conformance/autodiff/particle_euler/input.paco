@@ -1,0 +1,91 @@
+use stdlib::autodiff;
+
+/// Central finite differences: step `0.000001`, relative tolerance
+/// `0.000001` for `f64` (the widths' values are documented in
+/// `paco-test-harness`).
+fn agrees(analytic: float, numeric: float) -> bool {
+    (analytic - numeric).abs() <= 0.000001 * (1.0 + numeric.abs())
+}
+
+struct Vec2 {
+    x: f64,
+    y: f64,
+    type Tangent = Vec2;
+
+    fn zero_tangent(&self) -> Vec2 {
+        Vec2 { x: 0.0, y: 0.0 }
+    }
+
+    fn move_by(&mut self, offset: &Vec2) {
+        self.x = self.x + offset.x;
+        self.y = self.y + offset.y
+    }
+
+    fn add(&self, other: Vec2) -> Vec2 {
+        Vec2 { x: self.x + other.x, y: self.y + other.y }
+    }
+}
+
+struct Particle {
+    pos: Vec2,
+    vel: Vec2,
+
+    fn step(&mut self, dt: f64) {
+        self.pos.x = self.pos.x + self.vel.x * dt;
+        self.pos.y = self.pos.y + self.vel.y * dt;
+        self.vel.y = self.vel.y - 9.81 * dt;
+        self.vel.x = self.vel.x * 0.99
+    }
+}
+
+fn advance(p: &mut Particle, steps: i64) {
+    for i in 0..steps {
+        p.step(0.05)
+    }
+}
+
+fn final_x_value(v: Vec2) -> f64 {
+    let mut p = Particle { pos: Vec2 { x: 0.0, y: 1.0 }, vel: v };
+    advance(&mut p, 20);
+    p.pos.x * p.pos.y
+}
+
+#[differentiable]
+fn final_x(v: Vec2) -> f64 {
+    final_x_value(v)
+}
+
+fn scale_all(values: &mut []f64, factor: f64) {
+    for i in 0..values.len() {
+        values[i] = values[i] * factor
+    }
+}
+
+fn slices_value(x: float) -> float {
+    let mut values: []f64 = slice_of_zeros<f64>(3);
+    values[0] = x;
+    values[1] = x * x;
+    values[2] = values[0] * values[1];
+    scale_all(&mut values, x);
+    values[0] = values[2] + values[1];
+    values[0] + values[1] + values[2]
+}
+
+#[differentiable]
+fn slices(x: float) -> float {
+    slices_value(x)
+}
+
+fn main() {
+    let h = 0.000001;
+    let (f, g) = autodiff::grad(final_x, Vec2 { x: 3.0, y: 4.0 });
+    print(f);
+    let fx = (final_x_value(Vec2 { x: 3.0 + h, y: 4.0 }) - final_x_value(Vec2 { x: 3.0 - h, y: 4.0 })) / (2.0 * h);
+    let fy = (final_x_value(Vec2 { x: 3.0, y: 4.0 + h }) - final_x_value(Vec2 { x: 3.0, y: 4.0 - h })) / (2.0 * h);
+    print(agrees(g.x, fx));
+    print(agrees(g.y, fy));
+    let (s, ds) = autodiff::grad(slices, 1.5);
+    print(s);
+    print(ds);
+    print(agrees(ds, (slices_value(1.5 + h) - slices_value(1.5 - h)) / (2.0 * h)));
+}

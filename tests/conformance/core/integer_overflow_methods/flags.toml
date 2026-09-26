@@ -1,0 +1,4 @@
+kind = "run"
+feature_min = 2
+build = true
+comptime_differential = true

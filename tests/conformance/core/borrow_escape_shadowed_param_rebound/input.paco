@@ -1,0 +1,9 @@
+struct H { r: &i64 }
+fn f(a: &i64) -> H {
+    let b = a;
+    let h = H { r: b };
+    let b = 1;
+    print(b);
+    h
+}
+fn main() { let x = 1; let h = f(&x); print(*h.r); }

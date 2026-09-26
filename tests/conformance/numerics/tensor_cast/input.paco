@@ -1,0 +1,24 @@
+use stdlib::numerics;
+
+fn scaled(x: float) -> i64 {
+    (x * 1048576.0) as i64
+}
+
+fn main() {
+    let mut a = numerics::Tensor<f32, 2>::zeros();
+    let tenth: f32 = 0.1;
+    let big: f32 = 70000.0;
+    a.set_at(0, tenth);
+    a.set_at(1, big);
+    let b = numerics::Tensor<bf16, 2>::cast(&a);
+    let h = numerics::Tensor<f16, 2>::cast(&a);
+    let q = numerics::Tensor<f8e4m3, 2>::cast(&a);
+    print(scaled(b.at(0) as float));
+    print(scaled(h.at(0) as float));
+    print(scaled(q.at(0) as float));
+    print((h.at(1) as float) > 1000000.0);
+    let back = numerics::Tensor<f32, 2>::cast(&b);
+    print(scaled(back.at(0) as float));
+    let ints = numerics::Tensor<i64, 2>::cast(&a);
+    print(ints.at(1))
+}

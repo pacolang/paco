@@ -1,0 +1,11 @@
+fn main() {
+    let a = 1;
+    let mut v: Vec<&i64> = Vec::new();
+    let mut i = 0;
+    while i < 3 {
+        let t = i;
+        v.push(&t);
+        i = i + 1;
+    }
+    print(a);
+}

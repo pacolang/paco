@@ -1,0 +1,59 @@
+fn insertion_sort(a: &mut []i64) {
+    for i in 1..a.len() {
+        let v = a[i];
+        let mut j = i - 1;
+        while j >= 0 && a[j] > v {
+            a[j + 1] = a[j];
+            j = j - 1;
+        }
+        a[j + 1] = v;
+    }
+}
+
+fn main() {
+    let n: i64 = 20000;
+    let mut counts: Map<i64, i64> = Map::new();
+    let mut data: Vec<i64> = Vec::new();
+    let mut seed: i64 = 42;
+    let mut best: i64 = 0;
+    let mut best_key: i64 = 0;
+    for i in 0..n {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        let k0 = (seed / 16) % 2000000;
+        let k = if k0 < 0 { -k0 } else { k0 };
+        data.push(k);
+        let count = counts.get_or_insert(k, 0);
+        *count = *count + 1;
+        let c = *count;
+        if c > best || (c == best && k < best_key) {
+            best = c;
+            best_key = k;
+        }
+    }
+    data.sort();
+    let mut ok = true;
+    let mut acc: i64 = 0;
+    for i in 1..data.len() {
+        if data[i - 1] > data[i] {
+            ok = false;
+        }
+        acc = (acc * 31 + data[i]) % 1000000007;
+    }
+    let mut head: []i64 = slice_of_zeros<i64>(64);
+    for i in 0..64 {
+        head[i] = (i * 37) % 64;
+    }
+    insertion_sort(&mut head);
+    let mut head_ok = true;
+    for i in 0..64 {
+        if head[i] != i {
+            head_ok = false;
+        }
+    }
+    print(counts.len());
+    print(best);
+    print(best_key);
+    print(ok);
+    print(acc);
+    print(head_ok);
+}

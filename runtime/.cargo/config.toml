@@ -1,0 +1,11 @@
+# Only this workspace's own `cargo test`/`cargo build` (invoked with this
+# directory as the working directory) sees these flags: they give
+# `paco_rt_main`'s `__paco_entry`/`__paco_entry_returns_value` references a
+# default when nothing else in the link defines them (paco-link's separate
+# `rust-lld -flavor link` invocation for real programs builds its own
+# argument list and is unaffected).
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+    "-C", "link-arg=/alternatename:__paco_entry=paco_rt_no_program",
+    "-C", "link-arg=/alternatename:__paco_entry_returns_value=paco_rt_no_program_value",
+]

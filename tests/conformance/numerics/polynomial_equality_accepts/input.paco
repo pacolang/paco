@@ -1,0 +1,43 @@
+struct Grid<T: Numeric, const D: int...> {
+    data: []T,
+
+    pub fn zeros() -> Self {
+        let dims = D;
+        Grid { data: slice_of_zeros<T>(product(&dims)) }
+    }
+
+    pub fn len(&self) -> i64 {
+        self.data.len()
+    }
+}
+
+fn product(dims: &[]i64) -> i64 {
+    let mut count = 1;
+    for i in 0..dims.len() {
+        count = count * dims[i];
+    }
+    count
+}
+
+fn widen<const M: int>(a: Grid<f32, M + M>) -> Grid<f32, 2 * M> {
+    a
+}
+
+fn pad<const N: int>(a: Grid<f32, (N + 1) * 2>) -> Grid<f32, 2 * N + 2> {
+    a
+}
+
+fn flatten(a: Grid<f32, 28 * 28>) -> Grid<f32, 784> {
+    a
+}
+
+fn shrink<const N: int>(a: &Grid<f32, N + 1>) -> i64 {
+    N
+}
+
+fn main() {
+    print(widen<2>(Grid<f32, 4>::zeros()).len());
+    print(pad<3>(Grid<f32, 8>::zeros()).len());
+    print(flatten(Grid<f32, 784>::zeros()).len());
+    print(shrink(&Grid<f32, 8>::zeros()));
+}

@@ -1,0 +1,20 @@
+struct H { r: &i64 }
+struct P { x: i64 }
+fn first(v: &Vec<i64>) -> Option<&i64> { Option::Some(v.index(0)) }
+fn wrap(p: &P) -> H { H { r: &p.x } }
+fn pair(x: &i64) -> (i64, &i64) { (1, x) }
+fn main() {
+    let p = P { x: 4 };
+    let h = wrap(&p);
+    let mut v: Vec<i64> = Vec::new();
+    v.push(3);
+    let (n, r) = pair(&p.x);
+    let mut refs: Vec<&i64> = Vec::new();
+    {
+        let t = 9;
+        refs.push(&p.x);
+        print(t);
+    }
+    match first(&v) { Option::Some(x) => print(*x + n + *r + *h.r), Option::None => print(0), }
+    print(refs.len());
+}

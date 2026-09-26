@@ -1,0 +1,2 @@
+error[PACO-E0812] input.paco:6:5: a value that carries a derivative is passed to a call through a function value, whose target is not known at compile time; call the function by name
+  note at input.paco:10:18: reached through this call in `main`

@@ -1,0 +1,88 @@
+struct Guard {
+    name: string,
+
+    fn new(name: string) -> Guard {
+        print(string_concat(&"open ", &name));
+        Guard { name: name }
+    }
+
+    fn drop(&mut self) {
+        print(string_concat(&"close ", &self.name));
+    }
+}
+
+struct Pair {
+    first: Guard,
+    second: Guard,
+}
+
+struct Failure {
+    guard: Guard,
+}
+
+fn consume(g: Guard) {
+    print(string_concat(&"consume ", &g.name));
+}
+
+fn early(flag: bool) -> i64 {
+    let a = Guard::new("early-a");
+    let b = Guard::new("early-b");
+    if flag {
+        consume(b);
+        return 1;
+    }
+    print("early fallthrough");
+    0
+}
+
+fn fails(flag: bool) -> Result<i64, Failure> {
+    if flag {
+        return Result::Err(Failure { guard: Guard::new("error") });
+    }
+    Result::Ok(5)
+}
+
+fn propagate(flag: bool) -> Result<i64, Failure> {
+    let local = Guard::new("propagate");
+    let value = fails(flag)?;
+    Result::Ok(value + 1)
+}
+
+fn make() -> Guard {
+    let temp = Guard::new("made");
+    temp
+}
+
+fn main() {
+    let outer = Guard::new("outer");
+    {
+        let inner1 = Guard::new("inner1");
+        let inner2 = Guard::new("inner2");
+        print("leaving block");
+    }
+    let moved = Guard::new("moved");
+    consume(moved);
+    print(early(true));
+    print(early(false));
+    let mut slot = Guard::new("slot-1");
+    slot = Guard::new("slot-2");
+    print("after reassign");
+    let pair = Pair { first: Guard::new("pair-first"), second: Guard::new("pair-second") };
+    let kept = make();
+    match propagate(true) {
+        Result::Ok(v) => print(v),
+        Result::Err(e) => print(string_concat(&"failed with ", &e.guard.name)),
+    }
+    match propagate(false) {
+        Result::Ok(v) => print(v),
+        Result::Err(e) => print(e.guard.name),
+    }
+    let shared = Rc::new(Guard::new("shared"));
+    let alias = shared.clone();
+    let mut i: i64 = 0;
+    while i < 2 {
+        let loop_guard = Guard::new(i.display());
+        i = i + 1;
+    }
+    print("end of main");
+}

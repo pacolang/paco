@@ -1,0 +1,11 @@
+fn main() {
+    let m: Mutex<i64> = Mutex::new(5);
+    print(m.lock());
+    m.set(6);
+    print(m.lock());
+
+    let rw: RwLock<i64> = RwLock::new(1);
+    print(rw.read());
+    rw.write(2);
+    print(rw.read())
+}

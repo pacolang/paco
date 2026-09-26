@@ -1,0 +1,8 @@
+fn make() -> (i64, &i64) {
+    let t = 5;
+    (1, &t)
+}
+fn main() {
+    let (a, b) = make();
+    print(a + *b);
+}

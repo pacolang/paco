@@ -1,0 +1,7 @@
+fn main() {
+    let mut b: StringBuf = StringBuf::new();
+    b.push_str("hello");
+    b.push_str(", ");
+    b.push_str("world");
+    print(b.to_string())
+}

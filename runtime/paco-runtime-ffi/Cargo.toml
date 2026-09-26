@@ -1,0 +1,21 @@
+[package]
+name = "paco-runtime-ffi"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+corosensei.workspace = true
+libm.workspace = true
+paco-runtime = { path = "../paco-runtime" }
+mimalloc = { version = "0.1.52", default-features = false }
+gimli = { version = "0.33.0", default-features = false, features = ["read", "std"] }
+object = { version = "0.39.1", default-features = false, features = ["read_core", "elf", "macho", "pe", "std"] }
+
+[features]
+system-alloc = []

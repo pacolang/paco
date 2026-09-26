@@ -1,0 +1,86 @@
+use stdlib::autodiff;
+use stdlib::dims;
+
+struct Grid<T: Numeric + Add, const D: int...> {
+    data: []T,
+    dims: []i64,
+    type Tangent = Grid<T, D...>;
+
+    pub fn with_extents(extents: []i64) -> Self {
+        Grid { data: slice_of_zeros<T>(count(&extents)), dims: extents }
+    }
+
+    pub fn extent(&self, axis: i64) -> i64 {
+        self.dims[axis]
+    }
+
+    pub fn set(&mut self, i: i64, value: T) {
+        self.data[i] = value
+    }
+
+    pub fn zero_tangent(&self) -> Grid<T, D...> {
+        Grid { data: slice_of_zeros<T>(self.data.len()), dims: copy(&self.dims) }
+    }
+
+    pub fn move_by(&mut self, offset: &Grid<T, D...>) {
+        for i in 0..self.data.len() {
+            self.data[i] = self.data[i] + offset.data[i]
+        }
+    }
+}
+
+fn count(dims: &[]i64) -> i64 {
+    let mut total = 1;
+    for i in 0..dims.len() {
+        total = total * dims[i];
+    }
+    total
+}
+
+fn copy(dims: &[]i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(dims.len());
+    for i in 0..dims.len() {
+        out[i] = dims[i];
+    }
+    out
+}
+
+fn extents2(a: i64, b: i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(2);
+    out[0] = a;
+    out[1] = b;
+    out
+}
+
+#[differentiable]
+fn loss<dim B>(x: &Grid<f32, B, 4>) -> f32 {
+    let mut total: f32 = 0.0;
+    for i in 0..x.data.len() {
+        total = total + x.data[i] * x.data[i] * (i as f32)
+    }
+    total
+}
+
+fn step(x: Grid<f32, Dyn, 4>) -> Result<f32, dims::DimError> {
+    let n = x.dim(0);
+    let x: Grid<f32, n, 4> = x.with_dims()?;
+    let (value, gradient) = autodiff::grad(loss, &x);
+    let g: Grid<f32, n, 4> = gradient;
+    print(g.dims[0]);
+    print(g.dims[1]);
+    for i in 0..g.data.len() {
+        print(g.data[i])
+    }
+    Result::Ok(value)
+}
+
+fn main() {
+    let mut x = Grid<f32, Dyn, 4>::with_extents(extents2(2, 4));
+    for i in 0..8 {
+        x.set(i, (i as f32) * (0.5 as f32))
+    }
+    match step(x) {
+        Result::Ok(value) => print(value),
+        Result::Err(e) => print(e.display()),
+    }
+}

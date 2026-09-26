@@ -1,0 +1,80 @@
+use stdlib::string;
+
+fn next_seed(seed: i64) -> i64 {
+    (seed * 1103515245 + 12345) % 2147483648
+}
+
+fn generate(rows: i64) -> string {
+    let mut out = StringBuf::new();
+    let mut seed: i64 = 11;
+    for i in 0..rows {
+        seed = next_seed(seed);
+        out.push_str("user");
+        out.push_str(int_to_string(seed % 1000));
+        out.push(',');
+        seed = next_seed(seed);
+        out.push_str(int_to_string(seed % 100000));
+        out.push(',');
+        seed = next_seed(seed);
+        out.push_str(if seed % 3 == 0 { "POST" } else { "GET" });
+        out.push_str(",/api/v1/items/");
+        seed = next_seed(seed);
+        out.push_str(int_to_string(seed % 10000));
+        out.push('\n');
+    }
+    out.to_string()
+}
+
+fn main() {
+    let text = generate(2000);
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+    let mut total_bytes: i64 = 0;
+    let mut checksum: i64 = 0;
+    for pass in 0..3 {
+        let mut field: i64 = 0;
+        let mut num: i64 = 0;
+        let mut rows: i64 = 0;
+        let mut gets: i64 = 0;
+        let mut ident_hash: i64 = 0;
+        let mut words: i64 = 0;
+        let mut in_word = false;
+        for i in 0..len {
+            let c = bytes[i] as i64;
+            if c == 10 {
+                checksum = (checksum + num + ident_hash) % 1000000007;
+                num = 0;
+                field = 0;
+                ident_hash = 0;
+                rows = rows + 1;
+                in_word = false;
+            } else if c == 44 {
+                if field == 1 {
+                    checksum = (checksum + num * 31) % 1000000007;
+                }
+                num = 0;
+                field = field + 1;
+                in_word = false;
+            } else if c >= 48 && c <= 57 {
+                num = num * 10 + (c - 48);
+            } else if (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 47 {
+                if !in_word {
+                    words = words + 1;
+                    in_word = true;
+                }
+                if field == 2 && c == 71 {
+                    gets = gets + 1;
+                }
+                ident_hash = (ident_hash * 131 + c) % 1000003;
+            }
+        }
+        total_bytes = total_bytes + len;
+        if pass == 0 {
+            print(rows);
+            print(gets);
+            print(words);
+        }
+    }
+    print(total_bytes);
+    print(checksum);
+}

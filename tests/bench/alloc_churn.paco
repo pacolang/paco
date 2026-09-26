@@ -1,0 +1,33 @@
+fn churn(seed: i64) -> i64 {
+    let mut total: i64 = 0;
+    let mut i: i64 = 0;
+    while i < 3000000 {
+        let mut cells: []i64 = slice_of_zeros<i64>(8);
+        cells[3] = i + seed;
+        let text = string_concat(&"churn", &"!");
+        if text == "churn!" {
+            total = total + cells[3] % 7
+        }
+        i = i + 1
+    }
+    total
+}
+
+fn start(seed: i64) -> JoinHandle<i64> {
+    spawn churn(seed)
+}
+
+fn collect(handle: JoinHandle<i64>) -> i64 {
+    match handle.join() {
+        Result::Ok(value) => value,
+        Result::Err(e) => 0 - 1,
+    }
+}
+
+fn main() {
+    let a = start(1);
+    let b = start(2);
+    let c = start(3);
+    let d = start(4);
+    print(collect(a) + collect(b) + collect(c) + collect(d))
+}

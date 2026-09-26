@@ -1,0 +1,68 @@
+use stdlib::string;
+
+struct Counter {
+    step: fn(i64) -> i64,
+    label: string,
+}
+
+fn apply(f: fn(i64, i64) -> i64, a: i64, b: i64) -> i64 {
+    f(a, b)
+}
+
+fn make_greeter(name: string) -> fn(string) -> string {
+    |greeting: string| string_concat(&greeting, &name)
+}
+
+fn make_adder(n: i64) -> fn(i64) -> i64 {
+    |x| x + n
+}
+
+fn twice(f: fn(i64) -> i64, x: i64) -> i64 {
+    f(f(x))
+}
+
+fn main() {
+    let double: fn(i64) -> i64 = |x| x * 2;
+    print(double(21));
+    print(apply(|a, b| a + b, 3, 4));
+    let offset = 100;
+    print(apply(|a, b| a * b + offset, 5, 6));
+
+    let greet = make_greeter("paco");
+    print(greet("hi "));
+    print(greet("bye "));
+
+    let add5 = make_adder(5);
+    print(twice(add5, 1));
+    print(twice(double, 3));
+    print(make_adder(2)(3));
+    print(make_greeter("x")("temp "));
+
+    let counter = Counter { step: |x| x + 10, label: "tens" };
+    print((counter.step)(32));
+    print(counter.label);
+
+    let mut ops: Vec<fn(i64) -> i64> = Vec::new();
+    ops.push(make_adder(1));
+    ops.push(|x| x * x);
+    print(ops.len());
+
+    let say: fn() = || print("done");
+    say();
+    generic_and_composed();
+}
+
+fn apply_to<T>(f: fn(T) -> T, x: T) -> T {
+    f(x)
+}
+
+fn compose(f: fn(i64) -> i64, g: fn(i64) -> i64) -> fn(i64) -> i64 {
+    |x| g(f(x))
+}
+
+fn generic_and_composed() {
+    print(apply_to(|x| x + 1, 41));
+    print(apply_to(|b: bool| !b, true));
+    let h = compose(|x| x * 3, make_adder(-1));
+    print(h(5));
+}

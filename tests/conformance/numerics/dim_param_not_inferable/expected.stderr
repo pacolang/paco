@@ -1,0 +1,2 @@
+error[PACO-E0344] input.paco:28:11: cannot infer `N` from `2 * N`: dimension 0 expected `2 * N`, found `8` (expected `&Grid<f32, 2 * N>`, found `&Grid<f32, 8>`)
+  fix 1: pass `N` explicitly: `half<4>(..)`

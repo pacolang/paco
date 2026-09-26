@@ -1,0 +1,14 @@
+struct Plain {
+    x: i64,
+}
+
+fn dup<T: Copy>(x: T) -> T {
+    x
+}
+
+fn main() {
+    let p = dup(Plain { x: 1 });
+    let s: []i64 = slice_of_zeros<i64>(1);
+    let t = dup(s);
+    print(p.x);
+}

@@ -1,0 +1,26 @@
+iter fn counts_up(start: i64) -> i64 {
+    yield start;
+    yield start + 1;
+    yield start + 2;
+}
+
+fn first_of(start: i64) -> i64 {
+    let g = counts_up(start);
+    match g.next() {
+        Option::Some(value) => value,
+        Option::None => -1,
+    }
+}
+
+fn main() {
+    let g = counts_up(10);
+    let mut open = true;
+    while open {
+        match g.next() {
+            Option::Some(value) => print(value),
+            Option::None => open = false,
+        }
+    }
+    print(first_of(20));
+    let unused = counts_up(30);
+}

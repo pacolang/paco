@@ -1,0 +1,53 @@
+use stdlib::autodiff;
+
+struct Box<T: Numeric + Add> {
+    v: T,
+    type Tangent = Box<T>;
+
+    fn zero_tangent(&self) -> Box<T> {
+        let zero = slice_of_zeros<T>(1);
+        Box { v: zero[0] }
+    }
+
+    fn move_by(&mut self, offset: &Box<T>) {
+        self.v = self.v + offset.v
+    }
+
+    fn get(&self) -> T {
+        self.v
+    }
+}
+
+methods<T: Numeric + Add + Mul> Box<T> {
+    fn doubled(&self) -> T {
+        self.v * self.v
+    }
+}
+
+struct GetPullback<T> {
+    type Seed = T;
+    type Gradients = Box<T>;
+
+    fn pullback(self, seed: T) -> Box<T> {
+        Box { v: seed }
+    }
+}
+
+#[derivative(of = Box::get)]
+fn get_derivative<T: Numeric + Add>(b: Box<T>) -> (T, GetPullback<T>) {
+    (b.get(), GetPullback { })
+}
+
+#[differentiable]
+fn loss(b: Box<f32>) -> f32 {
+    let two: f32 = 2.0;
+    two * b.get()
+}
+
+fn main() {
+    let v: f32 = 3.0;
+    let (value, gradient) = autodiff::grad(loss, Box { v: v });
+    print(value);
+    print(gradient.get());
+    print(gradient.doubled());
+}

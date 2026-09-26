@@ -1,0 +1,50 @@
+use stdlib::string;
+
+fn byte_count(text: string) -> i64 {
+    text.as_bytes().len()
+}
+
+fn roundtrip(text: string) -> string {
+    let bytes = text.as_bytes();
+    match string_from_bytes(&bytes, 0, bytes.len()) {
+        Some(back) => back,
+        None => "invalid",
+    }
+}
+
+fn split_is_rejected() -> bool {
+    let bytes = "héllo".as_bytes();
+    string_from_bytes(&bytes, 0, 2).is_none() && string_from_bytes(&bytes, 3, 99).is_none()
+}
+
+fn write_into(at: i64) -> string {
+    let mut buf: []byte = slice_of_zeros<byte>(6);
+    let text = "abcdef";
+    let copied = bytes_write_string(&mut buf, 0, &text);
+    let written = bytes_write_string(&mut buf, at, &"XY");
+    let shown = match string_from_bytes(&buf, 0, 6) {
+        Some(s) => s,
+        None => "invalid",
+    };
+    if written { shown } else { string_concat(&shown, &" (unchanged)") }
+}
+
+fn same_hash() -> bool {
+    string_hash(&"key") == string_hash(&"key") && string_hash(&"key") != string_hash(&"kez")
+}
+
+fn third_byte(text: string) -> i64 {
+    let bytes = text.as_bytes();
+    bytes[2] as i64
+}
+
+fn main() {
+    print(byte_count("héllo"));
+    print(roundtrip("héllo, wörld"));
+    print(split_is_rejected());
+    print(write_into(2));
+    print(write_into(5));
+    print(same_hash());
+    print(third_byte("abc"));
+    print("héllo".len());
+}

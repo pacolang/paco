@@ -1,0 +1,19 @@
+use stdlib::autodiff;
+
+fn square(x: float) -> float {
+    x * x
+}
+
+#[differentiable]
+fn f(x: float) -> float {
+    let handle = spawn square(x);
+    match handle.join() {
+        Ok(v) => v,
+        Err(_) => 0.0,
+    }
+}
+
+fn main() {
+    let (v, d) = autodiff::grad(f, 3.0);
+    print(d);
+}

@@ -1,0 +1,12 @@
+fn pick(d: &i64) -> &i64 {
+    let t = 5;
+    let o = Option::Some(&t);
+    match o {
+        Option::Some(r) => r,
+        Option::None => d,
+    }
+}
+fn main() {
+    let z = 0;
+    print(*pick(&z));
+}

@@ -1,0 +1,1 @@
+panic at input.paco:153:5: dimension `N` = `B * B` overflows i64 or divides by zero

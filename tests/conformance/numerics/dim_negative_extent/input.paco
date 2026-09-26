@@ -1,0 +1,17 @@
+struct Grid<T: Numeric, const D: int...> {
+    data: []T,
+
+    pub fn first_extent() -> i64 {
+        let dims = D;
+        dims[0]
+    }
+}
+
+fn shrink<const N: int>() -> i64 {
+    Grid<f32, N - 5>::first_extent()
+}
+
+fn main() {
+    print(shrink<8>());
+    print(shrink<2>());
+}

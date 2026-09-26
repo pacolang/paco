@@ -1,0 +1,9 @@
+module geo;
+
+// padding line
+// padding line
+
+pub fn area(w: i64, h: i64) -> i64 {
+    let label: i64 = "area";
+    w * h
+}

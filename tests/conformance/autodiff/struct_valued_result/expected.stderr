@@ -1,0 +1,1 @@
+error[PACO-E0813] input.paco:24:33: `grad` needs a floating-point scalar result, but the result of `scaled` is `Vec2`; return a scalar computed from it

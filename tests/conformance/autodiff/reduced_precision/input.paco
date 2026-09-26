@@ -1,0 +1,37 @@
+use stdlib::autodiff;
+
+#[differentiable]
+fn wave_f32(x: f32) -> f32 {
+    x.sin() * x + x * x * x
+}
+
+#[differentiable]
+fn wave_f16(x: f16) -> f16 {
+    x.sin() * x + x * x * x
+}
+
+#[differentiable]
+fn wave_bf16(x: bf16) -> bf16 {
+    x.sin() * x + x * x * x
+}
+
+/// Whether `a` and `b` differ by at most one unit in the last place of a
+/// format with `bits` significant bits.
+fn within_ulp(a: f32, b: f32, bits: f32) -> bool {
+    let scale = (2.0 as f32).powf((b.abs().ln() / (2.0 as f32).ln()).max(0.0 as f32) - bits + (1.0 as f32));
+    (a - b).abs() <= scale
+}
+
+fn main() {
+    let (v, g) = autodiff::grad(wave_f32, 0.75 as f32);
+    print(v);
+    print(g);
+    let (hv, hg) = autodiff::grad(wave_f16, 0.75 as f16);
+    print(hv);
+    print(hg);
+    print(within_ulp(hg as f32, (g as f16) as f32, 11.0 as f32));
+    let (bv, bg) = autodiff::grad(wave_bf16, 0.75 as bf16);
+    print(bv);
+    print(bg);
+    print(within_ulp(bg as f32, (g as bf16) as f32, 8.0 as f32));
+}

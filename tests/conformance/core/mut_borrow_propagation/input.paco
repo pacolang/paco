@@ -1,0 +1,76 @@
+struct P {
+    x: i64,
+
+    fn bump(&mut self, by: i64) {
+        self.x = self.x + by
+    }
+
+    fn reset_other(&mut self, other: &mut P) {
+        other.x = self.x
+    }
+}
+
+struct Holder {
+    p: P,
+    items: Vec<i64>,
+}
+
+fn set_field(p: &mut P) {
+    p.x = 5
+}
+
+fn nested(p: &mut P) {
+    set_field(p);
+    p.bump(10)
+}
+
+fn push_two(v: &mut Vec<i64>) {
+    v.push(7);
+    v.push(8)
+}
+
+fn overwrite_first(v: &mut Vec<i64>) {
+    v.set(0, 99)
+}
+
+fn fill(s: &mut []i64) {
+    s[1] = 42
+}
+
+fn main() {
+    let mut a = P { x: 1 };
+    set_field(&mut a);
+    print(a.x);
+
+    let mut b = P { x: 1 };
+    nested(&mut b);
+    print(b.x);
+
+    let mut v: Vec<i64> = Vec::new();
+    push_two(&mut v);
+    overwrite_first(&mut v);
+    print(v.len());
+    print(v[0]);
+    print(v[1]);
+
+    let mut s: []i64 = slice_of_zeros<i64>(3);
+    fill(&mut s);
+    print(s[1]);
+
+    let mut h = Holder { p: P { x: 1 }, items: Vec::new() };
+    set_field(&mut h.p);
+    push_two(&mut h.items);
+    print(h.p.x);
+    print(h.items.len());
+
+    let mut c = P { x: 3 };
+    let mut d = P { x: 0 };
+    c.reset_other(&mut d);
+    print(d.x);
+
+    let mut e = P { x: 1 };
+    let r = &mut e;
+    r.x = 20;
+    nested(r);
+    print(e.x)
+}

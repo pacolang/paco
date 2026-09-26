@@ -1,0 +1,24 @@
+use stdlib::autodiff;
+
+fn simulate(x: float) -> float {
+    let mut acc = 0.0;
+    let mut v = x;
+    let mut i = 0;
+    while i < 1000000 {
+        v = v * 0.999999 + 0.000001 * (v * v).sin();
+        acc = acc + v * x;
+        i = i + 1
+    }
+    acc
+}
+
+#[differentiable]
+fn f(x: float) -> float {
+    simulate(x)
+}
+
+fn main() {
+    let (v, d) = autodiff::grad(f, 0.5);
+    print(v);
+    print(d);
+}

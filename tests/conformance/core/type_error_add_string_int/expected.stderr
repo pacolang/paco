@@ -1,0 +1,1 @@
+error[PACO-E0334] input.paco:2:13: `string` has no `add` method; this operator requires one

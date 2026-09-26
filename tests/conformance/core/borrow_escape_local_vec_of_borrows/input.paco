@@ -1,0 +1,25 @@
+fn total() -> i64 {
+    let a = 1;
+    let b = 2;
+    let mut v: Vec<&i64> = Vec::new();
+    v.push(&a);
+    v.push(&b);
+    v.len()
+}
+fn or_zero(o: Option<&i64>) -> i64 {
+    match o {
+        Option::Some(r) => *r,
+        Option::None => 0,
+    }
+}
+fn main() {
+    let x = 1;
+    let mut r = &x;
+    {
+        let y = 2;
+        r = &y;
+        print(*r);
+    }
+    print(total());
+    print(or_zero(Option::Some(&x)));
+}

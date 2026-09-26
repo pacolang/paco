@@ -1,0 +1,3 @@
+module a;
+
+use b;

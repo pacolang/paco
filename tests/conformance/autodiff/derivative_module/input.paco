@@ -1,0 +1,14 @@
+use stdlib::autodiff;
+use geo;
+
+#[differentiable]
+fn doubled(v: geo::Vec2) -> f64 {
+    2.0 * geo::norm(&v)
+}
+
+fn main() {
+    let (n, g) = autodiff::grad(doubled, geo::Vec2 { x: 3.0, y: 4.0 });
+    print(n);
+    print(g.x);
+    print(g.y);
+}

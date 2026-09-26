@@ -1,0 +1,29 @@
+fn widest_unsigned() -> string {
+    let zero: u64 = 0;
+    (~zero).to_string()
+}
+
+fn narrow_signed() -> string {
+    let a: i8 = -128;
+    a.to_string()
+}
+
+fn narrow_unsigned() -> string {
+    let n: u8 = 200;
+    string_concat(&n.to_string(), &"!")
+}
+
+fn joined() -> string {
+    let c = 'é';
+    let f: f32 = 0.1;
+    string_concat(&string_concat(&c.to_string(), &f.to_string()), &false.to_string())
+}
+
+fn main() {
+    print(widest_unsigned());
+    print(narrow_signed());
+    print(narrow_unsigned());
+    print(joined());
+    print(42.to_string());
+    print(2.5.to_string());
+}

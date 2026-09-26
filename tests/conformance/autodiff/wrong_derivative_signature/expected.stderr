@@ -1,0 +1,1 @@
+error[PACO-E0814] input.paco:16:1: `#[derivative(of = twice)]` function `twice_derivative` has signature `(f32) -> (float, TwicePullback)`, but `twice` has `(float) -> float`; the parameters must be identical

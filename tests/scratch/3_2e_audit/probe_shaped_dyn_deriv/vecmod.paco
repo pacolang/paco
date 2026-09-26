@@ -1,0 +1,111 @@
+module vecmod;
+
+// A generic differentiable struct that is also `stdlib::dims::Shaped` (a
+// literal `extent(&self, axis: i64) -> i64` method), declared in its own
+// module and instantiated with a `Dyn` dimension (extract-domain-libraries
+// task 3.2e: does the 3.2c hidden-Dyn-sentinel leak reappear once a
+// `#[derivative]` registration is also present on the same type?).
+pub struct T2<T: Numeric + Add + Copy, const D: int...> {
+    v: []T,
+    dims: []i64,
+    type Tangent = T2<T, D...>;
+
+    pub fn zeros(dims: []i64) -> T2<T, D...> {
+        T2 { v: slice_of_zeros<T>(count(&dims)), dims: dims }
+    }
+
+    pub fn zero_tangent(&self) -> T2<T, D...> {
+        T2 { v: slice_of_zeros<T>(self.v.len()), dims: copy_dims(&self.dims) }
+    }
+
+    pub fn move_by(&mut self, offset: &T2<T, D...>) {
+        for i in 0..self.v.len() {
+            self.v[i] = self.v[i] + offset.v[i]
+        }
+    }
+
+    pub fn at(&self, i: i64) -> T {
+        self.v[i]
+    }
+
+    // Satisfies `stdlib::dims::Shaped` structurally; its mere presence is
+    // what triggered the 3.2c leak.
+    pub fn extent(&self, axis: i64) -> i64 {
+        self.dims[axis]
+    }
+}
+
+methods<T: Numeric + Add + Copy, const D: int...> T2<T, D...> {
+    pub fn sum(&self) -> T {
+        let mut total = self.v[0];
+        for i in 1..self.v.len() {
+            total = total + self.v[i]
+        }
+        total
+    }
+
+    pub fn add(&self, other: &T2<T, D...>) -> T2<T, D...> {
+        let mut out = T2<T, D...>::zeros(copy_dims(&self.dims));
+        for i in 0..self.v.len() {
+            out.v[i] = self.v[i] + other.v[i]
+        }
+        out
+    }
+}
+
+fn count(dims: &[]i64) -> i64 {
+    let mut total = 1;
+    for i in 0..dims.len() {
+        total = total * dims[i];
+    }
+    total
+}
+
+fn copy_dims(dims: &[]i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(dims.len());
+    for i in 0..dims.len() {
+        out[i] = dims[i];
+    }
+    out
+}
+
+pub struct SumPullback<T: Copy, const D: int...> {
+    len: i64,
+    dims: []i64,
+    type Seed = T;
+    type Gradients = T2<T, D...>;
+
+    pub fn pullback(self, seed: T) -> T2<T, D...> {
+        let mut out = slice_of_zeros<T>(self.len);
+        for i in 0..self.len {
+            out[i] = seed
+        }
+        T2 { v: out, dims: self.dims }
+    }
+}
+
+#[derivative(of = T2::sum)]
+pub fn sum_derivative<T: Numeric + Add + Copy, const D: int...>(t: T2<T, D...>) -> (T, SumPullback<T, D...>) {
+    (t.sum(), SumPullback { len: t.v.len(), dims: copy_dims(&t.dims) })
+}
+
+pub struct AddPullback<T, const D: int...> {
+    dims: []i64,
+    type Seed = T2<T, D...>;
+    type Gradients = (T2<T, D...>, T2<T, D...>);
+
+    pub fn pullback(self, seed: T2<T, D...>) -> (T2<T, D...>, T2<T, D...>) {
+        let mut a = T2<T, D...>::zeros(copy_dims(&self.dims));
+        let mut b = T2<T, D...>::zeros(copy_dims(&self.dims));
+        for i in 0..seed.v.len() {
+            a.v[i] = seed.v[i];
+            b.v[i] = seed.v[i]
+        }
+        (a, b)
+    }
+}
+
+#[derivative(of = T2::add)]
+pub fn add_derivative<T: Numeric + Add + Copy, const D: int...>(a: T2<T, D...>, b: &T2<T, D...>) -> (T2<T, D...>, AddPullback<T, D...>) {
+    (a.add(b), AddPullback { dims: copy_dims(&a.dims) })
+}

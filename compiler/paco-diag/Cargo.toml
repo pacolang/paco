@@ -1,0 +1,22 @@
+[package]
+name = "paco-diag"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+autotests = false
+
+[dependencies]
+ariadne.workspace = true
+paco-span.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+toml.workspace = true
+walkdir.workspace = true
+
+[[test]]
+name = "main"
+path = "tests/main.rs"

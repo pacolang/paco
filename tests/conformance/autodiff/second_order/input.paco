@@ -1,0 +1,51 @@
+use stdlib::autodiff;
+
+/// Central finite differences: step `0.000001`, relative tolerance
+/// `0.000001` for `f64` (the widths' values are documented in
+/// `paco-test-harness`).
+fn agrees(analytic: float, numeric: float) -> bool {
+    (analytic - numeric).abs() <= 0.000001 * (1.0 + numeric.abs())
+}
+
+#[differentiable]
+fn cube(x: float) -> float {
+    x * x * x
+}
+
+#[differentiable]
+fn slope(x: float) -> float {
+    let (value, gradient) = autodiff::grad(cube, x);
+    gradient
+}
+
+#[differentiable]
+fn surface(x: float, y: float) -> float {
+    x * x * y + y.sin() * x
+}
+
+fn surface_gradient(x: float, y: float) -> (float, float) {
+    let (value, gradient) = autodiff::grad(surface, (x, y));
+    gradient
+}
+
+fn along_value(x: float, y: float) -> float {
+    let (dx, dy) = surface_gradient(x, y);
+    dx * 0.5 + dy * 2.0
+}
+
+#[differentiable]
+fn along(x: float, y: float) -> float {
+    let (value, (dx, dy)) = autodiff::grad(surface, (x, y));
+    dx * 0.5 + dy * 2.0
+}
+
+fn main() {
+    let h = 0.000001;
+    let (s, c) = autodiff::grad(slope, 2.0);
+    print(s);
+    print(c);
+    let (d, (hx, hy)) = autodiff::grad(along, (1.0, 2.0));
+    print(agrees(d, along_value(1.0, 2.0)));
+    print(agrees(hx, (along_value(1.0 + h, 2.0) - along_value(1.0 - h, 2.0)) / (2.0 * h)));
+    print(agrees(hy, (along_value(1.0, 2.0 + h) - along_value(1.0, 2.0 - h)) / (2.0 * h)));
+}

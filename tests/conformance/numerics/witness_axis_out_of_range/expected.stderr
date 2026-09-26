@@ -1,0 +1,1 @@
+error[PACO-E0345] input.paco:142:13: axis 2 is out of range for `Grid<f32, a.dim0, 4>`, which has 2 dimensions

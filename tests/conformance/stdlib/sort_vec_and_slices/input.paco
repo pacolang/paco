@@ -1,0 +1,141 @@
+struct Entry {
+    k: i64,
+    c: char,
+}
+
+struct Version {
+    major: i64,
+    minor: i64,
+
+    fn cmp(&self, other: &Version) -> i64 {
+        if self.major != other.major { self.major - other.major } else { self.minor - other.minor }
+    }
+}
+
+fn random_vec(count: i64, seed: i64) -> Vec<i64> {
+    let mut v: Vec<i64> = Vec::new();
+    let mut s = seed;
+    for i in 0..count {
+        s = (s * 1103515245 + 12345) % 2147483648;
+        v.push(s % 1000);
+    }
+    v
+}
+
+fn sorted_ok(count: i64) -> bool {
+    let mut v = random_vec(count, count + 1);
+    v.sort();
+    let mut ok = v.len() == count;
+    for i in 1..v.len() {
+        if v[i - 1] > v[i] {
+            ok = false;
+        }
+    }
+    ok
+}
+
+fn checksum(count: i64) -> i64 {
+    let mut v = random_vec(count, 7);
+    v.sort();
+    let mut acc: i64 = 0;
+    for i in 0..v.len() {
+        acc = (acc * 31 + v[i]) % 1000000007;
+    }
+    acc
+}
+
+fn main() {
+    print(sorted_ok(0));
+    print(sorted_ok(1));
+    print(sorted_ok(15));
+    print(sorted_ok(16));
+    print(sorted_ok(17));
+    print(sorted_ok(1000));
+    print(checksum(500));
+
+    let mut v: Vec<i64> = Vec::new();
+    v.push(3);
+    v.push(1);
+    v.push(2);
+    v.sort();
+    print(v[0]);
+    print(v[1]);
+    print(v[2]);
+
+    let mut entries: Vec<Entry> = Vec::new();
+    entries.push(Entry { k: 1, c: 'a' });
+    entries.push(Entry { k: 0, c: 'b' });
+    entries.push(Entry { k: 1, c: 'c' });
+    entries.push(Entry { k: 0, c: 'd' });
+    entries.sort_by(|x, y| y.k - x.k);
+    for i in 0..entries.len() {
+        print(entries[i].c);
+    }
+
+    let mut floats: []f64 = slice_of_zeros<f64>(4);
+    floats[0] = 2.5;
+    floats[1] = -1.0;
+    floats[2] = 10.0;
+    floats[3] = 0.5;
+    floats.sort();
+    print(floats[0]);
+    print(floats[3]);
+    let mut signed: []f64 = slice_of_zeros<f64>(3);
+    signed[0] = 0.0;
+    signed[1] = -0.0;
+    signed[2] = -2.0;
+    signed.sort();
+    print(signed[1]);
+    print(signed[2]);
+    let mut small: Vec<u8> = Vec::new();
+    let big: u8 = 200;
+    let tiny: u8 = 3;
+    small.push(big);
+    small.push(tiny);
+    small.sort();
+    print(small[0]);
+    let mut letters: []char = slice_of_zeros<char>(3);
+    letters[0] = 'z';
+    letters[1] = 'a';
+    letters[2] = 'm';
+    letters.sort();
+    print(letters[0]);
+    print(letters[2]);
+
+    let mut words: Vec<string> = Vec::new();
+    words.push("pear");
+    words.push("apple");
+    words.push("fig");
+    words.sort_by(|a, b| string_len_bytes(a) - string_len_bytes(b));
+    print(words[0]);
+    print(words[2]);
+
+    let mut versions: Vec<Version> = Vec::new();
+    versions.push(Version { major: 2, minor: 0 });
+    versions.push(Version { major: 1, minor: 9 });
+    versions.push(Version { major: 1, minor: 10 });
+    versions.sort();
+    print(versions[0].minor);
+    print(versions[2].major);
+
+    let mut slice: []i64 = slice_of_zeros<i64>(40);
+    for i in 0..40 {
+        slice[i] = (i * 17) % 40;
+    }
+    slice.sort_by(|a, b| *b - *a);
+    print(slice[0]);
+    print(slice[39]);
+    let pivot: i64 = 20;
+    let mut words_by_distance: Vec<string> = Vec::new();
+    words_by_distance.push("kiwi");
+    words_by_distance.push("banana");
+    words_by_distance.push("plum");
+    slice.sort_by(|a, b| (*a - pivot) * (*a - pivot) - (*b - pivot) * (*b - pivot));
+    print(slice[0]);
+    words_by_distance.sort_by(|a, b| string_len_bytes(b) - string_len_bytes(a) + pivot - pivot);
+    print(words_by_distance[0]);
+    print(words_by_distance[2]);
+    let mut empty: []i64 = slice_of_zeros<i64>(0);
+    empty.sort();
+    print(empty.len());
+}

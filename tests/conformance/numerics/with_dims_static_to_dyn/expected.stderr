@@ -1,0 +1,2 @@
+error[PACO-E0348] input.paco:142:27: `with_dims` cannot change dimension 0 from `4` to `n`: static and run-time extents are stored differently
+  note: convert with a copying constructor of the type instead

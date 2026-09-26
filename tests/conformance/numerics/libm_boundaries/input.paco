@@ -1,0 +1,30 @@
+extern "C" {
+    fn sin(x: float) -> float;
+    fn cos(x: float) -> float;
+    fn exp(x: float) -> float;
+    fn log(x: float) -> float;
+    fn pow(x: float, y: float) -> float;
+}
+
+fn main() {
+    let zero: float = 0.0;
+    let negative_zero: float = 0.0 - zero;
+    unsafe {
+        print(sin(zero));
+        print(sin(negative_zero));
+        print(cos(zero));
+        print(exp(zero));
+        print(exp(710.0));
+        print(exp(0.0 - 746.0));
+        print(log(1.0));
+        print(log(zero));
+        print(pow(2.0, 10.0));
+        print(pow(zero, zero));
+        print(pow(10.0, 5.0));
+        print(sin(10000000000000000000000.0) == 0.0 - 0.8522008497671888);
+        print(cos(10000000000000000000000.0) == 0.523214785395139);
+        print(exp(1.0) == 2.718281828459045);
+        print(log(10.0) == 2.302585092994046);
+        print(pow(1.0000001, 10000000.0) == 2.7182816941320818)
+    }
+}

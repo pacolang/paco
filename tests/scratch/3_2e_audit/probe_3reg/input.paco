@@ -1,0 +1,19 @@
+use stdlib::autodiff;
+use vecmod;
+
+#[differentiable]
+fn loss(t: vecmod::T2<f32, 2>) -> f32 {
+    let u = vecmod::T2<f32, 2>::zeros(2);
+    let added = t.add(&u);
+    let k: f32 = 2.0;
+    let scaled = added.scale(k);
+    scaled.sum()
+}
+
+fn main() {
+    let t = vecmod::T2<f32, 2>::zeros(2);
+    let (n, ga) = autodiff::grad(loss, t);
+    print(n);
+    print(ga.at(0));
+    print(ga.at(1));
+}

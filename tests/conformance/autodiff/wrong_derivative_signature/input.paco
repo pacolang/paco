@@ -1,0 +1,23 @@
+use stdlib::autodiff;
+
+fn twice(x: float) -> float {
+    2.0 * x
+}
+
+struct TwicePullback {
+    type Seed = f64;
+    type Gradients = f64;
+
+    fn pullback(self, seed: f64) -> f64 {
+        2.0 * seed
+    }
+}
+
+#[derivative(of = twice)]
+fn twice_derivative(x: f32) -> (float, TwicePullback) {
+    (2.0 * x as float, TwicePullback {})
+}
+
+fn main() {
+    print(twice(1.0));
+}

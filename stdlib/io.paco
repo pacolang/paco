@@ -1,0 +1,16 @@
+module io;
+
+pub struct IoError {
+    message: string,
+}
+
+pub fn read_file(path: &string) -> Result<string, IoError> {
+    match fs_read_to_string(path) {
+        Some(content) => Result::Ok(content),
+        None => Result::Err(IoError { message: "failed to read file" })
+    }
+}
+
+pub fn print_err(message: string) {
+    stderr_write(message)
+}

@@ -1,0 +1,20 @@
+struct Counter {
+    current: i64,
+    limit: i64,
+
+    fn next(&mut self) -> Option<i64> {
+        if self.current >= self.limit {
+            return Option::None
+        }
+        let value = self.current;
+        self.current = value + 1;
+        Option::Some(value)
+    }
+}
+
+fn main() {
+    let c = Counter { current: 1, limit: 4 };
+    for x in c {
+        print(x)
+    }
+}

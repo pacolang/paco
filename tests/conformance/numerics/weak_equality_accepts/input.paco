@@ -1,0 +1,27 @@
+struct Vec1<const N: int> {
+    data: []i64,
+
+    pub fn zeros() -> Self {
+        Vec1 { data: slice_of_zeros<i64>(N) }
+    }
+
+    pub fn len(&self) -> i64 {
+        N
+    }
+}
+
+fn same<const M: int>(a: Vec1<M * 2>) -> Vec1<2 * M> {
+    a
+}
+
+fn grow<const M: int>(a: &Vec1<M>) -> Vec1<M * (1 + 1)> {
+    Vec1<2 * M>::zeros()
+}
+
+fn main() {
+    let t = Vec1<6>::zeros();
+    let u: Vec1<6> = same<3>(t);
+    print(u.len());
+    let v: Vec1<12> = grow(&u);
+    print(v.len())
+}

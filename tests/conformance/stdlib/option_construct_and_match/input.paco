@@ -1,0 +1,13 @@
+fn describe(x: Option<i64>) -> i64 {
+    match x {
+        Option::Some(v) => v,
+        Option::None => 0 - 1,
+    }
+}
+
+fn main() {
+    let a: Option<i64> = Option::Some(42);
+    let b: Option<i64> = Option::None;
+    print(describe(a));
+    print(describe(b))
+}

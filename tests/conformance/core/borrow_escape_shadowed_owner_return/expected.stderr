@@ -1,0 +1,1 @@
+error[lifetime-error] input.paco:7:5: borrow of local `b` cannot outlive its owner

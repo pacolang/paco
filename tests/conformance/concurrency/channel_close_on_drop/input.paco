@@ -1,0 +1,29 @@
+fn produce(tx: Sender<i64>, count: i64) {
+    let mut i: i64 = 0;
+    while i < count {
+        let sent = tx.send(i * 10);
+        i = i + 1;
+    }
+}
+
+fn drain(rx: Receiver<i64>) -> i64 {
+    let mut total: i64 = 0;
+    let mut open = true;
+    while open {
+        match rx.recv() {
+            Result::Ok(value) => total = total + value,
+            Result::Err(e) => open = false,
+        }
+    }
+    total
+}
+
+fn main() {
+    let (tx, rx) = channel<i64>(capacity: 2);
+    let producer = spawn produce(tx, 4);
+    print(drain(rx));
+    match producer.join() {
+        Result::Ok(value) => print(0),
+        Result::Err(e) => print(-1),
+    }
+}

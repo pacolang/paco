@@ -1,0 +1,1 @@
+error[PACO-E0340] input.paco:8:5: `Point` does not satisfy `Ord`, required by `T` in `Vec::sort`

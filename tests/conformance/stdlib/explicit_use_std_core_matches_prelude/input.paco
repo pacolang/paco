@@ -1,0 +1,13 @@
+use stdlib::core;
+
+fn takes_prelude(x: Option<i64>) -> i64 {
+    match x {
+        Some(v) => v,
+        None => 0 - 1,
+    }
+}
+
+fn main() {
+    let explicit: core::Option<i64> = Some(7);
+    print(takes_prelude(explicit))
+}

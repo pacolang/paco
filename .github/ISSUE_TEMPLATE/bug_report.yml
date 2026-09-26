@@ -1,0 +1,37 @@
+name: Compiler bug
+description: The compiler accepts code the spec forbids, rejects valid code, or emits a wrong diagnostic.
+title: "bug: <short summary>"
+labels: ["bug"]
+body:
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The smallest Paco program that shows the problem.
+      render: rust
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What the spec or an RFC says should happen. Cite the section.
+    validations: { required: true }
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Real output, including the `PACO-Exxxx` code if there was one.
+    validations: { required: true }
+  - type: dropdown
+    id: area
+    attributes:
+      label: Suspected component
+      options: [area/frontend, area/analysis, area/codegen, area/runtime, area/tooling, area/ffi]
+    validations: { required: true }
+  - type: checkboxes
+    id: regression_test
+    attributes:
+      label: Confirmation
+      options:
+        - label: I will add a case under tests/conformance/ that fails today and proves the bug.
+          required: true

@@ -1,0 +1,34 @@
+fn built(count: i64) -> StringBuf {
+    let mut b = StringBuf::new();
+    for i in 0..count {
+        b.push_str("ab");
+    }
+    b
+}
+
+fn mixed() -> string {
+    let mut b = StringBuf::new();
+    b.push_str("h");
+    b.push('é');
+    b.push('€');
+    b.push('😀');
+    b.push('!');
+    b.to_string()
+}
+
+fn empty() -> string {
+    StringBuf::new().to_string()
+}
+
+fn main() {
+    print(built(1000).len());
+    print(built(3).to_string());
+    print(mixed());
+    print(StringBuf::new().len());
+    print(empty());
+    let mut b = StringBuf::new();
+    b.push_str(mixed());
+    b.push_str(built(2).to_string());
+    print(b.to_string());
+    print(b.len());
+}

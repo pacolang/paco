@@ -1,0 +1,75 @@
+struct Guard {
+    name: string,
+
+    fn new(name: string) -> Guard {
+        Guard { name: name }
+    }
+
+    fn label(&self) -> string {
+        self.name
+    }
+
+    fn drop(&mut self) {
+        print(string_concat(&"close ", &self.name));
+    }
+}
+
+enum Token {
+    Word(Guard),
+    Blank,
+
+    fn drop(&mut self) {
+        print("token dropped");
+    }
+}
+
+enum Holder {
+    One(Guard),
+    Nothing,
+}
+
+fn make(name: string) -> Guard {
+    Guard::new(name)
+}
+
+fn main() {
+    let a = Guard::new("a");
+    let a = Guard::new("a-shadow");
+    print(make("temp-field").name);
+    print(make("temp-method").label());
+    make("discarded");
+    let holder = Holder::One(Guard::new("held"));
+    match holder {
+        Holder::One(g) => print(g.name),
+        Holder::Nothing => print("nothing"),
+    }
+    let n: i64 = 3;
+    match n {
+        x if x > 5 => print("big"),
+        x => print(x),
+    }
+    let mut i: i64 = 0;
+    loop {
+        let step = Guard::new(i.display());
+        i = i + 1;
+        if i == 1 {
+            continue;
+        }
+        if i == 3 {
+            break;
+        }
+        print("looping");
+    }
+    let cell = RefCell::new(Guard::new("cell-1"));
+    cell.set(Guard::new("cell-2"));
+    let mut v: Vec<Guard> = Vec::new();
+    let mut k: i64 = 0;
+    while k < 5 {
+        v.push(Guard::new(string_concat(&"v", &k.display())));
+        k = k + 1;
+    }
+    print(v.len());
+    let t = Token::Word(Guard::new("word"));
+    let b = Token::Blank;
+    print("end");
+}

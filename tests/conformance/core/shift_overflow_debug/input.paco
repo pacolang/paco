@@ -1,0 +1,10 @@
+fn main() {
+    let one: u32 = 1;
+    let two: u32 = 2;
+    print(one << two);
+    let minus: i8 = -1;
+    let x: i64 = 5;
+    print(x << minus);
+    let n: u32 = 32;
+    print(one << n);
+}

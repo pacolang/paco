@@ -1,0 +1,14 @@
+[package]
+name = "paco-hir"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+paco-diag.workspace = true
+paco-span.workspace = true
+paco-syntax.workspace = true
+
+[lib]
+path = "src/lib.rs"

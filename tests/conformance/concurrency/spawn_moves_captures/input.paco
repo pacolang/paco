@@ -1,0 +1,30 @@
+fn total(rx: Receiver<i64>) -> i64 {
+    let mut sum: i64 = 0;
+    let mut open = true;
+    while open {
+        match rx.recv() {
+            Result::Ok(value) => sum = sum + value,
+            Result::Err(e) => open = false,
+        }
+    }
+    sum
+}
+
+fn main() {
+    let (tx, rx) = channel<i64>(capacity: 4);
+    let first = tx.send(1);
+    let producer = spawn {
+        let a = tx.send(2);
+        let b = tx.send(3);
+        4
+    };
+    let consumer = spawn total(rx);
+    match producer.join() {
+        Result::Ok(value) => print(value),
+        Result::Err(e) => print(-1),
+    }
+    match consumer.join() {
+        Result::Ok(value) => print(value),
+        Result::Err(e) => print(-1),
+    }
+}

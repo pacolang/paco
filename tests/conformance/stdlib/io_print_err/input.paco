@@ -1,0 +1,8 @@
+use stdlib::io;
+
+fn main() {
+    print("before");
+    io::print_err("error: something went wrong");
+    print("after");
+    io::print_err("second error line")
+}

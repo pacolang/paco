@@ -1,0 +1,39 @@
+extern "C" {
+    fn memcpy(dst: *mut float, src: *const float, n: i64);
+}
+
+fn poke(p: *mut float) {
+    unsafe {
+        *p = 4.0
+    }
+}
+
+fn copy_into(dst: &mut []float, src: &[]float) {
+    let d = slice_as_mut_ptr(dst);
+    let s = slice_as_ptr(src);
+    unsafe {
+        memcpy(d, s, 16)
+    }
+}
+
+fn main() {
+    let mut src: []float = slice_of_zeros<float>(3);
+    src[0] = 1.5;
+    src[1] = 2.5;
+    let mut dst: []float = slice_of_zeros<float>(3);
+    let s = slice_as_ptr(&src);
+    let d = slice_as_mut_ptr(&mut dst);
+    src[2] = 9.0;
+    unsafe {
+        memcpy(d, s, 24)
+    }
+    print(dst[0]);
+    print(dst[1]);
+    print(dst[2]);
+    poke(d);
+    print(dst[0]);
+    let mut other: []float = slice_of_zeros<float>(3);
+    copy_into(&mut other, &src);
+    print(other[1]);
+    print(other[2])
+}

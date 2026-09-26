@@ -1,0 +1,31 @@
+fn square(x: i64) -> i64 {
+    x * x
+}
+
+fn report(tx: Sender<i64>, value: i64) {
+    let sent = tx.send(value);
+}
+
+fn main() {
+    let base = 40;
+    let handle = spawn { base + 2 };
+    match handle.join() {
+        Result::Ok(value) => print(value),
+        Result::Err(e) => print(-1),
+    }
+    let blocking = spawn_blocking(|| { square(base) });
+    match blocking.join() {
+        Result::Ok(value) => print(value),
+        Result::Err(e) => print(-1),
+    }
+    let (tx, rx) = channel<i64>(capacity: 1);
+    let detached = spawn report(tx, 7);
+    match rx.recv() {
+        Result::Ok(value) => print(value),
+        Result::Err(e) => print(-1),
+    }
+    match rx.recv() {
+        Result::Ok(value) => print(value),
+        Result::Err(e) => print(0),
+    }
+}

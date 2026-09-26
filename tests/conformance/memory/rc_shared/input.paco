@@ -1,0 +1,45 @@
+struct Config {
+    name: string,
+    level: i64,
+}
+
+fn count_through(shared: Rc<Config>) -> i64 {
+    let again = shared.clone();
+    again.strong_count()
+}
+
+fn main() {
+    let first = Rc::new(Config { name: "base", level: 1 });
+    let second = first.clone();
+    print(first.strong_count());
+    {
+        let third = second.clone();
+        print(third.strong_count());
+        print(third.get().name);
+    }
+    print(first.strong_count());
+    print(count_through(first.clone()));
+    print(first.strong_count());
+
+    let text = Rc::new(RefCell::new("v1"));
+    let alias = text.clone();
+    alias.get().set("v2");
+    print(text.get().get());
+
+    let mut i: i64 = 0;
+    while i < 50 {
+        let copy = first.clone();
+        i = i + copy.get().level;
+    }
+    print(first.strong_count());
+
+    let lock = Mutex::new("locked");
+    lock.set("relocked");
+    print(lock.lock());
+    let rw = RwLock::new(Config { name: "r1", level: 2 });
+    rw.write(Config { name: "r2", level: 3 });
+    print(rw.read().name);
+    let counter = Cell::new(1);
+    counter.set(counter.get() + 1);
+    print(counter.get());
+}

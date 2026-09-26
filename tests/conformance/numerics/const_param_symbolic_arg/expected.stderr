@@ -1,0 +1,3 @@
+error[PACO-E0347] input.paco:154:32: `const N` cannot take the run-time dimension `n`; a `const` parameter is static
+  note at input.paco:140:9: `N` is declared `const` here
+  fix 1: declare it `dim N`

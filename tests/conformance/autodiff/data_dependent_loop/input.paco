@@ -1,0 +1,75 @@
+use stdlib::autodiff;
+
+/// Central finite differences: step `0.000001`, relative tolerance
+/// `0.000001` for `f64` (the widths' values are documented in
+/// `paco-test-harness`).
+fn agrees(analytic: float, numeric: float) -> bool {
+    (analytic - numeric).abs() <= 0.000001 * (1.0 + numeric.abs())
+}
+
+fn grow_value(x: float) -> float {
+    let mut v = x;
+    while v < 10.0 {
+        v = v * 1.5
+    }
+    v
+}
+
+#[differentiable]
+fn grow(x: float) -> float {
+    grow_value(x)
+}
+
+fn weighted_value(x: float) -> float {
+    let mut values: []f64 = slice_of_zeros<f64>(4);
+    for i in 0..values.len() {
+        values[i] = x * (i as float + 1.0)
+    }
+    let mut total = 0.0;
+    for i in 0..values.len() {
+        total = total + values[i] * values[i]
+    }
+    total
+}
+
+#[differentiable]
+fn weighted(x: float) -> float {
+    weighted_value(x)
+}
+
+#[differentiable]
+fn looped(x: float) -> float {
+    let mut total = 0.0;
+    let mut i = 0;
+    loop {
+        if i == 3 {
+            break;
+        }
+        total = total + x * x;
+        i = i + 1
+    }
+    total
+}
+
+fn main() {
+    let h = 0.000001;
+    let mut points: []f64 = slice_of_zeros<f64>(5);
+    points[0] = 0.7;
+    points[1] = 1.3;
+    points[2] = 2.9;
+    points[3] = 4.1;
+    points[4] = 8.2;
+    for i in 0..points.len() {
+        let x: float = points[i];
+        let (v, d) = autodiff::grad(grow, x);
+        let numeric = (grow_value(x + h) - grow_value(x - h)) / (2.0 * h);
+        print(agrees(d, numeric));
+    }
+    let (w, dw) = autodiff::grad(weighted, 1.5);
+    print(w);
+    print(dw);
+    print(agrees(dw, (weighted_value(1.5 + h) - weighted_value(1.5 - h)) / (2.0 * h)));
+    let (l, dl) = autodiff::grad(looped, 2.0);
+    print(l);
+    print(dl);
+}

@@ -1,0 +1,13 @@
+struct Point {
+    x: i64,
+    y: i64,
+
+    fn set_x(&self, x: i64) {
+        // do nothing
+    }
+}
+
+fn main() {
+    let p = Point { x: 10, y: 20 };
+    p.set_x("not an i64")
+}

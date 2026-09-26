@@ -1,0 +1,27 @@
+struct Counter {
+    value: i64,
+}
+
+fn keep(shared: Rc<Counter>) -> i64 {
+    shared.strong_count()
+}
+
+fn main() {
+    let a = Rc::new(Counter { value: 5 });
+    let c = a.clone();
+    print(c.strong_count());
+    let b = a;
+    print(b.strong_count());
+    print(c.strong_count());
+    {
+        let d = b;
+        print(d.strong_count());
+    }
+    print(c.strong_count());
+    let e = c.clone();
+    print(keep(e));
+    print(c.strong_count());
+    let f = c;
+    print(f.strong_count());
+    print(f.get().value);
+}

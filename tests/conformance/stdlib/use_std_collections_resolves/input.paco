@@ -1,0 +1,5 @@
+use stdlib::collections;
+
+fn main() {
+    print("ok")
+}

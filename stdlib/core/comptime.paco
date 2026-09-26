@@ -1,0 +1,17 @@
+module core;
+
+pub struct FieldInfo {
+    name: string,
+    ty: type,
+}
+
+pub struct FieldIter {
+    items: Vec<FieldInfo>,
+    pos: i64,
+
+    pub fn next(&mut self) -> Option<FieldInfo> {
+        let result = self.items.get(self.pos);
+        self.pos = self.pos + 1;
+        result
+    }
+}

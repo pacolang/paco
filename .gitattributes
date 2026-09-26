@@ -1,0 +1,4 @@
+# Paco source, expected test output and the Rust/docs sources it is
+# compared against are always compared with LF; checking them out with
+# CRLF on Windows breaks that comparison.
+* text=auto eol=lf

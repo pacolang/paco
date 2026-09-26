@@ -1,0 +1,70 @@
+module test;
+
+/// Assertion functions for `#[test]`-marked functions. Each is tagged
+/// `#[builtin(name)]`, the same mechanism `stdlib::autodiff::grad` uses: the
+/// compiler checks this signature and replaces every call, not the body
+/// written here (see `grad`'s own doc comment for the precedent).
+///
+/// Every function below declares its trailing `message` parameter as an
+/// ordinary, required `string` — the only form ordinary signature checking
+/// can validate today. At a real call site, once `#[builtin]` call-site
+/// handling reads the call's raw argument list from the AST (compiler
+/// work, not yet landed), `message` is OPTIONAL there: both `assert_eq(a,
+/// b)` and `assert_eq(a, b, "amounts must match")` are valid calls that
+/// bypass this written signature entirely, exactly as `grad`'s call sites
+/// already bypass its written signature. Only the 2-argument form
+/// type-checks under today's ordinary call-site checking.
+
+/// Panics naming `cond`'s source expression when it evaluates to `false`.
+#[builtin(assert)]
+pub fn assert(cond: bool, message: string) {
+    panic("`assert` calls are replaced by the compiler")
+}
+
+/// Panics naming `a`, `b` and both their values when they are unequal.
+#[builtin(assert_eq)]
+pub fn assert_eq<T>(a: T, b: T, message: string) {
+    panic("`assert_eq` calls are replaced by the compiler")
+}
+
+/// Panics naming `a`, `b` and both their values when they are equal.
+#[builtin(assert_ne)]
+pub fn assert_ne<T>(a: T, b: T, message: string) {
+    panic("`assert_ne` calls are replaced by the compiler")
+}
+
+/// Panics naming `cond`'s source expression when it evaluates to `false`.
+#[builtin(assert_true)]
+pub fn assert_true(cond: bool, message: string) {
+    panic("`assert_true` calls are replaced by the compiler")
+}
+
+/// Panics naming `cond`'s source expression when it evaluates to `true`.
+#[builtin(assert_false)]
+pub fn assert_false(cond: bool, message: string) {
+    panic("`assert_false` calls are replaced by the compiler")
+}
+
+/// Panics naming `opt`'s source expression when it holds `None`, not `Some`.
+#[builtin(assert_some)]
+pub fn assert_some<T>(opt: Option<T>, message: string) {
+    panic("`assert_some` calls are replaced by the compiler")
+}
+
+/// Panics naming `opt`'s source expression when it holds `Some`, not `None`.
+#[builtin(assert_none)]
+pub fn assert_none<T>(opt: Option<T>, message: string) {
+    panic("`assert_none` calls are replaced by the compiler")
+}
+
+/// Panics naming `result`'s source expression when it holds `Err`, not `Ok`.
+#[builtin(assert_ok)]
+pub fn assert_ok<T, E>(result: Result<T, E>, message: string) {
+    panic("`assert_ok` calls are replaced by the compiler")
+}
+
+/// Panics naming `result`'s source expression when it holds `Ok`, not `Err`.
+#[builtin(assert_err)]
+pub fn assert_err<T, E>(result: Result<T, E>, message: string) {
+    panic("`assert_err` calls are replaced by the compiler")
+}

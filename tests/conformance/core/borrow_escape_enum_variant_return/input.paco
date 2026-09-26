@@ -1,0 +1,6 @@
+enum E { One(&i64), Zero }
+fn make() -> E {
+    let t = 5;
+    E::One(&t)
+}
+fn main() { match make() { E::One(r) => print(*r), E::Zero => print(0), } }

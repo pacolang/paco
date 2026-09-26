@@ -1,0 +1,25 @@
+use stdlib::autodiff;
+
+struct Vec2 {
+    x: f64,
+    y: f64,
+    type Tangent = Vec2;
+
+    fn zero_tangent(&self) -> Vec2 {
+        Vec2 { x: 0.0, y: 0.0 }
+    }
+
+    fn move_by(&mut self, offset: &Vec2) {
+        self.x = self.x + offset.x;
+        self.y = self.y + offset.y
+    }
+}
+
+#[differentiable]
+fn scaled(v: Vec2) -> Vec2 {
+    Vec2 { x: v.x * 2.0, y: v.y * 2.0 }
+}
+
+fn main() {
+    let (v, d) = autodiff::grad(scaled, Vec2 { x: 1.0, y: 2.0 });
+}

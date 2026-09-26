@@ -1,0 +1,73 @@
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+struct Grid {
+    cells: []i64,
+    cols: i64,
+
+    fn index(&self, at: (i64, i64)) -> &i64 {
+        let (r, c) = at;
+        &self.cells[r * self.cols + c]
+    }
+}
+
+fn divmod(a: i64, b: i64) -> (i64, i64) {
+    (a / b, a % b)
+}
+
+fn swap(pair: (i64, float)) -> (float, i64) {
+    let (a, b) = pair;
+    (b, a)
+}
+
+fn classify(pair: (i64, bool)) -> i64 {
+    match pair {
+        (0, _) => 0,
+        (n, true) if n > 10 => 2,
+        (_, true) => 1,
+        (n, false) => -n,
+    }
+}
+
+fn main() {
+    let (q, r) = divmod(17, 5);
+    print(q);
+    print(r);
+
+    let t = swap((3, 2.5));
+    let (f, i) = t;
+    print(f);
+    print(i);
+
+    let nested = ((1, 2), (true, 4));
+    let ((a, b), (flag, d)) = nested;
+    print(a + b + d);
+    print(flag);
+
+    print(classify((0, true)));
+    print(classify((20, true)));
+    print(classify((5, true)));
+    print(classify((7, false)));
+
+    let p = (Point { x: 1, y: 2 }, 9);
+    let (point, weight) = p;
+    print(point.x + point.y + weight);
+
+    let mut acc = (0, 0);
+    for n in 1..=4 {
+        let (evens, odds) = acc;
+        acc = if n % 2 == 0 { (evens + n, odds) } else { (evens, odds + n) }
+    }
+    let (evens, odds) = acc;
+    print(evens);
+    print(odds);
+
+    let mut cells: []i64 = slice_of_zeros<i64>(6);
+    for k in 0..6 {
+        cells[k] = k * 10
+    }
+    let grid = Grid { cells: cells, cols: 3 };
+    print(grid[1, 2])
+}

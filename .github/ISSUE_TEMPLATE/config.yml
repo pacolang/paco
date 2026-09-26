@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Open design question
+    url: https://github.com/pacolang/paco/blob/main/context.md
+    about: "Design questions are NOT tracked as issues. They live in context.md and docs/design/spec.md §20, are resolved in discussion, and become an RFC. Issues are for executable work only."

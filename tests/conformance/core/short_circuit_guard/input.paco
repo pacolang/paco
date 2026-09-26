@@ -1,0 +1,42 @@
+fn guarded(j: i64) -> bool {
+    let a: []i64 = slice_of_zeros<i64>(3);
+    j >= 0 && a[j] == 0
+}
+
+fn guarded_or(j: i64) -> bool {
+    let a: []i64 = slice_of_zeros<i64>(3);
+    j < 0 || j >= 3 || a[j] == 0
+}
+
+fn bump(count: &mut i64, value: bool) -> bool {
+    *count = *count + 1;
+    value
+}
+
+fn calls(left: bool, right: bool, and: bool) -> i64 {
+    let mut count: i64 = 0;
+    let result = if and { left && bump(&mut count, right) } else { left || bump(&mut count, right) };
+    if result { count + 10 } else { count }
+}
+
+fn nested(a: bool, b: bool, c: bool) -> i64 {
+    let mut count: i64 = 0;
+    let r = (a && bump(&mut count, b)) || bump(&mut count, c);
+    if r { count + 10 } else { count }
+}
+
+fn main() {
+    print(guarded(-1));
+    print(guarded(1));
+    print(guarded_or(7));
+    print(guarded_or(2));
+    print(calls(false, true, true));
+    print(calls(true, true, true));
+    print(calls(true, false, true));
+    print(calls(true, false, false));
+    print(calls(false, false, false));
+    print(calls(false, true, false));
+    print(nested(false, true, true));
+    print(nested(true, true, false));
+    print(nested(true, false, false));
+}

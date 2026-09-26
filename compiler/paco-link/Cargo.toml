@@ -1,0 +1,33 @@
+[package]
+name = "paco-link"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+autotests = false
+
+[dependencies]
+paco-diag.workspace = true
+paco-span.workspace = true
+tempfile.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+cc = "1.4.7"
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+cranelift-codegen = "0.135.2"
+cranelift-frontend = "0.135.2"
+cranelift-module = "0.135.2"
+cranelift-object = "0.135.2"
+paco-borrow.workspace = true
+paco-codegen-cranelift.workspace = true
+paco-mir.workspace = true
+paco-syntax.workspace = true
+paco-types.workspace = true
+
+[[test]]
+name = "main"
+path = "tests/main.rs"

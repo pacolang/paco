@@ -1,0 +1,21 @@
+fn main() {
+    let mut m: Map<i64, i64> = Map::new();
+    m.insert(1, 100);
+    m.insert(2, 200);
+    m.insert(1, 999);
+    match m.get(1) {
+        Some(v) => print(v),
+        None => print(0 - 1),
+    }
+    match m.get(2) {
+        Some(v) => print(v),
+        None => print(0 - 1),
+    }
+    match m.get(3) {
+        Some(v) => print(v),
+        None => print(0 - 1),
+    }
+    print(m.len());
+    print(m.contains_key(2));
+    print(m.contains_key(3))
+}

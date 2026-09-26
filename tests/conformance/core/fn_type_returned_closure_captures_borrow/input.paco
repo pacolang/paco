@@ -1,0 +1,10 @@
+use stdlib::string;
+fn keep() -> fn() -> i64 {
+    let t = "abc";
+    let r = &t;
+    || r.as_bytes().len()
+}
+fn main() {
+    let f = keep();
+    print(f());
+}

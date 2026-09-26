@@ -1,0 +1,53 @@
+struct Person {
+    name: string,
+    tags: Vec<string>,
+}
+
+fn main() {
+    let mut names: Vec<string> = Vec::new();
+    let mut i: i64 = 0;
+    while i < 100 {
+        names.push(i.display());
+        i = i + 1;
+    }
+    print(names.len());
+    print(names[42]);
+    match names.get(7) {
+        Some(n) => print(n),
+        None => print("missing"),
+    }
+    names.set(7, "seven");
+    print(names[7]);
+
+    let mut people: Vec<Person> = Vec::new();
+    let mut k: i64 = 0;
+    while k < 5 {
+        let mut tags: Vec<string> = Vec::new();
+        tags.push("a");
+        tags.push(k.display());
+        people.push(Person { name: string_concat(&"p", &k.display()), tags: tags });
+        k = k + 1;
+    }
+    match people.get(3) {
+        Some(p) => {
+            print(p.name);
+            print(p.tags[1]);
+        }
+        None => print("missing"),
+    }
+
+    let mut index: Map<string, i64> = Map::new();
+    index.insert("one", 1);
+    index.insert("two", 2);
+    index.insert("one", 11);
+    match index.get("one") {
+        Some(n) => print(n),
+        None => print(0),
+    }
+    print(index.len());
+
+    let mut buf = StringBuf::new();
+    buf.push_str("he");
+    buf.push_str("llo");
+    print(buf.to_string());
+}

@@ -1,0 +1,48 @@
+use stdlib::autodiff;
+
+#[differentiable]
+fn branch(x: float) -> float {
+    if x > 0.0 { x * x } else { -x }
+}
+
+enum Shape {
+    Square,
+    Line,
+}
+
+fn pick(x: float) -> Shape {
+    if x > 1.0 { Shape::Square } else { Shape::Line }
+}
+
+#[differentiable]
+fn matched(x: float) -> float {
+    match pick(x) {
+        Shape::Square => x * x,
+        Shape::Line => 3.0 * x,
+    }
+}
+
+#[differentiable]
+fn early(x: float) -> float {
+    if x < 0.0 {
+        return x * 4.0;
+    }
+    x * x * x
+}
+
+fn main() {
+    let (a, da) = autodiff::grad(branch, 2.0);
+    print(a);
+    print(da);
+    let (b, db) = autodiff::grad(branch, -2.0);
+    print(b);
+    print(db);
+    let (c, dc) = autodiff::grad(matched, 2.0);
+    print(dc);
+    let (d, dd) = autodiff::grad(matched, 0.5);
+    print(dd);
+    let (e, de) = autodiff::grad(early, -1.0);
+    print(de);
+    let (f, df) = autodiff::grad(early, 2.0);
+    print(df);
+}

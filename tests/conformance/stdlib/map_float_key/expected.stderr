@@ -1,0 +1,1 @@
+error[PACO-E0340] input.paco:4:5: `float` does not satisfy `Hash`, required by `K` in `Map::insert`

@@ -1,0 +1,52 @@
+use stdlib::numerics;
+
+// Batch is dynamic, features are static — the shape of every real model.
+fn forward(
+    x: &numerics::Tensor<f32, Dyn, 3>,
+    w: &numerics::Tensor<f32, 3, 2>,
+) -> Result<numerics::Tensor<f32, Dyn, 2>, numerics::ShapeError> {
+    x.matmul(w)
+}
+
+fn main() {
+    let mut w = numerics::Tensor<f32, 3, 2>::zeros();
+    let half: f32 = 0.5;
+    let two: f32 = 2.0;
+    w.set(numerics::dims2(0, 0), half);
+    w.set(numerics::dims2(2, 1), two);
+    match numerics::Tensor<f32, Dyn, 3>::zeros_with(numerics::dims1(2)) {
+        Result::Ok(x0) => {
+            let mut x = x0;
+            let four: f32 = 4.0;
+            let three: f32 = 3.0;
+            x.set(numerics::dims2(0, 0), four);
+            x.set(numerics::dims2(1, 2), three);
+            match forward(&x, &w) {
+                Result::Ok(y) => {
+                    print(y.rank());
+                    print(y.shape()[0]);
+                    print(y.shape()[1]);
+                    for i in 0..y.len() {
+                        print(y.at(i))
+                    }
+                }
+                Result::Err(e) => print(e.axis),
+            }
+        }
+        Result::Err(e) => print(e.axis),
+    }
+
+    let mut a = numerics::Tensor<i64, 2, 2>::zeros();
+    a.set_at(0, 1);
+    a.set_at(1, 2);
+    a.set_at(2, 3);
+    a.set_at(3, 4);
+    match a.matmul(&a) {
+        Result::Ok(p) => {
+            for i in 0..p.len() {
+                print(p.at(i))
+            }
+        }
+        Result::Err(e) => print(e.axis),
+    }
+}

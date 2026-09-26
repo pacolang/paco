@@ -1,0 +1,12 @@
+fn check(n: i64) {
+    if n > 1 {
+        panic("boom");
+    }
+}
+
+fn main() {
+    print("start");
+    check(1);
+    check(2);
+    print("unreachable");
+}

@@ -1,0 +1,54 @@
+use stdlib::autodiff;
+
+struct Vec2 {
+    x: f64,
+    y: f64,
+    type Tangent = Vec2;
+
+    fn zero_tangent(&self) -> Vec2 {
+        Vec2 { x: 0.0, y: 0.0 }
+    }
+
+    fn move_by(&mut self, offset: &Vec2) {
+        self.x = self.x + offset.x;
+        self.y = self.y + offset.y
+    }
+
+    fn add(&self, other: Vec2) -> Vec2 {
+        Vec2 { x: self.x + other.x, y: self.y + other.y }
+    }
+}
+
+fn norm(v: &Vec2) -> f64 {
+    (v.x * v.x + v.y * v.y).sqrt()
+}
+
+/// Deliberately 100 times the true gradient, to show it is the one used.
+struct NormPullback {
+    v: Vec2,
+    n: f64,
+    type Seed = f64;
+    type Gradients = Vec2;
+
+    fn pullback(self, seed: f64) -> Vec2 {
+        Vec2 { x: 100.0 * seed * self.v.x / self.n, y: 100.0 * seed * self.v.y / self.n }
+    }
+}
+
+#[derivative(of = norm)]
+fn norm_derivative(v: &Vec2) -> (f64, NormPullback) {
+    let n = norm(v);
+    (n, NormPullback { v: Vec2 { x: v.x, y: v.y }, n: n })
+}
+
+#[differentiable]
+fn doubled(v: Vec2) -> f64 {
+    2.0 * norm(&v)
+}
+
+fn main() {
+    let (n, g) = autodiff::grad(doubled, Vec2 { x: 3.0, y: 4.0 });
+    print(n);
+    print(g.x);
+    print(g.y);
+}

@@ -1,0 +1,3 @@
+panic at input.paco:3:9: boom
+   at check (input.paco:3:9)
+   at main (input.paco:10:5)

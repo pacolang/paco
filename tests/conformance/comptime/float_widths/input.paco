@@ -1,0 +1,62 @@
+fn third_f64() -> f64 {
+    1.0 / 3.0
+}
+
+fn tenth_sum() -> f64 {
+    0.1 + 0.2
+}
+
+fn third_f32() -> f32 {
+    (1.0 as f32) / (3.0 as f32)
+}
+
+fn third_f16() -> f16 {
+    (1.0 as f16) / (3.0 as f16)
+}
+
+fn third_bf16() -> bf16 {
+    (1.0 as bf16) / (3.0 as bf16)
+}
+
+fn third_e4m3() -> f8e4m3 {
+    ((1.0 as f32) / (3.0 as f32)) as f8e4m3
+}
+
+fn third_e5m2() -> f8e5m2 {
+    ((1.0 as f32) / (3.0 as f32)) as f8e5m2
+}
+
+fn largest_f16() -> f16 {
+    65504.0 as f16
+}
+
+fn big_f64() -> f64 {
+    1000000000000000000000.0 * 3.0
+}
+
+fn truncate(x: f64) -> i64 {
+    x as i64
+}
+
+fn show_f16() -> string {
+    float_to_string(third_f16() as f64)
+}
+
+fn show_f32() -> string {
+    float_to_string(third_f32() as f64)
+}
+
+fn main() {
+    print(third_f64());
+    print(tenth_sum());
+    print(third_f32());
+    print(third_f16());
+    print(third_bf16());
+    print(third_e4m3());
+    print(third_e5m2());
+    print(largest_f16());
+    print(big_f64());
+    print(truncate(-2.75));
+    print(show_f16());
+    print(show_f32());
+}

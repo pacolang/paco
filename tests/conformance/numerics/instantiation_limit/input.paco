@@ -1,0 +1,19 @@
+struct Grid<const R: int, const C: int> {
+    data: []i64,
+
+    pub fn zeros() -> Self {
+        Grid { data: slice_of_zeros<i64>(R * C) }
+    }
+}
+
+#[instantiation_limit(2)]
+fn rows<const R: int>(t: &Grid<R, 4>) -> i64 {
+    R
+}
+
+fn main() {
+    let a = Grid<1, 4>::zeros();
+    let b = Grid<2, 4>::zeros();
+    let c = Grid<3, 4>::zeros();
+    print(rows(&a) + rows(&b) + rows(&c))
+}

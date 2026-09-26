@@ -1,0 +1,49 @@
+[package]
+name = "paco-driver"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+autotests = false
+
+[dependencies]
+clap.workspace = true
+paco-borrow.workspace = true
+paco-codegen-cranelift.workspace = true
+paco-comptime.workspace = true
+paco-codegen-llvm.workspace = true
+paco-diag.workspace = true
+paco-hir.workspace = true
+paco-link.workspace = true
+paco-match.workspace = true
+paco-mir.workspace = true
+paco-resolve.workspace = true
+paco-span.workspace = true
+paco-syntax.workspace = true
+paco-test-harness.workspace = true
+paco-types.workspace = true
+toml.workspace = true
+twox-hash = { version = "2.1.4", default-features = false, features = ["std", "xxhash3_128"] }
+
+[features]
+default = ["llvm"]
+llvm = ["paco-codegen-llvm/llvm"]
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "paco"
+path = "src/launcher.rs"
+
+[[bin]]
+name = "paco-compile"
+path = "src/main.rs"
+
+[dev-dependencies]
+object = { version = "0.39.1", default-features = false, features = ["read", "std"] }
+tempfile.workspace = true
+
+[[test]]
+name = "main"
+path = "tests/main.rs"

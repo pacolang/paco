@@ -1,0 +1,4 @@
+panic at input.paco:5:20: dimension `D` is negative: -3
+   at Grid::first_extent::f32_pack1_d-3 (input.paco:5:20)
+   at shrink::d2 (input.paco:11:5)
+   at main (input.paco:16:11)

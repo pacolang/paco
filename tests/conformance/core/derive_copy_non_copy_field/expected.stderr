@@ -1,0 +1,2 @@
+error[PACO-E0354] input.paco:4:5: cannot derive `Copy`: field `name` has type `string`, which is not `Copy`
+  note: a `Copy` type is duplicated bit for bit, so every field must be `Copy` too

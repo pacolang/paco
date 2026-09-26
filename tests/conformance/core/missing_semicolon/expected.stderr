@@ -1,0 +1,3 @@
+error[PACO-E0115] input.paco:2:14: expected `;` after this statement
+  note at input.paco:3:5: the next statement starts here
+  help: insert `;` here -> `;`

@@ -1,0 +1,60 @@
+#[derive(Copy)]
+struct V {
+    x: f64,
+    y: f64,
+
+    fn add(&self, o: V) -> V { V { x: self.x + o.x, y: self.y + o.y } }
+}
+
+#[derive(Copy)]
+enum Dir { Left, Right(i64) }
+
+fn take(v: V) -> f64 { v.x }
+
+fn main() {
+    let a = V { x: 1.0, y: 2.0 };
+    let mut b = a;
+    b.x = 5.0;
+    print(a.x);
+    print(b.x);
+    let c = a + b;
+    let d = a + b;
+    print(c.x + d.y);
+    print(take(a) + take(a));
+    let mut vs: Vec<V> = Vec::new();
+    vs.push(a);
+    let mut e = vs[0];
+    e.y = 9.0;
+    print(vs[0].y);
+    let t = (a, 3);
+    let u = t;
+    let (p, q) = t;
+    let (m, n) = u;
+    print(p.x + m.x);
+    print(q + n);
+    let r = Dir::Right(4);
+    let s = r;
+    match r { Dir::Left => print(0), Dir::Right(n) => print(n), }
+    match s { Dir::Left => print(0), Dir::Right(n) => print(n), }
+    more();
+}
+
+fn keep(v: V) -> f64 {
+    let mut w = v;
+    w.x = 9.0;
+    w.x
+}
+
+fn dup<T: Copy>(x: T) -> T {
+    let y = x;
+    x
+}
+
+fn more() {
+    let a = V { x: 1.0, y: 2.0 };
+    print(keep(a));
+    print(a.x);
+    let c = || a.x + 1.0;
+    print(c());
+    print(dup(a).y);
+}

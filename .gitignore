@@ -1,0 +1,27 @@
+/target
+/build
+**/*.rs.bk
+*.o
+*.a
+.tmp
+
+compiler/target/
+runtime/target/
+dist/
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.yandecode/
+
+# Local tooling (YandeCode RAG + Claude Code session config)
+.claude/
+.mcp.json
+yandecode.json
+CLAUDE.md
+.perf/
+__pycache__/
+*.pyc
+.archive/

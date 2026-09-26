@@ -1,0 +1,39 @@
+enum List {
+    Nil,
+    Cons(i64, Rc<List>),
+}
+
+fn sum(list: Rc<List>) -> i64 {
+    match list.get() {
+        List::Nil => 0,
+        List::Cons(value, rest) => value + sum(rest),
+    }
+}
+
+struct Node {
+    value: i64,
+    next: Option<Rc<Node>>,
+}
+
+fn length(node: Rc<Node>) -> i64 {
+    let current = node.get();
+    match current.next {
+        Some(next) => 1 + length(next),
+        None => 1,
+    }
+}
+
+fn main() {
+    let tail = Rc::new(List::Nil);
+    let two = Rc::new(List::Cons(2, tail));
+    let one = Rc::new(List::Cons(1, two.clone()));
+    let three = Rc::new(List::Cons(3, one));
+    print(sum(three));
+    print(sum(two));
+    let last = Rc::new(Node { value: 7, next: None });
+    let first = Rc::new(Node { value: 5, next: Some(last.clone()) });
+    print(last.strong_count());
+    print(length(first));
+    print(last.get().value);
+    print(last.strong_count());
+}

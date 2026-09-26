@@ -1,0 +1,1 @@
+error[PACO-E0345] input.paco:143:13: the axis of `dim` must be an integer literal; use `extent(i)` for a computed axis

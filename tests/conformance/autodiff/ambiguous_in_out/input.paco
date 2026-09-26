@@ -1,0 +1,14 @@
+use stdlib::autodiff;
+
+#[differentiable]
+fn swap(x: &mut float, y: &mut float) {
+    let t = *x;
+    *x = *y;
+    *y = t
+}
+
+fn main() {
+    let mut a = 1.0;
+    let mut b = 2.0;
+    let (v, d) = autodiff::grad(swap, (&mut a, &mut b));
+}

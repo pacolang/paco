@@ -1,0 +1,16 @@
+struct Grid<const R: int, const C: int> {
+    data: []i64,
+
+    pub fn rank(&self) -> i64 {
+        R * C
+    }
+}
+
+fn project(a: &Grid<768, 3072>) -> i64 {
+    a.rank()
+}
+
+fn main() {
+    let t = Grid<512, 3072> { data: slice_of_zeros<i64>(0) };
+    print(project(&t))
+}

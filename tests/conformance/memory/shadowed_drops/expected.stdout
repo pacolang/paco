@@ -1,0 +1,22 @@
+a12
+open same-1
+open same-2
+open inner
+inner
+close inner
+open loop-a
+open loop-b
+close loop-b
+close loop-a
+open loop-a
+open loop-b
+close loop-b
+close loop-a
+open w
+wrap w
+open w+
+close w
+end
+close w+
+close same-2
+close same-1

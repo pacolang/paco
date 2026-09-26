@@ -1,0 +1,24 @@
+[package]
+name = "paco-mir"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+autotests = false
+
+[dependencies]
+paco-borrow.workspace = true
+paco-diag.workspace = true
+paco-hir.workspace = true
+paco-resolve.workspace = true
+paco-span.workspace = true
+paco-syntax.workspace = true
+paco-types.workspace = true
+libm.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[test]]
+name = "main"
+path = "tests/main.rs"

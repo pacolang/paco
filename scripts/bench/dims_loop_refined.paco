@@ -1,0 +1,160 @@
+use stdlib::dims;
+
+struct Grid<T: Numeric + Add, const D: int...> {
+    data: []T,
+    dims: []i64,
+
+    pub fn zeros() -> Self {
+        let dims = D;
+        Grid { data: slice_of_zeros<T>(count(&dims)), dims: dims }
+    }
+
+    pub fn with_extents(extents: []i64) -> Self {
+        Grid { data: slice_of_zeros<T>(count(&extents)), dims: extents }
+    }
+
+    pub fn extent(&self, axis: i64) -> i64 {
+        self.dims[axis]
+    }
+
+    pub fn len(&self) -> i64 {
+        self.data.len()
+    }
+
+    pub fn set(&mut self, i: i64, value: T) {
+        self.data[i] = value;
+    }
+
+    pub fn get(&self, i: i64) -> T {
+        self.data[i]
+    }
+
+    pub fn add(&self, other: &Grid<T, D...>) -> Grid<T, D...> {
+        let mut data = slice_of_zeros<T>(self.data.len());
+        for i in 0..self.data.len() {
+            data[i] = self.data[i] + other.data[i];
+        }
+        Grid { data: data, dims: copy(&self.dims) }
+    }
+
+    pub fn checked_add<const E: int...>(&self, other: &Grid<T, E...>) -> Result<Grid<T, D...>, dims::DimError> {
+        for axis in 0..self.dims.len() {
+            if self.dims[axis] != other.dims[axis] {
+                return Result::Err(dims::DimError { axis: axis, expected: "", origin: "", bound: self.dims[axis], observed: other.dims[axis] });
+            }
+        }
+        Result::Ok(self.add_unchecked(&other.data))
+    }
+
+    #[broadcasts(D, R)]
+    pub fn broadcast_to<const R: int...>(&self) -> Grid<T, R...> {
+        let target = R;
+        let data = self.expanded(&target);
+        Grid<T, R...> { data: data, dims: target }
+    }
+
+    pub fn checked_broadcast_to<const R: int...>(&self) -> Result<Grid<T, R...>, dims::DimError> {
+        let target = R;
+        let axis = mismatch(&self.dims, &target);
+        if axis >= 0 {
+            return Result::Err(dims::DimError { axis: axis, expected: "", origin: "", bound: -1, observed: self.dims[axis] });
+        }
+        let data = self.expanded(&target);
+        Result::Ok(Grid<T, R...> { data: data, dims: copy(&target) })
+    }
+
+    fn expanded(&self, target: &[]i64) -> []T {
+        let total = count(target);
+        let mut data = slice_of_zeros<T>(total);
+        let offset = target.len() - self.dims.len();
+        for flat in 0..total {
+            let mut rest = flat;
+            let mut source = 0;
+            let mut stride = 1;
+            let mut axis = target.len();
+            while axis > 0 {
+                axis = axis - 1;
+                let index = rest % target[axis];
+                rest = rest / target[axis];
+                if axis >= offset {
+                    let from = self.dims[axis - offset];
+                    if from != 1 {
+                        source = source + index * stride;
+                    }
+                    stride = stride * from;
+                }
+            }
+            data[flat] = self.data[source];
+        }
+        data
+    }
+
+    fn add_unchecked(&self, other: &[]T) -> Grid<T, D...> {
+        let mut data = slice_of_zeros<T>(self.data.len());
+        for i in 0..self.data.len() {
+            data[i] = self.data[i] + other[i];
+        }
+        Grid { data: data, dims: copy(&self.dims) }
+    }
+}
+
+fn mismatch(source: &[]i64, target: &[]i64) -> i64 {
+    let offset = target.len() - source.len();
+    for axis in 0..source.len() {
+        if source[axis] != 1 && source[axis] != target[offset + axis] {
+            return axis;
+        }
+    }
+    -1
+}
+
+fn count(dims: &[]i64) -> i64 {
+    let mut total = 1;
+    for i in 0..dims.len() {
+        total = total * dims[i];
+    }
+    total
+}
+
+fn copy(dims: &[]i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(dims.len());
+    for i in 0..dims.len() {
+        out[i] = dims[i];
+    }
+    out
+}
+
+fn extents1(a: i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(1);
+    out[0] = a;
+    out
+}
+
+fn extents2(a: i64, b: i64) -> []i64 {
+    let mut out = slice_of_zeros<i64>(2);
+    out[0] = a;
+    out[1] = b;
+    out
+}
+
+fn run(a: Grid<f32, Dyn, 4>, b: Grid<f32, Dyn, 4>) -> Result<i64, dims::DimError> {
+    let n = a.dim(0);
+    let a: Grid<f32, n, 4> = a.with_dims()?;
+    let b: Grid<f32, n, 4> = b.with_dims()?;
+    let mut c = a + &b;
+    for i in 0..1000000 {
+        c = c + &b;
+    }
+    Result::Ok(c.len())
+}
+
+fn main() {
+    let mut a = Grid<f32, Dyn, 4>::with_extents(extents2(4, 4));
+    let mut b = Grid<f32, Dyn, 4>::with_extents(extents2(4, 4));
+    a.set(0, 1 as f32);
+    b.set(5, 2 as f32);
+    match run(a, b) {
+        Result::Ok(len) => print(len),
+        Result::Err(e) => print(e.display()),
+    }
+}

@@ -1,0 +1,9 @@
+struct Point {
+    x: i64,
+}
+
+fn main() {
+    let a = Point { x: 1 };
+    let b = Point { x: 2 };
+    print(a < b);
+}

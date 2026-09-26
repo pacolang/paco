@@ -1,0 +1,6 @@
+fn main() {
+    let n = 3;
+    let f: fn(i64) -> bool = |x| x > 0;
+    print(f(n));
+    print(n(1));
+}

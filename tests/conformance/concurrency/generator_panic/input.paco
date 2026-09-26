@@ -1,0 +1,35 @@
+iter fn checked(limit: i64) -> i64 {
+    yield 1;
+    yield 2;
+    if limit < 3 {
+        panic("generator exhausted its limit");
+    }
+    yield 3;
+}
+
+fn drain(limit: i64) -> i64 {
+    let g = checked(limit);
+    let mut total = 0;
+    let mut open = true;
+    while open {
+        match g.next() {
+            Option::Some(value) => total = total + value,
+            Option::None => open = false,
+        }
+    }
+    total
+}
+
+fn main() {
+    print(drain(5));
+    let task = spawn drain(2);
+    match task.join() {
+        Ok(total) => print(total),
+        Err(e) => print(e.message),
+    }
+    let blocking = spawn_blocking(|| drain(1));
+    match blocking.join() {
+        Ok(total) => print(total),
+        Err(e) => print(e.message),
+    }
+}

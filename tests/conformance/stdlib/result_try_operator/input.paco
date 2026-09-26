@@ -1,0 +1,40 @@
+struct OtherError {
+    code: i64,
+}
+
+struct MyError {
+    code: i64,
+
+    fn from(other: OtherError) -> Self {
+        MyError { code: other.code }
+    }
+}
+
+fn ok_call() -> Result<i64, OtherError> {
+    Result::Ok(7)
+}
+
+fn err_call() -> Result<i64, OtherError> {
+    Result::Err(OtherError { code: 13 })
+}
+
+fn try_ok() -> Result<i64, MyError> {
+    let v = ok_call()?;
+    Result::Ok(v)
+}
+
+fn try_err() -> Result<i64, MyError> {
+    let v = err_call()?;
+    Result::Ok(v)
+}
+
+fn main() {
+    match try_ok() {
+        Result::Ok(v) => print(v),
+        Result::Err(e) => print(e.code),
+    }
+    match try_err() {
+        Result::Ok(v) => print(v),
+        Result::Err(e) => print(e.code),
+    }
+}

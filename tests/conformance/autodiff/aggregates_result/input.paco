@@ -1,0 +1,97 @@
+use stdlib::autodiff;
+
+/// Central finite differences: step `0.000001`, relative tolerance
+/// `0.000001` for `f64` (the widths' values are documented in
+/// `paco-test-harness`).
+fn agrees(analytic: float, numeric: float) -> bool {
+    (analytic - numeric).abs() <= 0.000001 * (1.0 + numeric.abs())
+}
+
+struct Vec2 {
+    x: f64,
+    y: f64,
+    type Tangent = Vec2;
+
+    fn zero_tangent(&self) -> Vec2 {
+        Vec2 { x: 0.0, y: 0.0 }
+    }
+
+    fn move_by(&mut self, offset: &Vec2) {
+        self.x = self.x + offset.x;
+        self.y = self.y + offset.y
+    }
+
+    fn add(&self, other: Vec2) -> Vec2 {
+        Vec2 { x: self.x + other.x, y: self.y + other.y }
+    }
+}
+
+struct NormError {
+    code: i64,
+}
+
+fn checked_norm(v: &Vec2) -> Result<f64, NormError> {
+    let n = (v.x * v.x + v.y * v.y).sqrt();
+    if n > 0.0 { Result::Ok(n) } else { Result::Err(NormError { code: 1 }) }
+}
+
+fn safe_value(v: Vec2) -> f64 {
+    match checked_norm(&v) {
+        Ok(n) => n,
+        Err(_) => 0.0,
+    }
+}
+
+#[differentiable]
+fn safe(v: Vec2) -> f64 {
+    safe_value(v)
+}
+
+fn swap(pair: (f64, f64)) -> (f64, f64) {
+    let (first, second) = pair;
+    (second, first * 2.0)
+}
+
+#[differentiable]
+fn tupled(x: float, y: float) -> float {
+    let (a, b) = swap((x, y));
+    a * b
+}
+
+fn optional(x: float) -> Option<f64> {
+    if x > 0.0 { Option::Some(x * 3.0) } else { Option::None }
+}
+
+#[differentiable]
+fn maybe(x: float) -> float {
+    match optional(x) {
+        Some(v) => v * v,
+        None => 1.0,
+    }
+}
+
+fn main() {
+    let h = 0.000001;
+    let (n, g) = autodiff::grad(safe, Vec2 { x: 3.0, y: 4.0 });
+    print(n);
+    print(g.x);
+    print(g.y);
+    let fx = (safe_value(Vec2 { x: 3.0 + h, y: 4.0 }) - safe_value(Vec2 { x: 3.0 - h, y: 4.0 })) / (2.0 * h);
+    let fy = (safe_value(Vec2 { x: 3.0, y: 4.0 + h }) - safe_value(Vec2 { x: 3.0, y: 4.0 - h })) / (2.0 * h);
+    print(agrees(g.x, fx));
+    print(agrees(g.y, fy));
+    let (z, gz) = autodiff::grad(safe, Vec2 { x: 0.0, y: 0.0 });
+    print(z);
+    print(gz.x);
+    print(gz.y);
+    let (t, (tx, ty)) = autodiff::grad(tupled, (1.5, 2.5));
+    print(t);
+    print(tx);
+    print(ty);
+    let (m, dm) = autodiff::grad(maybe, 2.0);
+    print(m);
+    print(dm);
+    let (o, dout) = autodiff::grad(maybe, -2.0);
+    print(o);
+    print(dout);
+}

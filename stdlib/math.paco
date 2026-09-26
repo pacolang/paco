@@ -1,0 +1,193 @@
+module math;
+
+use stdlib::numerics;
+
+/// A dense row-major matrix whose dimensions are part of its type:
+/// `Matrix<float, 2, 3>`. Operands whose `Dyn` dimensions are not proved
+/// equal go through the `checked_*` operations, which return `Err` on a mismatch.
+pub struct Matrix<T: Numeric, const R: int, const C: int> {
+    t: numerics::Tensor<T, R, C>,
+
+    /// All zeros. A `Dyn` dimension gets extent `0`; use `with_shape`.
+    pub fn zeros() -> Self {
+        Matrix { t: numerics::Tensor<T, R, C>::zeros() }
+    }
+
+    /// All zeros with the given extents, which must match every static
+    /// dimension; they fill in the `Dyn` ones.
+    pub fn with_shape(rows: i64, cols: i64) -> Result<Self, numerics::ShapeError> {
+        if R >= 0 && R != rows {
+            return Result::Err(numerics::ShapeError { axis: 0, expected: R, found: rows })
+        }
+        if C >= 0 && C != cols {
+            return Result::Err(numerics::ShapeError { axis: 1, expected: C, found: cols })
+        }
+        let mut dyn_dims = numerics::dims0();
+        if R < 0 && C < 0 {
+            dyn_dims = numerics::dims2(rows, cols)
+        } else if R < 0 {
+            dyn_dims = numerics::dims1(rows)
+        } else if C < 0 {
+            dyn_dims = numerics::dims1(cols)
+        }
+        match numerics::Tensor<T, R, C>::zeros_with(dyn_dims) {
+            Result::Ok(t) => Result::Ok(Matrix { t: t }),
+            Result::Err(e) => Result::Err(e),
+        }
+    }
+
+    pub fn rows(&self) -> i64 {
+        self.t.shape()[0]
+    }
+
+    pub fn cols(&self) -> i64 {
+        self.t.shape()[1]
+    }
+
+    pub fn get(&self, r: i64, c: i64) -> T {
+        self.t.at(r * self.cols() + c)
+    }
+
+    pub fn set(&mut self, r: i64, c: i64, value: T) {
+        let flat = r * self.cols() + c;
+        self.t.set_at(flat, value)
+    }
+
+    pub fn data(&self) -> &[]T {
+        self.t.data()
+    }
+
+    pub fn data_mut(&mut self) -> &mut []T {
+        self.t.data_mut()
+    }
+
+    pub fn tensor(&self) -> &numerics::Tensor<T, R, C> {
+        &self.t
+    }
+
+    pub fn transpose(&self) -> Matrix<T, C, R> {
+        let rows = self.rows();
+        let cols = self.cols();
+        let mut out = numerics::Tensor<T, C, R>::zeros();
+        if R < 0 || C < 0 {
+            let mut dyn_dims = numerics::dims0();
+            if R < 0 && C < 0 {
+                dyn_dims = numerics::dims2(cols, rows)
+            } else if R < 0 {
+                dyn_dims = numerics::dims1(rows)
+            } else {
+                dyn_dims = numerics::dims1(cols)
+            }
+            match numerics::Tensor<T, C, R>::zeros_with(dyn_dims) {
+                Result::Ok(t) => out = t,
+                Result::Err(e) => {}
+            }
+        }
+        for r in 0..rows {
+            for c in 0..cols {
+                out.set_at(c * rows + r, self.get(r, c))
+            }
+        }
+        Matrix { t: out }
+    }
+}
+
+methods<T: Numeric + Add + Sub + Mul, const R: int, const C: int> Matrix<T, R, C> {
+    pub fn identity() -> Self {
+        let mut out = Matrix<T, R, C>::zeros();
+        let n = out.rows();
+        for i in 0..n {
+            out.set(i, i, 1 as T)
+        }
+        out
+    }
+
+    pub fn add(&self, other: &Self) -> Result<Self, numerics::ShapeError> {
+        self.checked_add(other)
+    }
+
+    /// Element-wise `+` on matrices whose shapes are not proved equal; the
+    /// shapes are compared at run time.
+    pub fn checked_add<const R2: int, const C2: int>(&self, other: &Matrix<T, R2, C2>) -> Result<Self, numerics::ShapeError> {
+        match self.t.checked_add(&other.t) {
+            Result::Ok(t) => Result::Ok(Matrix { t: t }),
+            Result::Err(e) => Result::Err(e),
+        }
+    }
+
+    pub fn sub(&self, other: &Self) -> Result<Self, numerics::ShapeError> {
+        self.checked_sub(other)
+    }
+
+    /// Element-wise `-` on matrices whose shapes are not proved equal; the
+    /// shapes are compared at run time.
+    pub fn checked_sub<const R2: int, const C2: int>(&self, other: &Matrix<T, R2, C2>) -> Result<Self, numerics::ShapeError> {
+        match self.t.checked_sub(&other.t) {
+            Result::Ok(t) => Result::Ok(Matrix { t: t }),
+            Result::Err(e) => Result::Err(e),
+        }
+    }
+
+    /// `self` (R×C) times `other` (C×N): the inner dimensions agree by type.
+    pub fn mul<const N: int>(&self, other: &Matrix<T, C, N>) -> Result<Matrix<T, R, N>, numerics::ShapeError> {
+        self.checked_mul(other)
+    }
+
+    /// `self` (R×C) times `other` (J×N) where `C` and `J` are not proved
+    /// equal; they are compared at run time.
+    pub fn checked_mul<const J: int, const N: int>(&self, other: &Matrix<T, J, N>) -> Result<Matrix<T, R, N>, numerics::ShapeError> {
+        match self.t.checked_matmul(&other.t) {
+            Result::Ok(t) => Result::Ok(Matrix { t: t }),
+            Result::Err(e) => Result::Err(e),
+        }
+    }
+
+    pub fn scale(&self, k: T) -> Self {
+        Matrix { t: self.t.scale(k) }
+    }
+}
+
+pub struct DataFrame<S> {
+    rows: Vec<S>,
+
+    pub fn new() -> Self {
+        DataFrame { rows: Vec::new() }
+    }
+
+    pub fn push(&mut self, row: S) {
+        self.rows.push(row)
+    }
+
+    pub fn len(&self) -> i64 {
+        self.rows.len()
+    }
+
+    pub fn row(&self, i: i64) -> Option<S> {
+        self.rows.get(i)
+    }
+}
+
+#[derivable(derive_schema)]
+pub trait Schema {
+}
+
+pub comptime fn derive_schema(t: type) -> Code {
+    let mut pieces: Vec<Code> = Vec::new();
+    for field in fields_of(t) {
+        pieces.push(quote {
+            methods #(t) {
+                pub fn #(field.name)(frame: &math::DataFrame<#(t)>) -> Vec<#(field.ty)> {
+                    let mut out = Vec<#(field.ty)>::new();
+                    for i in 0..frame.len() {
+                        match frame.row(i) {
+                            Some(row) => out.push(row.#(field.name)),
+                            None => {}
+                        }
+                    }
+                    out
+                }
+            }
+        })
+    }
+    Code::join(pieces, "")
+}

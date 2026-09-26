@@ -1,0 +1,6 @@
+fn main() {
+    let values: []i64 = slice_of_zeros<i64>(3);
+    print(values.len());
+    let index: i64 = 5;
+    print(values[index]);
+}

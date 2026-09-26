@@ -1,0 +1,31 @@
+module core;
+
+pub enum Option<T> {
+    Some(T),
+    None,
+
+    pub fn unwrap(self) -> T {
+        match self {
+            Option::Some(value) => value,
+            Option::None => panic("called `Option::unwrap()` on a `None` value"),
+        }
+    }
+
+    pub fn expect(self, message: string) -> T {
+        match self {
+            Option::Some(value) => value,
+            Option::None => panic(message),
+        }
+    }
+
+    pub fn is_some(&self) -> bool {
+        match self {
+            Option::Some(_) => true,
+            Option::None => false,
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        !self.is_some()
+    }
+}

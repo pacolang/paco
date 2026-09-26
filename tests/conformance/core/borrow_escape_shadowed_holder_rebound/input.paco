@@ -1,0 +1,8 @@
+fn pick(a: &i64) -> &i64 {
+    let t = 1;
+    let r = &t;
+    print(*r);
+    let r = a;
+    r
+}
+fn main() { let x = 7; print(*pick(&x)); }

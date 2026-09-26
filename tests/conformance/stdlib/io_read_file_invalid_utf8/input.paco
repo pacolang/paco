@@ -1,0 +1,17 @@
+use stdlib::io;
+
+fn show(path: &string) {
+    match io::read_file(path) {
+        Ok(content) => print(content),
+        Err(e) => print(e.message),
+    }
+}
+
+fn main() {
+    show(&"../../tests/conformance/stdlib/io_read_file_invalid_utf8/valid.txt");
+    show(&"../../tests/conformance/stdlib/io_read_file_invalid_utf8/bad_byte.txt");
+    show(&"../../tests/conformance/stdlib/io_read_file_invalid_utf8/overlong.txt");
+    show(&"../../tests/conformance/stdlib/io_read_file_invalid_utf8/surrogate.txt");
+    show(&"../../tests/conformance/stdlib/io_read_file_invalid_utf8/truncated.txt");
+    show(&"../../tests/conformance/stdlib/io_read_file_invalid_utf8");
+}

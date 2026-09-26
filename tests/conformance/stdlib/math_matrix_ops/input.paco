@@ -1,0 +1,43 @@
+use stdlib::math;
+
+fn main() {
+    let mut a = math::Matrix<float, 2, 2>::zeros();
+    a.set(0, 0, 1.0);
+    a.set(0, 1, 2.0);
+    a.set(1, 0, 3.0);
+    a.set(1, 1, 4.0);
+    let i = math::Matrix<float, 2, 2>::identity();
+
+    match a + &i {
+        Result::Ok(sum) => {
+            print(sum.get(0, 0));
+            print(sum.get(1, 1))
+        }
+        Result::Err(e) => print(e.axis),
+    }
+
+    match a - &i {
+        Result::Ok(diff) => print(diff.get(1, 1)),
+        Result::Err(e) => print(e.axis),
+    }
+
+    match a * &a {
+        Result::Ok(product) => {
+            print(product.get(0, 0));
+            print(product.get(0, 1));
+            print(product.get(1, 0));
+            print(product.get(1, 1))
+        }
+        Result::Err(e) => print(e.axis),
+    }
+
+    let t = a.transpose();
+    print(t.get(0, 1));
+    print(a.scale(0.5).get(1, 1));
+
+    let mut m = math::Matrix<i64, 2, 3>::zeros();
+    m.set(1, 2, 7);
+    print(m.transpose().get(2, 1));
+    print(m.rows());
+    print(m.cols())
+}

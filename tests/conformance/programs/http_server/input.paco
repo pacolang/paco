@@ -1,0 +1,20 @@
+// Minimal HTTP/1.1 server: accepts connections and spawns one task per
+// connection, so a slow client's request never delays any other client's
+// response (ADR 0004's M:N scheduler suspends only the task blocked on
+// that connection's socket).
+//
+// Each response is a fixed, minimal HTTP/1.1 reply — this example
+// demonstrates the concurrency model (§8), not a full HTTP/1.1 parser.
+
+fn respond(stream: TcpStream) {
+    let request = stream.read(4096);
+    stream.write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK")
+}
+
+fn main() {
+    let listener = tcp_listen(8080);
+    loop {
+        let connection = listener.accept();
+        spawn respond(connection)
+    }
+}

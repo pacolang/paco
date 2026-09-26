@@ -1,0 +1,17 @@
+use stdlib::autodiff;
+use vecmod;
+
+#[differentiable]
+fn loss(t: vecmod::T2<f32, 2>) -> f32 {
+    let other = vecmod::T2<f32, 2>::zeros(2);
+    let combined = vecmod::combine_via_trait(&t, &other);
+    combined.sum()
+}
+
+fn main() {
+    let t = vecmod::T2<f32, 2>::zeros(2);
+    let (n, ga) = autodiff::grad(loss, t);
+    print(n);
+    print(ga.at(0));
+    print(ga.at(1));
+}

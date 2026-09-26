@@ -1,0 +1,36 @@
+use stdlib::autodiff;
+
+struct Line {
+    w: f64,
+    b: f64,
+    type Tangent = LineGradient;
+
+    fn zero_tangent(&self) -> LineGradient {
+        LineGradient { dw: 0.0, db: 0.0 }
+    }
+
+    fn move_by(&mut self, offset: &LineGradient) {
+        self.w = self.w + offset.dw;
+        self.b = self.b + offset.db
+    }
+}
+
+struct LineGradient {
+    dw: f64,
+    db: f64,
+}
+
+fn predict(line: &Line, x: f64) -> f64 {
+    line.w * x + line.b
+}
+
+#[differentiable]
+fn loss(line: Line) -> f64 {
+    let p = predict(&line, 2.0);
+    p * p
+}
+
+fn main() {
+    let (l, g) = autodiff::grad(loss, Line { w: 3.0, b: 1.0 });
+    print(l);
+}
