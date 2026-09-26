@@ -270,15 +270,15 @@ fn each_module_in_a_multi_module_dependency_is_independently_importable() {
     let cache_root = temp_dir("e2e_multi_cache");
     let program_dir = temp_dir("e2e_multi_program");
 
-    let fetched = pkg_cache::fetch_into_cache(&cache_root, "github.com/pacolang/numerics", "v1.0.0", RefKind::TagOrBranch, repo.to_str().unwrap(), None).unwrap();
+    let fetched = pkg_cache::fetch_into_cache(&cache_root, "example.com/team/toolkit", "v1.0.0", RefKind::TagOrBranch, repo.to_str().unwrap(), None).unwrap();
     fs::write(
         program_dir.join("paco.mod"),
-        "module = \"example.com/myprogram\"\n\n[dependencies]\n\"github.com/pacolang/numerics\" = \"v1.0.0\"\n",
+        "module = \"example.com/myprogram\"\n\n[dependencies]\n\"example.com/team/toolkit\" = \"v1.0.0\"\n",
     )
     .unwrap();
     manifest::Lockfile {
         packages: vec![manifest::LockedPackage {
-            path: "github.com/pacolang/numerics".to_string(),
+            path: "example.com/team/toolkit".to_string(),
             tag: Some("v1.0.0".to_string()),
             commit: fetched.commit,
             ..Default::default()
@@ -288,7 +288,7 @@ fn each_module_in_a_multi_module_dependency_is_independently_importable() {
     .unwrap();
     fs::write(
         program_dir.join("main.paco"),
-        "use github.com/pacolang/numerics/a;\nuse github.com/pacolang/numerics/b;\n\nfn main() {\n    print(a::value() + b::value())\n}\n",
+        "use example.com/team/toolkit/a;\nuse example.com/team/toolkit/b;\n\nfn main() {\n    print(a::value() + b::value())\n}\n",
     )
     .unwrap();
 
@@ -519,13 +519,14 @@ fn a_program_with_no_paco_mod_and_no_domain_shaped_use_paths_is_entirely_unaffec
 //
 // A `{ path = ... }` dependency (`git-module-fetch` task 8.4) needs no
 // cache or lock file at all, so these use it as the throwaway stand-in for
-// `github.com/pacolang/numerics` instead of a git fixture -- simpler, and
-// still the real `Domain`-kind resolution path `resolve_domain_use_path`
+// each module's own library (`github.com/pacolang/tensor`,
+// `.../math`, `.../blas`) instead of a git fixture -- simpler, and still
+// the real `Domain`-kind resolution path `resolve_domain_use_path`
 // exercises for a `path` dependency in `domain_resolution_tests`.
 
 /// A minimal `Tensor` (rank via a repeated `const D: int...` dimension
 /// list, `zeros`/`len`/`checked_add`) standing in for
-/// `github.com/pacolang/numerics`'s real `src/tensor.paco` -- enough to
+/// `github.com/pacolang/tensor`'s real `src/tensor.paco` -- enough to
 /// build and run `numerics::Tensor<f32, 2, 2>::zeros()` and
 /// `a.checked_add(&b)`.
 const FAKE_TENSOR_MODULE: &str = r#"
@@ -567,12 +568,12 @@ methods<T: Numeric + Add, const D: int...> Tensor<T, D...> {
 }
 "#;
 
-fn write_fake_numerics_path_dependency(program_dir: &std::path::Path, dependency_key: &str) {
-    fs::create_dir_all(program_dir.join("numerics_lib/src")).unwrap();
-    fs::write(program_dir.join("numerics_lib/src/tensor.paco"), FAKE_TENSOR_MODULE).unwrap();
+fn write_fake_library_path_dependency(program_dir: &std::path::Path, dependency_key: &str, module_source: &str, module_file_name: &str) {
+    fs::create_dir_all(program_dir.join("library_lib/src")).unwrap();
+    fs::write(program_dir.join("library_lib/src").join(module_file_name), module_source).unwrap();
     fs::write(
         program_dir.join("paco.mod"),
-        format!("module = \"example.com/myprogram\"\n\n[dependencies]\n\"{dependency_key}\" = {{ path = \"numerics_lib\" }}\n"),
+        format!("module = \"example.com/myprogram\"\n\n[dependencies]\n\"{dependency_key}\" = {{ path = \"library_lib\" }}\n"),
     )
     .unwrap();
 }
@@ -580,7 +581,7 @@ fn write_fake_numerics_path_dependency(program_dir: &std::path::Path, dependency
 #[test]
 fn old_numerics_import_with_the_dependency_declared_builds_runs_and_warns() {
     let program_dir = temp_dir("moved_declared");
-    write_fake_numerics_path_dependency(&program_dir, "github.com/pacolang/numerics");
+    write_fake_library_path_dependency(&program_dir, "github.com/pacolang/tensor", FAKE_TENSOR_MODULE, "tensor.paco");
     fs::write(
         program_dir.join("main.paco"),
         "use stdlib::numerics;\n\nfn main() {\n    let a = numerics::Tensor<f32, 2, 2>::zeros();\n    let b = numerics::Tensor<f32, 2, 2>::zeros();\n    match a.checked_add(&b) {\n        Result::Ok(c) => print(c.len()),\n        Result::Err(e) => print(e.axis),\n    }\n}\n",
@@ -592,7 +593,7 @@ fn old_numerics_import_with_the_dependency_declared_builds_runs_and_warns() {
     assert!(output.status.success(), "paco run failed: {}", String::from_utf8_lossy(&output.stderr));
     assert_eq!(String::from_utf8_lossy(&output.stdout), "4\n");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("use github.com/pacolang/numerics/tensor;"), "{stderr}");
+    assert!(stderr.contains("use github.com/pacolang/tensor;"), "{stderr}");
     assert!(stderr.contains("tensor::"), "{stderr}");
     assert!(stderr.contains("deprecated"), "{stderr}");
 
@@ -609,8 +610,8 @@ fn old_blas_import_without_the_dependency_declared_is_a_build_error() {
 
     assert!(!output.status.success(), "expected `paco run` to fail with the dependency undeclared");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("use github.com/pacolang/numerics/blas;"), "{stderr}");
-    assert!(stderr.contains("paco get github.com/pacolang/numerics"), "{stderr}");
+    assert!(stderr.contains("use github.com/pacolang/blas;"), "{stderr}");
+    assert!(stderr.contains("paco get github.com/pacolang/blas"), "{stderr}");
 
     let _ = fs::remove_dir_all(&program_dir);
 }
@@ -665,7 +666,7 @@ fn old_numerics_import_with_no_manifest_at_all_still_builds_and_warns() {
     assert!(output.status.success(), "paco run failed: {}", String::from_utf8_lossy(&output.stderr));
     assert_eq!(String::from_utf8_lossy(&output.stdout), "4\n");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("use github.com/pacolang/numerics/tensor;"), "{stderr}");
+    assert!(stderr.contains("use github.com/pacolang/tensor;"), "{stderr}");
     assert!(stderr.contains("deprecated"), "{stderr}");
 
     let _ = fs::remove_dir_all(&program_dir);

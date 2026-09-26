@@ -113,8 +113,9 @@ pub enum Commands {
     },
     /// Rewrites `use stdlib::numerics`/`stdlib::math`/`stdlib::blas` (and the
     /// `numerics::`/`.add`/`.sub`/`.mul` call sites their move affects) to
-    /// the `github.com/pacolang/numerics` library, and adds it to
-    /// `paco.mod` (`extract-domain-libraries` task 4.3).
+    /// their own library — `github.com/pacolang/tensor`, `.../math` or
+    /// `.../blas` — and adds it to `paco.mod` (`extract-domain-libraries`
+    /// task 4.3).
     Fix {
         /// The `paco.mod` file to read; defaults to `paco.mod` in the
         /// current directory.
@@ -646,23 +647,25 @@ fn use_path_to_file(path: &[String], base_dir: &std::path::Path) -> PathBuf {
     result
 }
 
-/// `stdlib::numerics`/`stdlib::math`/`stdlib::blas` have moved to
-/// `github.com/pacolang/numerics`'s `tensor`/`math`/`blas` modules
+/// `stdlib::numerics`/`stdlib::math`/`stdlib::blas` have each moved to
+/// their own single-module library, one repository per module
 /// (`extract-domain-libraries`); each pair is `(old std qualifier, new
-/// module name in the library)`. `numerics` is the only one that renames
-/// (to `tensor`) — `math` and `blas` keep their name in the new library.
+/// module name)`. `numerics` is the only one that renames (to `tensor`,
+/// its repository's name) — `math` and `blas` keep their name in their
+/// own library and repository.
 const MOVED_STD_MODULES: &[(&str, &str)] = &[("numerics", "tensor"), ("math", "math"), ("blas", "blas")];
 
-/// `NUMERICS_MODULE_PATH`'s domain-path segments (`git-module-fetch`'s
-/// `longest_prefix_match` form), with `module` appended.
-fn numerics_domain_segments(module: &str) -> Vec<String> {
-    ["github", "com", "pacolang", "numerics", module].iter().map(|segment| segment.to_string()).collect()
+/// `new_module`'s own repository's domain-path segments
+/// (`git-module-fetch`'s `longest_prefix_match` form) — each moved
+/// module lives in its own single-module repository,
+/// `github.com/pacolang/<new_module>`, so the repository path and the
+/// module path are the same thing.
+fn library_domain_segments(new_module: &str) -> Vec<String> {
+    ["github", "com", "pacolang", new_module].iter().map(|segment| segment.to_string()).collect()
 }
 
-const NUMERICS_MODULE_PATH: &str = "github.com/pacolang/numerics";
-
-fn numerics_library_path(module: &str) -> String {
-    format!("{NUMERICS_MODULE_PATH}/{module}")
+fn library_module_path(new_module: &str) -> String {
+    format!("github.com/pacolang/{new_module}")
 }
 
 /// `Some((old, new))` when `path` is exactly `stdlib::<old>` for one of
@@ -674,13 +677,13 @@ fn moved_std_module(path: &[String]) -> Option<(&'static str, &'static str)> {
     MOVED_STD_MODULES.iter().find(|(old, _)| path[1] == *old).copied()
 }
 
-/// Whether `paco.mod` declares `github.com/pacolang/numerics` (or, once
-/// `blas`/`math` are added there, a shorter prefix covering `module`) —
-/// the same longest-prefix-match `resolve_domain_use_path` itself uses.
-fn declares_numerics_module(project: Option<&Result<ProjectManifest, String>>, module: &str) -> bool {
+/// Whether `paco.mod` declares `new_module`'s own repository (or a
+/// shorter prefix covering it) — the same longest-prefix-match
+/// `resolve_domain_use_path` itself uses.
+fn declares_library_module(project: Option<&Result<ProjectManifest, String>>, new_module: &str) -> bool {
     project
         .and_then(|result| result.as_ref().ok())
-        .is_some_and(|project| manifest::longest_prefix_match(&project.manifest.dependencies, &numerics_domain_segments(module)).is_some())
+        .is_some_and(|project| manifest::longest_prefix_match(&project.manifest.dependencies, &library_domain_segments(new_module)).is_some())
 }
 
 /// Whether `entry_dir` is `stdlib_root()` itself (or under it) — i.e.
@@ -702,7 +705,7 @@ fn entry_is_within_stdlib(entry_dir: &std::path::Path) -> bool {
 /// Resolves an old `use stdlib::numerics`/`stdlib::math`/`stdlib::blas` line during
 /// the transition window (`extract-domain-libraries` design.md's "alias
 /// table" and its migration-plan step 3, tasks.md task 4.4): with
-/// `paco.mod` declaring `github.com/pacolang/numerics`, this resolves to
+/// `paco.mod` declaring `new_module`'s own repository, this resolves to
 /// the library with a deprecation warning; with a `paco.mod` present that
 /// does *not* declare it, this is a build error naming the replacement
 /// line and `paco get` (the spec delta's "Old import without the
@@ -730,14 +733,13 @@ fn resolve_moved_std_module(
     if entry_is_within_stdlib(ctx.entry_dir) {
         return Ok(use_path_to_file(&["stdlib".to_string(), old_module.to_string()], ctx.entry_dir));
     }
-    let library_line = format!("use {};", numerics_library_path(new_module));
-    if ctx.project.is_some() && !declares_numerics_module(ctx.project, new_module) {
+    let library_path = library_module_path(new_module);
+    let library_line = format!("use {library_path};");
+    if ctx.project.is_some() && !declares_library_module(ctx.project, new_module) {
         reporter.push(Diagnostic::error(
             "PACO-E0902",
             use_span,
-            format!(
-                "`use stdlib::{old_module}` has moved to `{NUMERICS_MODULE_PATH}`; add `{library_line}` and run `paco get {NUMERICS_MODULE_PATH}`"
-            ),
+            format!("`use stdlib::{old_module}` has moved to `{library_path}`; add `{library_line}` and run `paco get {library_path}`"),
         ));
         return Err(emit(reporter, sources));
     }
@@ -750,13 +752,13 @@ fn resolve_moved_std_module(
     if ctx.project.is_none() {
         return Ok(use_path_to_file(&["stdlib".to_string(), old_module.to_string()], ctx.entry_dir));
     }
-    resolve_domain_use_path(ctx.project, &numerics_domain_segments(new_module))
+    resolve_domain_use_path(ctx.project, &library_domain_segments(new_module))
 }
 
 /// `PACO-E0306` ("type is not supported yet: {path}") whose unresolved
 /// path's last segment is exactly `Tensor` — bare or through a `tensor::`/
 /// `numerics::` path — means the caller most likely meant the extracted
-/// `github.com/pacolang/numerics` library's `Tensor`, since `paco-types`
+/// `github.com/pacolang/tensor` library's `Tensor`, since `paco-types`
 /// has no knowledge of `paco.mod` or git dependencies to say so itself
 /// (`extract-domain-libraries` task 4.2). The compiler cannot tell this
 /// apart from an unrelated user type that also happens to be named
@@ -764,7 +766,8 @@ fn resolve_moved_std_module(
 /// named after the library's exact type name, so this matches on the name
 /// alone, same as design.md accepts.
 fn apply_tensor_missing_library_hint(reporter: &mut Reporter, project: Option<&Result<ProjectManifest, String>>) {
-    let declared = declares_numerics_module(project, "tensor");
+    let declared = declares_library_module(project, "tensor");
+    let library_path = library_module_path("tensor");
     for diagnostic in reporter.diagnostics_mut() {
         if diagnostic.code() != "PACO-E0306" {
             continue;
@@ -774,10 +777,9 @@ fn apply_tensor_missing_library_hint(reporter: &mut Reporter, project: Option<&R
             continue;
         }
         let span = diagnostic.primary().span;
-        let mut hint =
-            Diagnostic::error("PACO-E0903", span, format!("cannot find `Tensor`; add `use {};`", numerics_library_path("tensor")));
+        let mut hint = Diagnostic::error("PACO-E0903", span, format!("cannot find `Tensor`; add `use {library_path};`"));
         if !declared {
-            hint = hint.with_note(format!("run `paco get {NUMERICS_MODULE_PATH}` to add the dependency"));
+            hint = hint.with_note(format!("run `paco get {library_path}` to add the dependency"));
         }
         *diagnostic = hint;
     }
@@ -2147,22 +2149,22 @@ fn collect_domain_use_paths(dir: &std::path::Path, out: &mut Vec<Vec<String>>) -
     Ok(())
 }
 
-/// The `github.com/pacolang/numerics` version `paco fix` declares when it
-/// adds the dependency: design.md's "at the latest tag compatible with
-/// the running compiler" degrades to this fixed placeholder, since no
-/// real `pacolang/numerics` tag has been cut yet (tasks.md task 3.5).
-const NUMERICS_DEFAULT_VERSION: &str = "v0.1.0";
+/// The version `paco fix` declares for any of the three moved libraries
+/// when it adds the dependency: design.md's "at the latest tag compatible
+/// with the running compiler" degrades to this fixed placeholder, since no
+/// real tag has been cut for any of them yet (tasks.md task 3.5).
+const LIBRARY_DEFAULT_VERSION: &str = "v0.1.0";
 
 /// `paco fix` (`extract-domain-libraries` task 4.3): rewrites every moved
 /// `use stdlib::numerics`/`stdlib::math`/`stdlib::blas` line under the package to
-/// its `github.com/pacolang/numerics` replacement (keeping any `as`
-/// alias); for an unaliased `stdlib::numerics`, also rewrites `numerics::`
-/// path segments to `tensor::`; rewrites `.add`/`.sub`/`.mul` calls whose
-/// receiver's type-checked static type is `Tensor` to
-/// `.checked_add`/`.checked_sub`/`.checked_mul`; and adds the dependency
-/// to `paco.mod` when some file needed it. Idempotent: nothing left to
-/// rewrite (already-migrated files, an already-declared dependency)
-/// changes nothing on a second run.
+/// its own library's replacement (keeping any `as` alias); for an
+/// unaliased `stdlib::numerics`, also rewrites `numerics::` path segments
+/// to `tensor::`; rewrites `.add`/`.sub`/`.mul` calls whose receiver's
+/// type-checked static type is `Tensor` to
+/// `.checked_add`/`.checked_sub`/`.checked_mul`; and adds a dependency to
+/// `paco.mod` for each moved module some file actually used. Idempotent:
+/// nothing left to rewrite (already-migrated files, an already-declared
+/// dependency) changes nothing on a second run.
 fn run_fix(path: Option<PathBuf>) -> Result<DriverOutput, String> {
     let manifest_path = path.unwrap_or_else(|| PathBuf::from("paco.mod"));
     if !manifest_path.is_file() {
@@ -2174,13 +2176,20 @@ fn run_fix(path: Option<PathBuf>) -> Result<DriverOutput, String> {
     let mut paco_files = Vec::new();
     collect_paco_files(&project_dir, &mut paco_files)?;
 
-    let uses_moved_module = paco_files.iter().any(|file_path| file_uses_moved_std_module(file_path));
+    let used_modules = moved_std_modules_used(&paco_files);
 
     let manifest_text = fs::read_to_string(&manifest_path)
         .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
     let manifest = manifest::Manifest::parse(&manifest_text)?;
-    if uses_moved_module && manifest::longest_prefix_match(&manifest.dependencies, &numerics_domain_segments("tensor")).is_none() {
-        let updated = add_dependency_line(&manifest_text, NUMERICS_MODULE_PATH, NUMERICS_DEFAULT_VERSION);
+    let mut updated = manifest_text;
+    let mut manifest_changed = false;
+    for new_module in &used_modules {
+        if manifest::longest_prefix_match(&manifest.dependencies, &library_domain_segments(new_module)).is_none() {
+            updated = add_dependency_line(&updated, &library_module_path(new_module), LIBRARY_DEFAULT_VERSION);
+            manifest_changed = true;
+        }
+    }
+    if manifest_changed {
         fs::write(&manifest_path, &updated)
             .map_err(|error| format!("failed to write `{}`: {error}", manifest_path.display()))?;
     }
@@ -2196,17 +2205,31 @@ fn run_fix(path: Option<PathBuf>) -> Result<DriverOutput, String> {
     Ok(DriverOutput { stdout, stderr: String::new() })
 }
 
-fn file_uses_moved_std_module(file_path: &std::path::Path) -> bool {
-    let Ok(source) = fs::read_to_string(file_path) else { return false };
+/// Every distinct new-module name (`MOVED_STD_MODULES`'s second element —
+/// `tensor`/`math`/`blas`) that at least one of `paco_files` imports via a
+/// moved `stdlib` qualifier, in `MOVED_STD_MODULES`'s own order (stable,
+/// so `paco fix` adds dependency lines in a deterministic order).
+fn moved_std_modules_used(paco_files: &[PathBuf]) -> Vec<&'static str> {
+    let used: std::collections::HashSet<&'static str> = paco_files.iter().flat_map(|file_path| file_moved_std_modules(file_path)).collect();
+    MOVED_STD_MODULES.iter().map(|(_, new)| *new).filter(|new_module| used.contains(new_module)).collect()
+}
+
+fn file_moved_std_modules(file_path: &std::path::Path) -> Vec<&'static str> {
+    let Ok(source) = fs::read_to_string(file_path) else { return Vec::new() };
     let mut sources = SourceMap::new();
     let mut reporter = Reporter::new();
     let file_id = sources.add_file(file_path.display().to_string(), source);
     let tokens = lex(sources.source(file_id).unwrap_or(""), file_id, &mut reporter);
     if reporter.has_errors() {
-        return false;
+        return Vec::new();
     }
-    let Ok(module) = parse_module(&tokens, &mut reporter) else { return false };
-    module.items.iter().any(|item| matches!(item, Item::Use(decl) if moved_std_module(&decl.path).is_some()))
+    let Ok(module) = parse_module(&tokens, &mut reporter) else { return Vec::new() };
+    module
+        .items
+        .iter()
+        .filter_map(|item| if let Item::Use(decl) = item { moved_std_module(&decl.path) } else { None })
+        .map(|(_, new)| new)
+        .collect()
 }
 
 /// Every `.paco` file under `dir`, scanned recursively (`collect_domain_use_paths`'s own walk).
@@ -2276,7 +2299,7 @@ fn fix_paco_file(
         let Item::Use(decl) = item else { continue };
         let Some((old, new)) = moved_std_module(&decl.path) else { continue };
         let alias_suffix = decl.alias.as_ref().map(|alias| format!(" as {alias}")).unwrap_or_default();
-        edits.push((decl.span.start(), decl.span.end(), format!("use {}{alias_suffix}", numerics_library_path(new))));
+        edits.push((decl.span.start(), decl.span.end(), format!("use {}{alias_suffix}", library_module_path(new))));
         if old == "numerics" && decl.alias.is_none() {
             rewrites_numerics_qualifier = true;
         }
@@ -2807,20 +2830,20 @@ mod domain_resolution_tests {
     #[test]
     fn a_multi_module_dependency_resolves_its_remainder_under_the_cache_src_dir() {
         let root = temp_dir("multi");
-        let (dir, commit) = fake_cache_dir(&root, "github.com/pacolang/numerics", "v1.0.0");
-        fs::write(dir.join("src").join("blas.paco"), "pub fn value() -> i64 { 2 }\n").unwrap();
+        let (dir, commit) = fake_cache_dir(&root, "example.com/team/toolkit", "v1.0.0");
+        fs::write(dir.join("src").join("helper.paco"), "pub fn value() -> i64 { 2 }\n").unwrap();
         git(&dir, &["add", "."]);
-        git(&dir, &["commit", "--quiet", "-m", "add blas"]);
+        git(&dir, &["commit", "--quiet", "-m", "add helper"]);
         let commit = git::resolve_ref(&dir, "HEAD").unwrap_or(commit);
         let project = project(
-            vec![("github.com/pacolang/numerics".to_string(), manifest::DependencySource::Tag("v1.0.0".to_string()))],
-            vec![manifest::LockedPackage { path: "github.com/pacolang/numerics".to_string(), tag: Some("v1.0.0".to_string()), commit, ..Default::default() }],
+            vec![("example.com/team/toolkit".to_string(), manifest::DependencySource::Tag("v1.0.0".to_string()))],
+            vec![manifest::LockedPackage { path: "example.com/team/toolkit".to_string(), tag: Some("v1.0.0".to_string()), commit, ..Default::default() }],
             root.clone(),
         );
 
-        let resolved = resolve_domain_use_path(Some(&project), &path(&["github", "com", "pacolang", "numerics", "blas"])).unwrap();
+        let resolved = resolve_domain_use_path(Some(&project), &path(&["example", "com", "team", "toolkit", "helper"])).unwrap();
 
-        assert_eq!(resolved, pkg_cache::cache_dir_for(&root, "github.com/pacolang/numerics", "v1.0.0").join("src").join("blas.paco"));
+        assert_eq!(resolved, pkg_cache::cache_dir_for(&root, "example.com/team/toolkit", "v1.0.0").join("src").join("helper.paco"));
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -2914,8 +2937,8 @@ mod domain_resolution_tests {
 
         let diagnostic = &reporter.diagnostics()[0];
         assert_eq!(diagnostic.code(), "PACO-E0903");
-        assert!(diagnostic.primary().message.contains("use github.com/pacolang/numerics/tensor;"), "{}", diagnostic.primary().message);
-        assert!(diagnostic.notes().iter().any(|note| note.contains("paco get github.com/pacolang/numerics")), "{:?}", diagnostic.notes());
+        assert!(diagnostic.primary().message.contains("use github.com/pacolang/tensor;"), "{}", diagnostic.primary().message);
+        assert!(diagnostic.notes().iter().any(|note| note.contains("paco get github.com/pacolang/tensor")), "{:?}", diagnostic.notes());
     }
 
     #[test]
@@ -2936,7 +2959,7 @@ mod domain_resolution_tests {
         let mut reporter = Reporter::new();
         reporter.push(e0306(&mut sources, "Tensor"));
         let project = project(
-            vec![("github.com/pacolang/numerics".to_string(), manifest::DependencySource::Tag("v0.1.0".to_string()))],
+            vec![("github.com/pacolang/tensor".to_string(), manifest::DependencySource::Tag("v0.1.0".to_string()))],
             vec![],
             temp_dir("tensor_hint_declared"),
         );
@@ -2964,8 +2987,8 @@ mod domain_resolution_tests {
     #[test]
     fn add_dependency_line_inserts_right_after_an_existing_dependencies_header() {
         let manifest = "module = \"m\"\n\n[dependencies]\n\"example.com/team/json\" = \"v1.0.0\"\n";
-        let updated = add_dependency_line(manifest, "github.com/pacolang/numerics", "v0.1.0");
-        assert!(updated.contains("\"github.com/pacolang/numerics\" = \"v0.1.0\"\n"), "{updated}");
+        let updated = add_dependency_line(manifest, "github.com/pacolang/tensor", "v0.1.0");
+        assert!(updated.contains("\"github.com/pacolang/tensor\" = \"v0.1.0\"\n"), "{updated}");
         let parsed = manifest::Manifest::parse(&updated).unwrap();
         assert_eq!(parsed.dependencies.len(), 2);
     }
@@ -2973,9 +2996,9 @@ mod domain_resolution_tests {
     #[test]
     fn add_dependency_line_appends_a_new_table_when_none_exists() {
         let manifest = "module = \"m\"\n";
-        let updated = add_dependency_line(manifest, "github.com/pacolang/numerics", "v0.1.0");
+        let updated = add_dependency_line(manifest, "github.com/pacolang/tensor", "v0.1.0");
         let parsed = manifest::Manifest::parse(&updated).unwrap();
-        assert_eq!(parsed.dependencies, vec![("github.com/pacolang/numerics".to_string(), manifest::DependencySource::Tag("v0.1.0".to_string()))]);
+        assert_eq!(parsed.dependencies, vec![("github.com/pacolang/tensor".to_string(), manifest::DependencySource::Tag("v0.1.0".to_string()))]);
     }
 
     #[test]

@@ -555,11 +555,12 @@ lint = false
 message_template = "`use std::{module}` is deprecated; replace it with `use {library};` (the `{new_module}::` qualifier)"
 severity = "warning"
 explanation = """
-`std::numerics`, `std::math` and `std::blas` moved out of the compiler into the `github.com/pacolang/numerics` \
-library, as its `tensor`, `math` and `blas` modules. During the transition window the old `use std::<module>` \
-line still resolves — bound to the same qualifier as before — as long as `paco.mod` declares the library, but is \
+`std::numerics`, `std::math` and `std::blas` moved out of the compiler into their own libraries, one repository \
+per module: `github.com/pacolang/tensor` (renamed from `numerics`), `github.com/pacolang/math` and \
+`github.com/pacolang/blas`. During the transition window the old `use std::<module>` line still resolves — \
+bound to the same qualifier as before — as long as `paco.mod` declares that module's library, but is \
 deprecated: `paco fix` migrates it automatically."""
-cause = "A file writes `use std::numerics`, `use std::math` or `use std::blas`, and `paco.mod` declares `github.com/pacolang/numerics`."
+cause = "A file writes `use std::numerics`, `use std::math` or `use std::blas`, and `paco.mod` declares that module's library."
 fix = "Run `paco fix`, or replace the `use` line with the library path yourself."
 spec_ref = "openspec/changes/extract-domain-libraries/specs/compiler/module-loading/spec.md"
 adr_ref = "docs/design/decisions/0030-repository-organization-and-stdlib-scope.md"
@@ -568,17 +569,18 @@ status = "active"
 lint = false
 
 [E0902]
-message_template = "`use std::{module}` has moved to `github.com/pacolang/numerics`; add `use {library};` and run `paco get github.com/pacolang/numerics`"
+message_template = "`use std::{module}` has moved to `{library}`; add `use {library};` and run `paco get {library}`"
 severity = "error"
 explanation = """
-`std::numerics`, `std::math` and `std::blas` moved out of the compiler into the `github.com/pacolang/numerics` \
-library. A project with a `paco.mod` that does not declare that library gets this error, naming the \
-replacement line and the command that adds the dependency, rather than silently resolving to the old `std` \
-file. A project with no `paco.mod` at all is unaffected by this error (it keeps resolving to the old `std` \
-file with only the `PACO-E0901` deprecation warning) — `paco.mod`'s absence is not itself grounds for this \
-diagnostic, only an explicit `paco.mod` that omits the dependency is."""
-cause = "A file writes `use std::numerics`, `use std::math` or `use std::blas`, the project has a `paco.mod`, and that `paco.mod` does not declare `github.com/pacolang/numerics`."
-fix = "Run `paco get github.com/pacolang/numerics`, or run `paco fix` to do that and rewrite the `use` line."
+`std::numerics`, `std::math` and `std::blas` moved out of the compiler into their own libraries, one repository \
+per module: `github.com/pacolang/tensor` (renamed from `numerics`), `github.com/pacolang/math` and \
+`github.com/pacolang/blas`. A project with a `paco.mod` that does not declare the moved module's library gets \
+this error, naming the replacement line and the command that adds the dependency, rather than silently \
+resolving to the old `std` file. A project with no `paco.mod` at all is unaffected by this error (it keeps \
+resolving to the old `std` file with only the `PACO-E0901` deprecation warning) — `paco.mod`'s absence is not \
+itself grounds for this diagnostic, only an explicit `paco.mod` that omits the dependency is."""
+cause = "A file writes `use std::numerics`, `use std::math` or `use std::blas`, the project has a `paco.mod`, and that `paco.mod` does not declare that module's library."
+fix = "Run `paco get`, naming the library the diagnostic points to, or run `paco fix` to do that and rewrite the `use` line."
 spec_ref = "openspec/changes/extract-domain-libraries/specs/compiler/module-loading/spec.md"
 adr_ref = "docs/design/decisions/0030-repository-organization-and-stdlib-scope.md"
 introduced_in = "extract-domain-libraries"
@@ -586,16 +588,16 @@ status = "active"
 lint = false
 
 [E0903]
-message_template = "cannot find `Tensor`; add `use github.com/pacolang/numerics/tensor;`"
+message_template = "cannot find `Tensor`; add `use github.com/pacolang/tensor;`"
 severity = "error"
 explanation = """
-`Tensor` moved out of the compiler into the `github.com/pacolang/numerics` library's `tensor` module; the \
-compiler itself knows no tensor type (design.md's "the compiler knows no tensor" decision). A bare `Tensor`, or \
-a `tensor::`/`numerics::` path, with no import providing it most likely means this library, so the error \
-suggests the import (and, if `paco.mod` does not declare the dependency yet, the `paco get` command) rather \
-than the compiler's ordinary "type is not supported yet" message."""
+`Tensor` moved out of the compiler into its own library, `github.com/pacolang/tensor` (renamed from \
+`numerics`); the compiler itself knows no tensor type (design.md's "the compiler knows no tensor" decision). A \
+bare `Tensor`, or a `tensor::`/`numerics::` path, with no import providing it most likely means this library, \
+so the error suggests the import (and, if `paco.mod` does not declare the dependency yet, the `paco get` \
+command) rather than the compiler's ordinary "type is not supported yet" message."""
 cause = "A file names `Tensor`, bare or through a `tensor::`/`numerics::` path, and no import in that file provides it."
-fix = "Add `use github.com/pacolang/numerics/tensor;`; if `paco.mod` does not declare the dependency, run `paco get github.com/pacolang/numerics` first."
+fix = "Add `use github.com/pacolang/tensor;`; if `paco.mod` does not declare the dependency, run `paco get github.com/pacolang/tensor` first."
 spec_ref = "openspec/changes/extract-domain-libraries/specs/compiler/module-loading/spec.md"
 adr_ref = "docs/design/decisions/0030-repository-organization-and-stdlib-scope.md"
 introduced_in = "extract-domain-libraries"

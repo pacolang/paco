@@ -536,11 +536,11 @@ mod tests {
 
     #[test]
     fn longest_prefix_match_leaves_a_remainder_for_a_module_inside_a_multi_module_repo() {
-        let deps = vec![("github.com/pacolang/numerics".to_string(), DependencySource::Tag("v1.0.0".to_string()))];
-        let path = segs(&["github", "com", "pacolang", "numerics", "blas"]);
+        let deps = vec![("example.com/team/toolkit".to_string(), DependencySource::Tag("v1.0.0".to_string()))];
+        let path = segs(&["example", "com", "team", "toolkit", "helper"]);
         let (matched, remainder) = longest_prefix_match(&deps, &path).unwrap();
-        assert_eq!(matched.0, "github.com/pacolang/numerics");
-        assert_eq!(remainder, segs(&["blas"]));
+        assert_eq!(matched.0, "example.com/team/toolkit");
+        assert_eq!(remainder, segs(&["helper"]));
     }
 
     #[test]
