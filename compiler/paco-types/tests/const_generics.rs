@@ -424,3 +424,31 @@ fn mixed_element_type_operations_require_an_explicit_conversion() {
     assert!(error.contains("expects &Tensor<bf16, 128>, found &Tensor<f32, 128>"), "{error}");
 }
 
+#[test]
+fn a_method_const_param_used_only_in_its_body_is_rejected() {
+    let error = rejects(
+        "
+methods<T, const D: int...> Tensor<T, D...> {
+    fn add_scaled<const K: int>(&self, other: &Self) -> Self {
+        Tensor { data: slice_of_zeros<T>(0), dyn_dims: slice_of_zeros<i64>(0) }
+    }
+}
+fn main() {}
+",
+    );
+    assert!(error.contains("PACO-E0344"), "{error}");
+    assert!(error.contains("`K`") && error.contains("Tensor::add_scaled"), "{error}");
+}
+
+#[test]
+fn a_method_const_param_used_in_its_own_signature_is_accepted() {
+    accepts(
+        "
+methods<T, const D: int...> Tensor<T, D...> {
+    fn repeated<const K: int>(&self, other: &Tensor<T, K>) -> i64 { K }
+}
+fn main() {}
+",
+    );
+}
+
