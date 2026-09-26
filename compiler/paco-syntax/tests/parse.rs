@@ -1302,3 +1302,86 @@ fn nested_generic_arguments_still_close_with_adjacent_greater_thans() {
     let Item::Fn(function) = &module.items[0] else { panic!("expected function item") };
     assert_eq!(function.body.stmts.len(), 3);
 }
+
+fn bound_names(bounds: &[Ty]) -> Vec<String> {
+    bounds
+        .iter()
+        .map(|bound| match bound {
+            Ty::Path(path, _) => path.join("::"),
+            other => panic!("expected a Ty::Path bound, got {other:?}"),
+        })
+        .collect()
+}
+
+#[test]
+fn parser_parses_inline_bounds_on_a_function_generic() {
+    let module = parse_source("fn total<T: Shape>(x: &T) -> i64 { 0 }");
+    let Item::Fn(function) = &module.items[0] else { panic!("expected function item") };
+    assert_eq!(bound_names(&function.generics[0].bounds), vec!["Shape".to_string()]);
+}
+
+#[test]
+fn parser_parses_a_where_clause_equivalent_to_an_inline_bound() {
+    let module = parse_source("fn total<T>(x: &T) -> i64 where T: Shape { 0 }");
+    let Item::Fn(function) = &module.items[0] else { panic!("expected function item") };
+    assert_eq!(bound_names(&function.generics[0].bounds), vec!["Shape".to_string()]);
+}
+
+#[test]
+fn parser_parses_multiple_bounds_and_parameters_in_one_where_clause() {
+    let module = parse_source("fn f<T, U>(a: T, b: U) -> i64 where T: A + B, U: C { 0 }");
+    let Item::Fn(function) = &module.items[0] else { panic!("expected function item") };
+    assert_eq!(bound_names(&function.generics[0].bounds), vec!["A".to_string(), "B".to_string()]);
+    assert_eq!(bound_names(&function.generics[1].bounds), vec!["C".to_string()]);
+}
+
+#[test]
+fn parser_parses_where_clauses_on_struct_enum_trait_and_methods_headers() {
+    let module = parse_source("struct S<T> where T: A { x: T }");
+    let Item::Struct(decl) = &module.items[0] else { panic!("expected struct item") };
+    assert_eq!(bound_names(&decl.generics[0].bounds), vec!["A".to_string()]);
+
+    let module = parse_source("enum E<T> where T: A { V(T) }");
+    let Item::Enum(decl) = &module.items[0] else { panic!("expected enum item") };
+    assert_eq!(bound_names(&decl.generics[0].bounds), vec!["A".to_string()]);
+
+    let module = parse_source("trait Tr<T> where T: A { fn f(&self); }");
+    let Item::Trait(decl) = &module.items[0] else { panic!("expected trait item") };
+    assert_eq!(bound_names(&decl.generics[0].bounds), vec!["A".to_string()]);
+
+    let module = parse_source("methods<T> Vec<T> where T: Display { fn f(&self) {} }");
+    let Item::Methods(block) = &module.items[0] else { panic!("expected methods item") };
+    assert_eq!(bound_names(&block.generics[0].bounds), vec!["Display".to_string()]);
+}
+
+#[test]
+fn parser_rejects_a_where_clause_naming_an_undeclared_parameter() {
+    let mut sources = SourceMap::new();
+    let file = sources.add_file("main.paco", "fn f<T>(x: T) -> i64 where U: A { 0 }");
+    let mut reporter = Reporter::new();
+    let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
+    parse_module(&tokens, &mut reporter).unwrap();
+    assert!(reporter.has_errors());
+    assert!(reporter.emit_to_string(&sources).contains("PACO-E0114"));
+}
+
+#[test]
+fn parser_accepts_but_flags_a_question_mark_bound_as_not_supported() {
+    let mut sources = SourceMap::new();
+    let file = sources.add_file("main.paco", "fn f<T: ?Sized>(x: T) {}");
+    let mut reporter = Reporter::new();
+    let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
+    let module = parse_module(&tokens, &mut reporter).unwrap();
+    let Item::Fn(function) = &module.items[0] else { panic!("expected function item") };
+    assert_eq!(bound_names(&function.generics[0].bounds), vec!["Sized".to_string()]);
+    assert!(reporter.has_errors());
+    assert!(reporter.emit_to_string(&sources).contains("PACO-E0114"));
+}
+
+#[test]
+fn paco_fmt_round_trips_inline_and_where_clause_bounds_to_the_same_output() {
+    let inline = paco_syntax::fmt::format_module(&parse_source("fn f<T: A + B>(x: T) {}"), None);
+    let where_clause = paco_syntax::fmt::format_module(&parse_source("fn f<T>(x: T) where T: A + B {}"), None);
+    assert_eq!(inline, where_clause);
+    assert_eq!(paco_syntax::fmt::format_module(&parse_source(&inline), None), inline);
+}
