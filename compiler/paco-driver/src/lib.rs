@@ -713,6 +713,11 @@ fn extern_scalar_type(ty: &Ty) -> paco_types::Type {
     if let Ty::RawPointer { mutable, ty: pointee, .. } = ty {
         return paco_types::Type::RawPointer { mutable: *mutable, ty: Box::new(extern_scalar_type(pointee)) };
     }
+    if let Ty::Fn { params, return_ty, extern_abi, is_unsafe, .. } = ty {
+        let params = params.iter().map(extern_scalar_type).collect();
+        let return_ty = return_ty.as_deref().map_or(paco_types::Type::Unit, extern_scalar_type);
+        return paco_types::Type::Fn(params, Box::new(return_ty), extern_abi.clone(), *is_unsafe);
+    }
     let Ty::Path(path, _) = ty else {
         panic!("extern function type `{ty:?}` is not supported by codegen yet");
     };

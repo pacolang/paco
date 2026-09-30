@@ -1,0 +1,33 @@
+extern "C" {
+    fn qsort(base: *mut u8, nmemb: i64, size: i64, compar: extern "C" fn(*const u8, *const u8) -> i32);
+    fn malloc(size: i64) -> *mut u8;
+    fn free(p: *mut u8);
+}
+
+extern "C" fn compare_i32(a: *const u8, b: *const u8) -> i32 {
+    unsafe {
+        let x: i32 = (a as *const i32).read();
+        let y: i32 = (b as *const i32).read();
+        if x < y { -1 as i32 } else if x > y { 1 as i32 } else { 0 as i32 }
+    }
+}
+
+fn main() {
+    unsafe {
+        let n = 5;
+        let raw = malloc(n * 4);
+        let arr: *mut i32 = raw as *mut i32;
+        arr.write(5 as i32);
+        arr.add(1).write(3 as i32);
+        arr.add(2).write(4 as i32);
+        arr.add(3).write(1 as i32);
+        arr.add(4).write(2 as i32);
+
+        qsort(raw, n, 4, compare_i32);
+
+        for i in 0..n {
+            print(arr.add(i).read());
+        }
+        free(raw);
+    }
+}
