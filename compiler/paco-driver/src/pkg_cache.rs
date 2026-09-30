@@ -11,12 +11,13 @@ use std::path::{Path, PathBuf};
 use crate::git;
 
 /// The package cache root: `PACO_PKG_CACHE`, else `$HOME/.paco/pkg`
-/// (design.md: mirrors Go's `$GOPATH/pkg/mod`). `PACO_PKG_CACHE` exists so
-/// this proposal's own tests (and anyone else) can point at an isolated
-/// temp directory instead of the real developer cache.
+/// (design.md: mirrors Go's `$GOPATH/pkg/mod`; falls back to `USERPROFILE`
+/// since Windows does not set `HOME`). `PACO_PKG_CACHE` exists so this
+/// proposal's own tests (and anyone else) can point at an isolated temp
+/// directory instead of the real developer cache.
 pub fn pkg_cache_root(env: impl Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
     let set = |name: &str| env(name).filter(|value| !value.is_empty()).map(PathBuf::from);
-    set("PACO_PKG_CACHE").or_else(|| set("HOME").map(|home| home.join(".paco").join("pkg")))
+    set("PACO_PKG_CACHE").or_else(|| set("HOME").or_else(|| set("USERPROFILE")).map(|home| home.join(".paco").join("pkg")))
 }
 
 /// Where a dependency `dependency_path` (e.g. `"example.com/team/json"`)
