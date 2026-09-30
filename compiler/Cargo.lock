@@ -818,6 +818,7 @@ dependencies = [
  "paco-syntax",
  "paco-test-harness",
  "paco-types",
+ "serde_json",
  "tempfile",
  "toml",
  "twox-hash",
