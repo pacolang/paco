@@ -1,0 +1,8 @@
+use stdlib::time;
+
+fn main() {
+    let i = time::Instant::now();
+    time::sleep(time::Duration::millis(50 as u64));
+    print(i.elapsed().as_millis() >= 50 as u64);
+    print(time::SystemTime::now().seconds() > 1700000000);
+}

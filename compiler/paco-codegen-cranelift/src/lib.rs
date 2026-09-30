@@ -2024,7 +2024,8 @@ fn compile_builtin_call<M: Module>(
         "string_len_bytes" | "string_next_char_boundary" | "string_char_at" | "string_byte_at"
         | "string_slice_utf8" | "fs_read_to_string" | "stderr_write" | "string_concat" | "int_to_string" | "uint_to_string"
         | "bool_to_string" | "float_to_string" | "char_to_string" | "arg_count" | "arg_at" | "string_to_bytes"
-        | "string_from_bytes" | "bytes_write_string" | "string_hash" | "slice_sort" => format!("paco_{name}"),
+        | "string_from_bytes" | "bytes_write_string" | "string_hash" | "slice_sort" | "rt_sleep_ns" | "rt_monotonic_ns"
+        | "rt_wall_ns" => format!("paco_{name}"),
         _ => return false,
     };
     let mut values: Vec<Value> = Vec::with_capacity(args.len() + 1);
@@ -2042,7 +2043,7 @@ fn compile_builtin_call<M: Module>(
             let len = builder.ins().load(types::I64, MemFlagsData::trusted(), values[0], SLICE_LEN_OFFSET);
             write_place(builder, destination.expect("returns a value"), len, cx);
         }
-        "string_next_char_boundary" | "arg_count" | "string_hash" => {
+        "string_next_char_boundary" | "arg_count" | "string_hash" | "rt_monotonic_ns" | "rt_wall_ns" => {
             let next = call_returning(module, builder, &runtime_name, types::I64, &values);
             write_place(builder, destination.expect("returns a value"), next, cx);
         }
@@ -2053,7 +2054,7 @@ fn compile_builtin_call<M: Module>(
         "string_char_at" | "string_byte_at" | "string_slice_utf8" | "fs_read_to_string" | "string_from_bytes" => {
             compile_option_builtin(module, builder, &runtime_name, values, destination.expect("returns a value"), cx);
         }
-        "stderr_write" | "slice_sort" => call_void(module, builder, &runtime_name, &values),
+        "stderr_write" | "slice_sort" | "rt_sleep_ns" => call_void(module, builder, &runtime_name, &values),
         _ => {
             let out = allocate_stack_slot(builder, 16, 8);
             values.push(out);

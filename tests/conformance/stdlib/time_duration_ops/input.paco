@@ -1,0 +1,5 @@
+use stdlib::time;
+
+fn main() {
+    print((time::Duration::seconds(1 as u64) + time::Duration::millis(500 as u64)).as_millis());
+}

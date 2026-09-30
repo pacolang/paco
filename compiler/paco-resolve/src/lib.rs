@@ -61,6 +61,9 @@ const PRELUDE_VALUES: &[&str] = &[
     "stderr_write",
     "arg_count",
     "arg_at",
+    "rt_sleep_ns",
+    "rt_monotonic_ns",
+    "rt_wall_ns",
 ];
 
 pub fn resolve_module(module: &Module, reporter: &mut Reporter) -> Result<(), ResolveError> {
