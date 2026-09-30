@@ -183,3 +183,79 @@ fn a_link_attribute_with_an_invalid_kind_is_rejected() {
     let error = check_source(source).expect("expected an error");
     assert!(error.contains("PACO-E0357"), "{error}");
 }
+
+#[test]
+fn declaring_a_c_function_pointer_parameter_type_is_accepted() {
+    let source = r#"extern "C" {
+        fn qsort(base: *mut i64, n: u64, size: u64, cmp: extern "C" fn(*const u8, *const u8) -> i32);
+    }"#;
+    let error = check_source(source);
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn an_extern_c_fn_item_coerces_to_a_matching_c_function_pointer_type() {
+    let source = r#"
+        extern "C" fn cmp(a: *const u8, b: *const u8) -> i32 { 0 as i32 }
+        fn take(f: extern "C" fn(*const u8, *const u8) -> i32) {}
+        fn main() { take(cmp) }
+    "#;
+    let error = check_source(source);
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn a_foreign_function_coerces_to_the_unsafe_c_function_pointer_type() {
+    let source = r#"
+        extern "C" { fn qsort_cmp(a: *const u8, b: *const u8) -> i32; }
+        fn take(f: unsafe extern "C" fn(*const u8, *const u8) -> i32) {}
+        fn main() { take(qsort_cmp) }
+    "#;
+    let error = check_source(source);
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn an_ordinary_fn_item_does_not_coerce_to_a_c_function_pointer_type() {
+    let source = r#"
+        fn plain(a: i64) -> i64 { a }
+        fn take(f: extern "C" fn(i64) -> i64) {}
+        fn main() { take(plain) }
+    "#;
+    let error = check_source(source).expect("expected an error");
+    assert!(error.contains("unresolved identifier"), "{error}");
+}
+
+#[test]
+fn a_closure_is_rejected_as_a_c_function_pointer() {
+    let source = r#"
+        fn take(f: extern "C" fn(*const u8, *const u8) -> i32) {}
+        fn main() { take(|a, b| 0) }
+    "#;
+    let error = check_source(source).expect("expected an error");
+    assert!(error.contains("PACO-E0358"), "{error}");
+}
+
+#[test]
+fn calling_a_c_function_pointer_outside_unsafe_is_rejected() {
+    let source = "fn call_it(f: extern \"C\" fn(i64) -> i64) -> i64 { f(1) }";
+    let error = check_source(source).expect("expected an error");
+    assert!(error.contains("PACO-E0325"), "{error}");
+}
+
+#[test]
+fn calling_a_c_function_pointer_inside_unsafe_is_accepted() {
+    let source = "fn call_it(f: extern \"C\" fn(i64) -> i64) -> i64 { unsafe { f(1) } }";
+    let error = check_source(source);
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn a_plain_fn_type_parameter_still_accepts_a_closure() {
+    let source = r#"
+        fn take(f: fn(i64) -> i64) -> i64 { f(1) }
+        fn main() { take(|x| x + 1); }
+    "#;
+    let error = check_source(source);
+    assert!(error.is_none(), "{error:?}");
+}

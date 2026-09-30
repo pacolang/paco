@@ -76,6 +76,21 @@ introduced_in = "ffi-link-attribute"
 status = "active"
 lint = false
 
+[E0358]
+message_template = "a closure cannot be a C function pointer; declare an `extern \"C\" fn` item instead, passing any captured state through a `*mut u8` user-data pointer"
+severity = "error"
+explanation = """
+A C function pointer (`extern \"C\" fn(..)`) is a thin, non-capturing code address; it has no room for \
+a closure's captured environment. A closure passed where one is expected is rejected outright, rather \
+than as a generic type mismatch, since the fix is different: declare a top-level `extern \"C\" fn` item \
+and thread any state the callback needs through a `*mut u8` user-data argument, the usual C idiom."""
+cause = "A closure literal was passed where an `extern \"C\" fn(..)` (C function pointer) type was expected."
+fix = "Declare an `extern \"C\" fn` item with the same signature, using a `*mut u8` parameter for captured state."
+spec_ref = "docs/design/spec.md#18-foreign-function-interface"
+introduced_in = "ffi-function-pointers"
+status = "active"
+lint = false
+
 [E0353]
 message_template = "cannot derive `{trait_name}`: no `#[derivable(..)]` registration found"
 severity = "error"

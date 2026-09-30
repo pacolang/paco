@@ -469,9 +469,11 @@ impl<'a> TypeLayouts<'a> {
             }
             Ty::Tuple(items, _) if items.is_empty() => Type::Unit,
             Ty::Tuple(items, _) => Type::Tuple(items.iter().map(|item| self.resolve_ty_template(item, generics)).collect()),
-            Ty::Fn { params, return_ty, .. } => Type::Fn(
+            Ty::Fn { params, return_ty, extern_abi, is_unsafe, .. } => Type::Fn(
                 params.iter().map(|param| self.resolve_ty_template(param, generics)).collect(),
                 Box::new(return_ty.as_ref().map_or(Type::Unit, |ret| self.resolve_ty_template(ret, generics))),
+                extern_abi.clone(),
+                *is_unsafe,
             ),
             _ => panic!("aggregate layout for this field type is not implemented yet: {ty:?}"),
         }

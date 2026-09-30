@@ -1631,7 +1631,7 @@ impl<'a> Lowerer<'a> {
 
     fn lower_closure(&mut self, expr: &Expr, params: &[ClosureParam], body: &Expr) -> Operand {
         let closure_ty = self.type_of(expr);
-        let Type::Fn(param_tys, ret) = &closure_ty else {
+        let Type::Fn(param_tys, ret, ..) = &closure_ty else {
             panic!("closure should type-check to a function type, found {closure_ty:?}")
         };
         let captures = self.free_variables(body);

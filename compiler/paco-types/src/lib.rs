@@ -184,7 +184,13 @@ pub enum Type {
     /// can represent it once a `Ty::Slice` AST node exists.
     Slice(Box<Type>),
     Tuple(Vec<Type>),
-    Fn(Vec<Type>, Box<Type>),
+    /// A function value's type: parameters, return type, the ABI it was
+    /// declared `extern "<abi>"` with (`None` for a plain Paco `fn`), and
+    /// whether calling it requires `unsafe` (always true for a foreign
+    /// function; false otherwise). Only an `extern "C" fn` item or a
+    /// foreign function coerces to one with `abi.is_some()`; a closure or
+    /// an ordinary `fn` item never does.
+    Fn(Vec<Type>, Box<Type>, Option<String>, bool),
     Generic(String),
     /// `type` (`phase-9-comptime` Decision 5): a comptime-only value that
     /// *is* a captured `Type`, not a value of that type. Only meaningful
@@ -314,7 +320,9 @@ pub fn erase_symbolic(ty: &Type) -> Type {
         Type::Borrow { mutable, ty } => Type::Borrow { mutable: *mutable, ty: Box::new(erase_symbolic(ty)) },
         Type::RawPointer { mutable, ty } => Type::RawPointer { mutable: *mutable, ty: Box::new(erase_symbolic(ty)) },
         Type::Slice(ty) => Type::Slice(Box::new(erase_symbolic(ty))),
-        Type::Fn(params, ret) => Type::Fn(params.iter().map(erase_symbolic).collect(), Box::new(erase_symbolic(ret))),
+        Type::Fn(params, ret, extern_abi, is_unsafe) => {
+            Type::Fn(params.iter().map(erase_symbolic).collect(), Box::new(erase_symbolic(ret)), extern_abi.clone(), *is_unsafe)
+        }
         other => other.clone(),
     }
 }
@@ -648,6 +656,9 @@ struct FunctionSig {
     /// `FunctionContext::in_comptime` is set — checked the same way
     /// `requires_unsafe` gates a call needing `unsafe { .. }`.
     requires_comptime: bool,
+    /// `Some(abi)` for a foreign function or a Paco `extern "<abi>" fn`
+    /// item — what its bare name coerces to as a C function pointer value.
+    extern_abi: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1115,6 +1126,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         // Placeholder only: `[]T` has no literal-construction syntax yet
@@ -1135,6 +1147,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.bounds.insert("hash_of".to_string(), vec![("T".to_string(), vec!["Hash".to_string()])]);
@@ -1152,6 +1165,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1164,6 +1178,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         // `phase-9-comptime` Decision 6: type introspection. `FieldInfo`
@@ -1181,6 +1196,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: true,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1193,6 +1209,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: true,
+                extern_abi: None,
             },
         );
         // `phase-9-comptime` Decision 7: renders a `Code`'s spliced content
@@ -1209,6 +1226,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: true,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1227,6 +1245,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1239,6 +1258,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1251,6 +1271,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1263,6 +1284,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1275,6 +1297,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1287,6 +1310,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1299,6 +1323,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1311,6 +1336,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1323,6 +1349,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1335,6 +1362,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1347,6 +1375,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1359,6 +1388,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         let string_ref = Type::Borrow { mutable: false, ty: Box::new(Type::String) };
@@ -1388,6 +1418,7 @@ impl Program {
                     receiver: None,
                     requires_unsafe: false,
                     requires_comptime: false,
+                    extern_abi: None,
                 },
             );
         }
@@ -1401,6 +1432,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1413,6 +1445,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1425,6 +1458,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1443,6 +1477,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1461,6 +1496,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1473,6 +1509,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1485,6 +1522,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.functions.insert(
@@ -1497,6 +1535,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.methods.insert(
@@ -1509,6 +1548,7 @@ impl Program {
                 receiver: Some(Receiver { mutable: false }),
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.methods.insert(
@@ -1521,6 +1561,7 @@ impl Program {
                 receiver: Some(Receiver { mutable: false }),
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.methods.insert(
@@ -1533,6 +1574,7 @@ impl Program {
                 receiver: Some(Receiver { mutable: false }),
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
 
@@ -1552,6 +1594,7 @@ impl Program {
                 receiver: Some(Receiver { mutable: false }),
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.methods.insert(
@@ -1564,6 +1607,7 @@ impl Program {
                 receiver: Some(Receiver { mutable: false }),
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.methods.insert(
@@ -1582,6 +1626,7 @@ impl Program {
                 receiver: Some(Receiver { mutable: false }),
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.methods.insert(
@@ -1603,6 +1648,7 @@ impl Program {
                 receiver: Some(Receiver { mutable: false }),
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.methods.insert(
@@ -1621,6 +1667,7 @@ impl Program {
                 receiver: Some(Receiver { mutable: false }),
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.register_shared_cell("Rc", "get", None, true);
@@ -1642,6 +1689,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: true,
+                extern_abi: None,
             },
         );
     }
@@ -1664,6 +1712,7 @@ impl Program {
                 receiver: None,
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         self.methods.insert(
@@ -1676,6 +1725,7 @@ impl Program {
                 receiver: Some(Receiver { mutable: false }),
                 requires_unsafe: false,
                 requires_comptime: false,
+                extern_abi: None,
             },
         );
         if let Some(write_method) = write_method {
@@ -1689,6 +1739,7 @@ impl Program {
                     receiver: Some(Receiver { mutable: false }),
                     requires_unsafe: false,
                     requires_comptime: false,
+                    extern_abi: None,
                 },
             );
         }
@@ -1703,6 +1754,7 @@ impl Program {
                     receiver: Some(Receiver { mutable: false }),
                     requires_unsafe: false,
                     requires_comptime: false,
+                    extern_abi: None,
                 },
             );
             self.methods.insert(
@@ -1715,6 +1767,7 @@ impl Program {
                     receiver: Some(Receiver { mutable: false }),
                     requires_unsafe: false,
                     requires_comptime: false,
+                    extern_abi: None,
                 },
             );
         }
@@ -1991,6 +2044,7 @@ impl Program {
             generics: ast::generic_names(&method.generics),
             requires_unsafe: false,
             requires_comptime: false,
+            extern_abi: None,
         }
     }
 
@@ -2124,6 +2178,7 @@ impl Program {
                     receiver: None,
                     requires_unsafe: true,
                     requires_comptime: false,
+                    extern_abi: Some(block.abi.clone()),
                 },
             );
         }
@@ -2360,6 +2415,7 @@ impl Program {
             generics: ast::generic_names(&function.generics),
             requires_unsafe: function.is_unsafe,
             requires_comptime: function.is_comptime,
+            extern_abi: function.extern_abi.clone(),
         }
     }
 
@@ -2438,12 +2494,14 @@ impl Program {
                 mutable: *mutable,
                 ty: Box::new(self.ty_from_ast_omitted(ty, generics, allow_omitted, reporter)),
             },
-            Ty::Fn { params, return_ty, .. } => Type::Fn(
+            Ty::Fn { params, return_ty, extern_abi, is_unsafe, .. } => Type::Fn(
                 params.iter().map(|param| self.ty_from_ast_omitted(param, generics, allow_omitted, reporter)).collect(),
                 Box::new(match return_ty {
                     Some(ret) => self.ty_from_ast_omitted(ret, generics, allow_omitted, reporter),
                     None => Type::Unit,
                 }),
+                extern_abi.clone(),
+                *is_unsafe,
             ),
             Ty::Path(path, span) => {
                 let key = self.resolve_type_key(path);
@@ -2900,7 +2958,7 @@ fn type_references_param(ty: &Type, name: &str) -> bool {
         Type::Borrow { ty, .. } | Type::RawPointer { ty, .. } | Type::Slice(ty) | Type::TypeValue(ty) => {
             type_references_param(ty, name)
         }
-        Type::Fn(params, ret) => params.iter().any(|param| type_references_param(param, name)) || type_references_param(ret, name),
+        Type::Fn(params, ret, ..) => params.iter().any(|param| type_references_param(param, name)) || type_references_param(ret, name),
         _ => false,
     }
 }
@@ -3215,7 +3273,8 @@ fn infer_grad_call(
         ));
         return Type::Error;
     }
-    let function_ty = Type::Fn(signature.params.clone(), Box::new(signature.return_ty.clone()));
+    let function_ty =
+        Type::Fn(signature.params.clone(), Box::new(signature.return_ty.clone()), signature.extern_abi.clone(), signature.requires_unsafe);
     program.types.borrow_mut().insert(function as *const Expr, function_ty);
     let expected_inputs = match signature.params.as_slice() {
         [single] => single.clone(),
@@ -3669,8 +3728,19 @@ fn loop_breaks(body: &Block) -> bool {
     breaks.0
 }
 
+/// `name`'s bare-name value, when it names a foreign function or a Paco
+/// `extern "<abi>" fn` item — the only two things a C function pointer type
+/// coerces from. An ordinary Paco `fn` item has no such value form (its
+/// name only resolves when called), matching a closure, which never
+/// coerces either.
+fn c_function_pointer_value(name: &str, program: &Program) -> Option<Type> {
+    let signature = program.functions.get(name)?;
+    let extern_abi = signature.extern_abi.clone()?;
+    Some(Type::Fn(signature.params.clone(), Box::new(signature.return_ty.clone()), Some(extern_abi), signature.requires_unsafe))
+}
+
 fn seed_closure_params(value: &Expr, expected: Option<&Type>, context: &mut FunctionContext<'_>) {
-    if let (Expr::Closure { params, .. }, Some(Type::Fn(expected_params, _))) = (value, expected)
+    if let (Expr::Closure { params, .. }, Some(Type::Fn(expected_params, ..))) = (value, expected)
         && params.len() == expected_params.len()
     {
         context.closure_params.entry(value as *const Expr).or_insert_with(|| expected_params.clone());
@@ -3710,6 +3780,7 @@ fn infer_expr_uncached(
             .or_else(|| program.consts.get(name).map(|info| info.ty.clone()))
             .or_else(|| context.const_values.get(name).cloned())
             .or_else(|| find_zero_field_variant_enum(name, program))
+            .or_else(|| c_function_pointer_value(name, program))
             .unwrap_or_else(|| {
                 reporter.push(Diagnostic::error(
                     "PACO-E0319",
@@ -4784,7 +4855,7 @@ fn infer_closure(
     let ret = infer_expr(body, program, &mut inner, reporter);
     context.closure_params = inner.closure_params;
     context.unresolved_closure_params = inner.unresolved_closure_params;
-    Type::Fn(param_types, Box::new(ret))
+    Type::Fn(param_types, Box::new(ret), None, false)
 }
 
 fn infer_closure_call(
@@ -4795,9 +4866,12 @@ fn infer_closure_call(
     context: &mut FunctionContext<'_>,
     reporter: &mut Reporter,
 ) -> Type {
-    let Type::Fn(params, ret) = &binding.ty else {
+    let Type::Fn(params, ret, extern_abi, _) = &binding.ty else {
         return Type::Error;
     };
+    if extern_abi.is_some() {
+        require_unsafe(reporter, span, context.in_unsafe, "calling a C function pointer");
+    }
     if let Some(closure) = binding.closure
         && params.contains(&Type::Unknown)
         && args.len() == params.len()
@@ -4838,7 +4912,7 @@ fn infer_spawn_blocking(
         return Type::Error;
     };
     match infer_expr(closure, program, context, reporter) {
-        Type::Fn(params, ret) if params.is_empty() => Type::Struct("JoinHandle".to_string(), vec![*ret]),
+        Type::Fn(params, ret, ..) if params.is_empty() => Type::Struct("JoinHandle".to_string(), vec![*ret]),
         Type::Error => Type::Error,
         other => {
             reporter.push(Diagnostic::error(
@@ -6202,6 +6276,17 @@ fn check_args(
         let actual = named::subsume_dyn(expected, actual, program);
         take_unproved();
         if !unify_type(expected, &actual, substitutions) {
+            if matches!(arg, Expr::Closure { .. }) && matches!(expected, Type::Fn(_, _, Some(_), _)) {
+                take_unproved();
+                reporter.push(Diagnostic::error(
+                    "PACO-E0358",
+                    paco_syntax::parse::expr_span(arg),
+                    "a closure cannot be a C function pointer; declare an `extern \"C\" fn` item instead, \
+                     passing any captured state through a `*mut u8` user-data pointer"
+                        .to_string(),
+                ));
+                continue;
+            }
             let unproved = take_unproved();
             let expected_now = substitute_generics(expected, substitutions);
             if unproved.is_none() && has_unbound_dim(&expected_now, substitutions) {
@@ -6780,8 +6865,13 @@ fn unify_type(expected: &Type, actual: &Type, substitutions: &mut HashMap<String
         (Type::Slice(expected_elem), Type::Slice(actual_elem)) => {
             unify_type(expected_elem, actual_elem, substitutions)
         }
-        (Type::Fn(expected_params, expected_ret), Type::Fn(actual_params, actual_ret)) => {
-            expected_params.len() == actual_params.len()
+        (
+            Type::Fn(expected_params, expected_ret, expected_abi, expected_unsafe),
+            Type::Fn(actual_params, actual_ret, actual_abi, actual_unsafe),
+        ) => {
+            expected_abi == actual_abi
+                && expected_unsafe == actual_unsafe
+                && expected_params.len() == actual_params.len()
                 && expected_params
                     .iter()
                     .zip(actual_params)
@@ -6924,9 +7014,11 @@ pub fn substitute_generics(ty: &Type, substitutions: &HashMap<String, Type>) -> 
                 .collect(),
         ),
         Type::Slice(elem) => Type::Slice(Box::new(substitute_generics(elem, substitutions))),
-        Type::Fn(params, ret) => Type::Fn(
+        Type::Fn(params, ret, extern_abi, is_unsafe) => Type::Fn(
             params.iter().map(|param| substitute_generics(param, substitutions)).collect(),
             Box::new(substitute_generics(ret, substitutions)),
+            extern_abi.clone(),
+            *is_unsafe,
         ),
         Type::Dim(dim) => dims::substitute_dim(dim, substitutions),
         Type::Pack(items) => {
@@ -7249,8 +7341,10 @@ impl Type {
             Type::Tuple(items) => {
                 format!("({})", items.iter().map(Type::name).collect::<Vec<_>>().join(", "))
             }
-            Type::Fn(params, ret) => format!(
-                "fn({}) -> {}",
+            Type::Fn(params, ret, extern_abi, is_unsafe) => format!(
+                "{}{}fn({}) -> {}",
+                if *is_unsafe { "unsafe " } else { "" },
+                extern_abi.as_deref().map_or(String::new(), |abi| format!("extern \"{abi}\" ")),
                 params.iter().map(Type::name).collect::<Vec<_>>().join(", "),
                 ret.name()
             ),
