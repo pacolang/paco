@@ -47,3 +47,24 @@ fn channel_destructures_into_sender_and_receiver_bindings() {
 
     infer_module(&module, &mut reporter).expect("module should type-check");
 }
+
+#[test]
+fn a_direct_extern_call_inside_spawn_warns_that_it_may_stall_the_worker_pool() {
+    let source = "extern \"C\" { fn getpid() -> i32; } fn main() { spawn { unsafe { getpid() } }; }";
+    let module = parse_source(source);
+    let mut reporter = Reporter::new();
+
+    infer_module(&module, &mut reporter).expect("module should type-check");
+    assert!(reporter.diagnostics().iter().any(|diagnostic| diagnostic.code() == "blocking-call-on-worker"));
+}
+
+#[test]
+fn a_nonblocking_extern_fn_is_exempt_from_the_blocking_call_lint() {
+    let source =
+        "extern \"C\" { #[nonblocking] fn getpid() -> i32; } fn main() { spawn { unsafe { getpid() } }; }";
+    let module = parse_source(source);
+    let mut reporter = Reporter::new();
+
+    infer_module(&module, &mut reporter).expect("module should type-check");
+    assert!(!reporter.diagnostics().iter().any(|diagnostic| diagnostic.code() == "blocking-call-on-worker"));
+}

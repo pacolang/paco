@@ -304,8 +304,11 @@ impl Parser<'_, '_> {
         self.consume(TokenKind::LeftBrace, "expected `{` after extern ABI")?;
         let mut functions = Vec::new();
         while !self.check(TokenKind::RightBrace) && !self.check(TokenKind::Eof) {
+            let attrs = self.parse_outer_attributes()?;
             self.consume(TokenKind::Fn, "expected a function declaration in an extern block")?;
-            functions.push(self.extern_fn_decl()?);
+            let mut signature = self.extern_fn_decl()?;
+            signature.attrs = attrs;
+            functions.push(signature);
         }
         let right = self.consume(TokenKind::RightBrace, "expected `}` after extern block")?;
         Ok(ExternBlock {
@@ -338,6 +341,7 @@ impl Parser<'_, '_> {
             params,
             return_ty,
             body: None,
+            attrs: Vec::new(),
             span: Span::new(
                 self.previous().span.file_id(),
                 start,
@@ -627,6 +631,7 @@ impl Parser<'_, '_> {
             params,
             return_ty,
             body,
+            attrs: Vec::new(),
             span: Span::new(
                 self.previous().span.file_id(),
                 start,

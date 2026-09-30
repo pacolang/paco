@@ -695,6 +695,10 @@ struct Program {
     traits: HashMap<String, TraitInfo>,
     functions: HashMap<String, FunctionSig>,
     extern_functions: HashSet<String>,
+    /// Extern functions declared `#[nonblocking]`: the caller guarantees
+    /// they never block the calling thread, so `blocking-call-on-worker`
+    /// does not warn about calling them directly inside a spawned task.
+    nonblocking_extern_functions: HashSet<String>,
     iter_functions: HashSet<String>,
     methods: HashMap<(String, String), FunctionSig>,
     associated: HashMap<(String, String), FunctionSig>,
@@ -2198,6 +2202,9 @@ impl Program {
         check_link_attributes(&block.attrs, reporter);
         for function in &block.functions {
             self.extern_functions.insert(function.name.clone());
+            if function.attrs.iter().any(|attr| attr.name == "nonblocking") {
+                self.nonblocking_extern_functions.insert(function.name.clone());
+            }
             let params = function
                 .params
                 .iter()
@@ -7197,10 +7204,14 @@ fn literal_type(literal: &Literal) -> Type {
 /// direct one inside a spawned task can stall the whole worker pool.
 /// `spawn_blocking` is the sanctioned fix, but the compiler cannot know
 /// whether a given foreign function actually blocks — so this is a warning,
-/// not an error (compilation still succeeds).
+/// not an error (compilation still succeeds). An extern function declared
+/// `#[nonblocking]` is exempt: the caller guarantees it never blocks (for
+/// example, `std::net` marks its own O_NONBLOCK-guaranteed FFI calls this
+/// way).
 fn warn_blocking_calls_on_worker(expr: &Expr, program: &Program, reporter: &mut Reporter) {
     let mut finder = ExternCallFinder {
         extern_functions: &program.extern_functions,
+        nonblocking_extern_functions: &program.nonblocking_extern_functions,
         found: Vec::new(),
     };
     finder.visit_expr(expr);
@@ -7218,6 +7229,7 @@ fn warn_blocking_calls_on_worker(expr: &Expr, program: &Program, reporter: &mut 
 
 struct ExternCallFinder<'a> {
     extern_functions: &'a HashSet<String>,
+    nonblocking_extern_functions: &'a HashSet<String>,
     found: Vec<(String, Span)>,
 }
 
@@ -7231,6 +7243,7 @@ impl ast::Visit for ExternCallFinder<'_> {
         if let Expr::Call { callee, span, .. } = expr
             && let Expr::Ident(name, _) = callee.as_ref()
             && self.extern_functions.contains(name)
+            && !self.nonblocking_extern_functions.contains(name)
         {
             self.found.push((name.clone(), *span));
         }
