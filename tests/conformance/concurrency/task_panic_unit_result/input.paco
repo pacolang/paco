@@ -1,0 +1,8 @@
+fn main() {
+    let handle = spawn { panic("bad input") };
+    match handle.join() {
+        Ok(v) => print("ok"),
+        Err(e) => print(e.message),
+    }
+    print("still running");
+}

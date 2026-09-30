@@ -858,7 +858,7 @@ fn compile_statement<M: Module>(
             }
         }
         Statement::Store { address, value, ty } => {
-            if matches!(ty, Type::Unit) {
+            if matches!(ty, Type::Unit | Type::Never) {
                 return;
             }
             let addr = compile_operand(builder, address, cx);
