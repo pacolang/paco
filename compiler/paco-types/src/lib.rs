@@ -3844,6 +3844,47 @@ fn infer_expr_uncached(
         Expr::Cast { expr, ty, span } => {
             let source_ty = infer_expr(expr, program, context, reporter);
             let target_ty = program.ty_from_ast(ty, &context.generics, reporter);
+
+            // A borrow converts to a raw pointer of the same pointee type,
+            // safely (spec: "converting a borrow to a raw pointer is
+            // safe") -- except a shared borrow can't become a mutable
+            // pointer, since it never had exclusive access to promise.
+            if let (Type::Borrow { mutable: source_mutable, ty: source_pointee }, Type::RawPointer { mutable: target_mutable, ty: target_pointee }) =
+                (&source_ty, &target_ty)
+            {
+                if *target_mutable && !source_mutable {
+                    reporter.push(Diagnostic::error(
+                        "PACO-E0330",
+                        *span,
+                        format!("cannot cast {} to {}: a shared borrow has no exclusive access to promise", source_ty.name(), target_ty.name()),
+                    ));
+                    return Type::Error;
+                }
+                if !compatible(source_pointee, target_pointee) {
+                    reporter.push(Diagnostic::error(
+                        "PACO-E0330",
+                        *span,
+                        format!("cannot cast {} to {}: pointee types differ", source_ty.name(), target_ty.name()),
+                    ));
+                    return Type::Error;
+                }
+                return target_ty;
+            }
+
+            // A pointer casts to a pointer of any other pointee and either
+            // mutability -- narrowing to the wrong pointee is a misuse of
+            // the resulting pointer's `unsafe` dereference, not of the
+            // cast itself.
+            if matches!(&source_ty, Type::RawPointer { .. }) && matches!(&target_ty, Type::RawPointer { .. }) {
+                return target_ty;
+            }
+            // A pointer's address is representable as `u64` and back.
+            if (matches!(&source_ty, Type::RawPointer { .. }) && matches!(&target_ty, Type::Int(IntWidth::U64)))
+                || (matches!(&source_ty, Type::Int(IntWidth::U64)) && matches!(&target_ty, Type::RawPointer { .. }))
+            {
+                return target_ty;
+            }
+
             let castable = |ty: &Type| {
                 is_numeric_primitive(ty) || (matches!(ty, Type::Generic(_)) && satisfies(ty, "Numeric", program, Some(context)))
             };
@@ -3852,7 +3893,7 @@ fn infer_expr_uncached(
                     "PACO-E0330",
                     *span,
                     format!(
-                        "cannot cast {} to {}: `as` only converts between numeric primitive types",
+                        "cannot cast {} to {}: `as` only converts between numeric primitive types, a borrow to a raw pointer of the same type, between raw pointer types, or between a raw pointer and `u64`",
                         source_ty.name(),
                         target_ty.name()
                     ),
