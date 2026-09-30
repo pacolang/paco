@@ -1287,6 +1287,7 @@ impl<'p, 'b> Machine<'p, 'b> {
             }
             "fs_read_to_string" => return Err(not_allowed("file I/O")),
             "arg_count" | "arg_at" => return Err(not_allowed("reading the process arguments")),
+            "rt_sleep_ns" | "rt_monotonic_ns" | "rt_wall_ns" => return Err(not_allowed("reading the clock or sleeping")),
             "tcp_listen" | "TcpListener::accept" | "TcpStream::read" | "TcpStream::write" => return Err(not_allowed("network I/O")),
             "paco_rt_spawn" | "paco_rt_spawn_blocking" | "paco_rt_join" => return Err(not_allowed("spawning a task")),
             "paco_rt_channel" | "paco_rt_send" | "paco_rt_recv" | "paco_rt_sender_close" | "paco_rt_receiver_close"

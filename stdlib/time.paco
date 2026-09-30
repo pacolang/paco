@@ -1,0 +1,107 @@
+module time;
+
+/// A non-negative span with nanosecond precision.
+#[derive(Copy)]
+pub struct Duration {
+    nanos: u64,
+
+    pub fn seconds(n: u64) -> Duration {
+        Duration { nanos: n * 1000000000 as u64 }
+    }
+
+    pub fn millis(n: u64) -> Duration {
+        Duration { nanos: n * 1000000 as u64 }
+    }
+
+    pub fn micros(n: u64) -> Duration {
+        Duration { nanos: n * 1000 as u64 }
+    }
+
+    pub fn nanos(n: u64) -> Duration {
+        Duration { nanos: n }
+    }
+
+    pub fn as_nanos(&self) -> u64 {
+        self.nanos
+    }
+
+    pub fn as_micros(&self) -> u64 {
+        self.nanos / 1000 as u64
+    }
+
+    pub fn as_millis(&self) -> u64 {
+        self.nanos / 1000000 as u64
+    }
+
+    pub fn as_secs(&self) -> u64 {
+        self.nanos / 1000000000 as u64
+    }
+
+    pub fn add(&self, other: Duration) -> Duration {
+        Duration { nanos: self.nanos + other.nanos }
+    }
+
+    pub fn sub(&self, other: Duration) -> Duration {
+        if other.nanos > self.nanos {
+            panic("duration subtraction overflowed")
+        }
+        Duration { nanos: self.nanos - other.nanos }
+    }
+
+    pub fn eq(&self, other: Duration) -> bool {
+        self.nanos == other.nanos
+    }
+
+    pub fn cmp(&self, other: Duration) -> i64 {
+        if self.nanos < other.nanos {
+            -1
+        } else if self.nanos > other.nanos {
+            1
+        } else {
+            0
+        }
+    }
+}
+
+/// A point on the monotonic clock, which never goes backwards.
+#[derive(Copy)]
+pub struct Instant {
+    nanos: u64,
+
+    pub fn now() -> Instant {
+        Instant { nanos: rt_monotonic_ns() }
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        Duration { nanos: rt_monotonic_ns() - self.nanos }
+    }
+
+    pub fn duration_since(&self, earlier: Instant) -> Duration {
+        Duration { nanos: self.nanos - earlier.nanos }
+    }
+}
+
+/// The current wall-clock time, as whole seconds since the Unix epoch and
+/// the nanosecond remainder.
+#[derive(Copy)]
+pub struct SystemTime {
+    nanos: u64,
+
+    pub fn now() -> SystemTime {
+        SystemTime { nanos: rt_wall_ns() }
+    }
+
+    pub fn seconds(&self) -> i64 {
+        (self.nanos / 1000000000 as u64) as i64
+    }
+
+    pub fn subsec_nanos(&self) -> i64 {
+        (self.nanos % 1000000000 as u64) as i64
+    }
+}
+
+/// Suspends the calling task for at least `d`, letting its worker run other
+/// tasks meanwhile.
+pub fn sleep(d: Duration) {
+    rt_sleep_ns(d.nanos)
+}

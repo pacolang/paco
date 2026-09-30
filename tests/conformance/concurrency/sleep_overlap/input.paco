@@ -1,0 +1,20 @@
+use stdlib::time;
+
+fn main() {
+    let start = time::Instant::now();
+    let mut handles: Vec<JoinHandle<()>> = Vec::new();
+    let mut i = 0;
+    while i < 100 {
+        handles.push(spawn { time::sleep(time::Duration::millis(100 as u64)) });
+        i = i + 1;
+    }
+    let mut j = 0;
+    while j < 100 {
+        match handles.get(j) {
+            Option::Some(h) => match h.join() { Result::Ok(v) => v, Result::Err(e) => () },
+            Option::None => (),
+        }
+        j = j + 1;
+    }
+    print(start.elapsed().as_millis() < 1000 as u64);
+}

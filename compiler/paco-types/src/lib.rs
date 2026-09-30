@@ -1449,6 +1449,45 @@ impl Program {
             },
         );
         self.functions.insert(
+            "rt_sleep_ns".to_string(),
+            FunctionSig {
+                generics: Vec::new(),
+                params: vec![Type::Int(IntWidth::U64)],
+                body_params: vec![Type::Int(IntWidth::U64)],
+                return_ty: Type::Unit,
+                receiver: None,
+                requires_unsafe: false,
+                requires_comptime: false,
+                extern_abi: None,
+            },
+        );
+        self.functions.insert(
+            "rt_monotonic_ns".to_string(),
+            FunctionSig {
+                generics: Vec::new(),
+                params: Vec::new(),
+                body_params: Vec::new(),
+                return_ty: Type::Int(IntWidth::U64),
+                receiver: None,
+                requires_unsafe: false,
+                requires_comptime: false,
+                extern_abi: None,
+            },
+        );
+        self.functions.insert(
+            "rt_wall_ns".to_string(),
+            FunctionSig {
+                generics: Vec::new(),
+                params: Vec::new(),
+                body_params: Vec::new(),
+                return_ty: Type::Int(IntWidth::U64),
+                receiver: None,
+                requires_unsafe: false,
+                requires_comptime: false,
+                extern_abi: None,
+            },
+        );
+        self.functions.insert(
             "fs_read_to_string".to_string(),
             FunctionSig {
                 generics: Vec::new(),

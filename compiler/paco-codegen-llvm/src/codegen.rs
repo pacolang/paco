@@ -1682,6 +1682,9 @@ impl<'ctx, 'm, 'a> Generator<'ctx, 'm, 'a> {
                 | "bytes_write_string"
                 | "string_hash"
                 | "slice_sort"
+                | "rt_sleep_ns"
+                | "rt_monotonic_ns"
+                | "rt_wall_ns"
         ) {
             return false;
         }
@@ -1702,7 +1705,7 @@ impl<'ctx, 'm, 'a> Generator<'ctx, 'm, 'a> {
                 let len = self.load(self.i64().into(), self.as_ptr(values[0]), i64::from(SLICE_LEN_OFFSET));
                 self.write_place(frame, destination(), len);
             }
-            "string_next_char_boundary" | "arg_count" | "string_hash" => {
+            "string_next_char_boundary" | "arg_count" | "string_hash" | "rt_monotonic_ns" | "rt_wall_ns" => {
                 let next = self.call_runtime(&runtime_name, &values, Some(self.i64().into())).expect("i64");
                 self.write_place(frame, destination(), next);
             }
@@ -1713,7 +1716,7 @@ impl<'ctx, 'm, 'a> Generator<'ctx, 'm, 'a> {
             "string_char_at" | "string_byte_at" | "string_slice_utf8" | "fs_read_to_string" | "string_from_bytes" => {
                 self.option_builtin(frame, &runtime_name, values, destination());
             }
-            "stderr_write" | "slice_sort" => {
+            "stderr_write" | "slice_sort" | "rt_sleep_ns" => {
                 self.call_runtime(&runtime_name, &values, None);
             }
             _ => {
