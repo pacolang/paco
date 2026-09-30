@@ -15,5 +15,6 @@ mod named_dims;
 mod operator_overloading;
 mod pattern_matching;
 mod question_mark;
+mod raw_pointers;
 mod slice_type;
 mod trait_declarations;
