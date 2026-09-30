@@ -246,8 +246,9 @@ pub enum Rvalue {
     /// Allocates `size` bytes of scratch stack storage and produces its
     /// address — a raw, type-less buffer for compiler-internal marshaling
     /// (a spawn thunk's packed captures buffer, one 8-byte slot per
-    /// captured scalar — see `scalar_byte_len`'s own scoping note), not a
-    /// real Paco value or a place any Paco-level pattern ever names.
+    /// captured scalar — see `Lowerer::lower_spawn_via`'s own scoping
+    /// note), not a real Paco value or a place any Paco-level pattern
+    /// ever names.
     RawAlloc { size: u64 },
     /// The address of the named top-level function — resolved the same
     /// way `Terminator::Call`'s `CallTarget` already is (by-name, against

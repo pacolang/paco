@@ -39,6 +39,7 @@ fn lower_all_functions(source: &str) -> (Vec<(String, Body)>, Module) {
     let drops =
         paco_borrow::analyze_module(&module, &mut reporter).expect("module should borrow-check");
     let registry = TypeRegistry::from_module(&module);
+    let layouts = TypeLayouts::from_module(&module);
 
     let bodies = module
         .items
@@ -46,7 +47,7 @@ fn lower_all_functions(source: &str) -> (Vec<(String, Body)>, Module) {
         .flat_map(|item| match item {
             Item::Fn(function) => {
                 let (body, outlined) =
-                    paco_mir::lower_function(function, &typed, &registry, &drops, Profile::Debug);
+                    paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, Profile::Debug);
                 let mut result = vec![(function.name.clone(), body)];
                 result.extend(outlined);
                 result

@@ -24,10 +24,11 @@ fn lower(module: &Module, profile: Profile) -> Vec<(String, Body)> {
     let typed = paco_types::infer_module(module, &mut reporter).expect("module should type-check");
     let drops = paco_borrow::analyze_module(module, &mut reporter).expect("module should borrow-check");
     let registry = paco_mir::TypeRegistry::from_module(module);
+    let layouts = TypeLayouts::from_module(module);
     let mut bodies = Vec::new();
     for item in &module.items {
         if let Item::Fn(function) = item {
-            let (body, outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, profile);
+            let (body, outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, profile);
             bodies.push((function.name.clone(), body));
             bodies.extend(outlined);
         }

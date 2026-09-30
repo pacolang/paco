@@ -11,6 +11,7 @@ fn lower_source_with_profile(source: &str, profile: Profile) -> Body {
     let mut reporter = Reporter::new();
     let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
     let module = parse_module(&tokens, &mut reporter).unwrap();
+    let layouts = paco_mir::TypeLayouts::from_module(&module);
     assert!(!reporter.has_errors(), "{}", reporter.emit_to_string(&sources));
 
     let typed = infer_module(&module, &mut reporter).expect("module should type-check");
@@ -26,7 +27,7 @@ fn lower_source_with_profile(source: &str, profile: Profile) -> Body {
             _ => None,
         })
         .expect("expected a `main` function");
-    paco_mir::lower_function(function, &typed, &registry, &drops, profile).0
+    paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, profile).0
 }
 
 #[test]

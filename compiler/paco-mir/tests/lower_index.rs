@@ -16,6 +16,7 @@ fn lower_main(source: &str) -> paco_mir::Body {
     let mut reporter = Reporter::new();
     let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
     let module = parse_module(&tokens, &mut reporter).unwrap();
+    let layouts = paco_mir::TypeLayouts::from_module(&module);
     assert!(!reporter.has_errors(), "{}", reporter.emit_to_string(&sources));
 
     let typed = infer_module(&module, &mut reporter).expect("module should type-check");
@@ -30,7 +31,7 @@ fn lower_main(source: &str) -> paco_mir::Body {
         })
         .unwrap();
 
-    paco_mir::lower_function(main, &typed, &registry, &drops, Profile::Debug).0
+    paco_mir::lower_function(main, &typed, &registry, &drops, &layouts, Profile::Debug).0
 }
 
 fn assignments(body: &paco_mir::Body) -> Vec<&Statement> {

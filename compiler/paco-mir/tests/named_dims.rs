@@ -36,6 +36,7 @@ fn lower(name: &str) -> Body {
     let mut reporter = Reporter::new();
     let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
     let module = parse_module(&tokens, &mut reporter).unwrap();
+    let layouts = paco_mir::TypeLayouts::from_module(&module);
     let typed = infer_module(&module, &mut reporter).unwrap_or_else(|_| panic!("{}", reporter.emit_to_string(&sources)));
     let drops = paco_borrow::analyze_module(&module, &mut reporter).unwrap_or_else(|_| panic!("{}", reporter.emit_to_string(&sources)));
     let registry = TypeRegistry::from_module(&module);
@@ -47,7 +48,7 @@ fn lower(name: &str) -> Body {
             _ => None,
         })
         .unwrap();
-    paco_mir::lower_function(function, &typed, &registry, &drops, Profile::Release).0
+    paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, Profile::Release).0
 }
 
 fn calls(body: &Body, prefix: &str) -> Vec<usize> {
@@ -92,6 +93,7 @@ fn a_dim_parameter_is_one_hidden_leading_argument() {
     let mut reporter = Reporter::new();
     let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
     let module = parse_module(&tokens, &mut reporter).unwrap();
+    let layouts = paco_mir::TypeLayouts::from_module(&module);
     let typed = infer_module(&module, &mut reporter).unwrap();
     let drops = paco_borrow::analyze_module(&module, &mut reporter).unwrap();
     let registry = TypeRegistry::from_module(&module);
@@ -106,7 +108,7 @@ fn a_dim_parameter_is_one_hidden_leading_argument() {
     let substitutions = [("B".to_string(), paco_types::Type::Generic(hidden.clone()))].into_iter().collect();
     let instances = paco_mir::InstantiationRegistry::new();
     let (body, _) =
-        paco_mir::lower_instance(rows, &typed, &registry, &drops, Profile::Release, &substitutions, &[hidden], &instances, &Default::default());
+        paco_mir::lower_instance(rows, &typed, &registry, &drops, &layouts, Profile::Release, &substitutions, &[hidden], &instances, &Default::default());
     assert_eq!(body.param_count, 2);
     assert_eq!(body.locals[0].ty, paco_types::Type::Int(paco_types::IntWidth::I64));
     assert!(matches!(&body.blocks[0].terminator, Terminator::Return(paco_mir::Operand::Copy(paco_mir::Place::Local(local))) if local.0 == 0));

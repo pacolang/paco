@@ -18,11 +18,12 @@ fn statements_terminators_and_bodies_carry_their_source_spans() {
     let mut reporter = Reporter::new();
     let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
     let module = parse_module(&tokens, &mut reporter).unwrap();
+    let layouts = paco_mir::TypeLayouts::from_module(&module);
     let typed = infer_module(&module, &mut reporter).unwrap();
     let drops = paco_borrow::analyze_module(&module, &mut reporter).unwrap();
     let registry = paco_mir::TypeRegistry::from_module(&module);
     let Some(Item::Fn(main)) = module.items.first() else { panic!("expected `main`") };
-    let body = paco_mir::lower_function(main, &typed, &registry, &drops, Profile::Debug).0;
+    let body = paco_mir::lower_function(main, &typed, &registry, &drops, &layouts, Profile::Debug).0;
 
     assert!(text(body.span).starts_with("fn main()"), "{:?}", text(body.span));
     let mut seen = Vec::new();

@@ -45,6 +45,7 @@ fn calls(body: &Body) -> Vec<&str> {
 #[test]
 fn comptime_blocks_are_outlined_then_replaced_by_their_values() {
     let module = parse();
+    let layouts = paco_mir::TypeLayouts::from_module(&module);
     let mut reporter = Reporter::new();
     let typed = infer_module(&module, &mut reporter).unwrap();
     let drops = paco_borrow::analyze_module(&module, &mut reporter).unwrap();
@@ -54,7 +55,7 @@ fn comptime_blocks_are_outlined_then_replaced_by_their_values() {
 
     let outlining = InstantiationRegistry::new();
     let (body, outlined) =
-        paco_mir::lower_function_with_substitutions(main, &typed, &registry, &drops, Profile::Debug, &empty, &outlining);
+        paco_mir::lower_function_with_substitutions(main, &typed, &registry, &drops, &layouts, Profile::Debug, &empty, &outlining);
     let sites = outlining.take_comptime_sites();
     assert_eq!(sites.len(), 2);
     assert!(sites.iter().all(|site| calls(&body).contains(&site.name.as_str())), "{:?}", calls(&body));
@@ -62,7 +63,7 @@ fn comptime_blocks_are_outlined_then_replaced_by_their_values() {
     assert_eq!(quotes(&body), 0);
 
     let describe = function(&module, "describe");
-    let (describe_body, _) = paco_mir::lower_function(describe, &typed, &registry, &drops, Profile::Debug);
+    let (describe_body, _) = paco_mir::lower_function(describe, &typed, &registry, &drops, &layouts, Profile::Debug);
     assert_eq!(quotes(&describe_body), 1);
 
     let values = HashMap::from([
@@ -72,7 +73,7 @@ fn comptime_blocks_are_outlined_then_replaced_by_their_values() {
     let embedding = InstantiationRegistry::new();
     embedding.set_comptime_values(values);
     let (body, outlined) =
-        paco_mir::lower_function_with_substitutions(main, &typed, &registry, &drops, Profile::Release, &empty, &embedding);
+        paco_mir::lower_function_with_substitutions(main, &typed, &registry, &drops, &layouts, Profile::Release, &empty, &embedding);
     assert!(outlined.is_empty());
     assert!(!embedding.has_comptime_sites());
     assert_eq!(quotes(&body), 0);
