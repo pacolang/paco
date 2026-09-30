@@ -1,0 +1,21 @@
+struct Pt {
+    x: i64,
+    y: i64,
+}
+
+extern "C" {
+    fn malloc(size: i64) -> *mut u8;
+    fn free(p: *mut u8);
+}
+
+fn main() {
+    unsafe {
+        let raw = malloc(16);
+        let p: *mut Pt = raw as *mut Pt;
+        p.write(Pt { x: 1, y: 2 });
+        let back = p.read();
+        print(back.x);
+        print(back.y);
+        free(raw);
+    }
+}
