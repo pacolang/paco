@@ -10,10 +10,10 @@
 # release transition window as the alias table itself (design.md "Window
 # length"); task 5.3 removes the alias table and this allowlisting along with
 # it once the window closes.
-compiler/paco-driver/src/lib.rs:773
-compiler/paco-driver/src/lib.rs:778
-compiler/paco-driver/src/lib.rs:2365
-compiler/paco-driver/src/lib.rs:2911
-compiler/paco-driver/src/lib.rs:2925
-compiler/paco-driver/src/lib.rs:2926
-compiler/paco-driver/src/lib.rs:2937
+compiler/paco-driver/src/lib.rs:776
+compiler/paco-driver/src/lib.rs:780
+compiler/paco-driver/src/lib.rs:2388
+compiler/paco-driver/src/lib.rs:2934
+compiler/paco-driver/src/lib.rs:2948
+compiler/paco-driver/src/lib.rs:2949
+compiler/paco-driver/src/lib.rs:2960
