@@ -1,0 +1,10 @@
+module mathx;
+
+#[link(name = "m")]
+extern "C" {
+    fn cbrt(x: float) -> float;
+}
+
+pub fn cube_root(x: float) -> float {
+    unsafe { cbrt(x) }
+}

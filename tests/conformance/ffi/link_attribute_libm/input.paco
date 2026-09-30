@@ -1,0 +1,5 @@
+use mathx;
+
+fn main() {
+    print(mathx::cube_root(27.0))
+}
