@@ -3386,11 +3386,14 @@ impl<'a> Lowerer<'a> {
     /// `offset`/`add` (element-scaled pointer arithmetic) and `is_null` on
     /// a `*const T`/`*mut T` receiver — composed from casts and ordinary
     /// arithmetic already lowered elsewhere, so neither backend needs a
-    /// pointer-specific `Rvalue`. `read`/`write` are not lowered yet (a
-    /// later task). Scoped to a scalar pointee, like `scalar_byte_len`
-    /// above: a struct/enum/tuple pointee's size needs a name-keyed
-    /// aggregate layout lookup this `Lowerer` cannot make (no
-    /// `TypeLayouts` access).
+    /// pointer-specific `Rvalue`. `read`/`write` reuse the same
+    /// `Place::Deref` a source-level `*p`/`*p = v` already lowers to,
+    /// which already copies any sized `pointee` (aggregates included) —
+    /// each backend resolves the concrete size from its own
+    /// `TypeLayouts` at codegen time. `offset`/`add` are scoped to a
+    /// scalar pointee, like `scalar_byte_len` above: a struct/enum/tuple
+    /// pointee's size needs a name-keyed aggregate layout lookup this
+    /// `Lowerer` cannot make (no `TypeLayouts` access).
     fn lower_pointer_method(&mut self, receiver: &Expr, pointee: &Type, method: &str, args: &[Expr], call_expr: &Expr) -> Operand {
         match method {
             "offset" | "add" => {
@@ -3443,6 +3446,18 @@ impl<'a> Lowerer<'a> {
                     ),
                 ));
                 Operand::Copy(Place::Local(result))
+            }
+            "read" => {
+                let address = self.lower_operand(receiver);
+                let place = Place::Deref { address: Box::new(address), ty: pointee.clone() };
+                if is_copy(pointee) { Operand::Copy(place) } else { Operand::Move(place) }
+            }
+            "write" => {
+                let address = self.lower_operand(receiver);
+                let value = self.lower_operand(&args[0]);
+                let place = Place::Deref { address: Box::new(address), ty: pointee.clone() };
+                self.push(Statement::Assign(place, Rvalue::Use(value)));
+                Operand::Constant(Constant::Unit)
             }
             _ => panic!("`{method}` on a raw pointer is not lowered yet"),
         }
