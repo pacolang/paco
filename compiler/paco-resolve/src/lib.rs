@@ -25,6 +25,8 @@ const PRELUDE_VALUES: &[&str] = &[
     "slice_sort_native",
     "slice_as_ptr",
     "slice_as_mut_ptr",
+    "ptr_null",
+    "ptr_null_mut",
     // `phase-9-comptime` builtins: `splice_field` is never written by a
     // user directly — the parser desugars `base.#(name)` to
     // `splice_field(base, name)` (Decision 7) — the others are ordinary
