@@ -78,3 +78,44 @@ fn a_bound_naming_a_builtin_trait_is_accepted() {
     let error = check_source("fn f<T: Add + Copy>(x: T) {}");
     assert!(error.is_none(), "{error:?}");
 }
+
+#[test]
+fn a_method_call_on_a_bounded_generic_resolves_through_the_bound() {
+    let error = check_source(
+        "
+trait Shape {
+    fn area(&self) -> i64;
+}
+fn total<T: Shape>(x: &T) -> i64 { x.area() }
+",
+    );
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn an_operator_on_a_bounded_generic_resolves_through_the_bound() {
+    let error = check_source(
+        "
+trait Add {
+    fn add(&self, other: Self) -> Self;
+}
+fn sum<T: Add + Copy>(a: T, b: T) -> T { a + b }
+",
+    );
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn a_method_not_provided_by_any_bound_is_rejected() {
+    let error = check_source(
+        "
+trait Shape {
+    fn area(&self) -> i64;
+}
+fn f<T: Shape>(x: &T) -> i64 { x.perimeter() }
+",
+    )
+    .expect("expected error");
+    assert!(error.contains("PACO-E0314"), "{error}");
+    assert!(error.contains("perimeter") && error.contains("Shape"), "{error}");
+}

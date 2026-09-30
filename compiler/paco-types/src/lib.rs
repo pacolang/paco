@@ -4941,6 +4941,19 @@ fn infer_method_call(
         return Type::Error;
     }
     let Some(type_name) = target_type_name(&receiver_ty) else {
+        if let Type::Generic(name) = &receiver_ty {
+            return infer_bound_method_call(
+                name,
+                method,
+                args,
+                receiver,
+                receiver_borrow,
+                span,
+                program,
+                context,
+                reporter,
+            );
+        }
         reporter.push(Diagnostic::error(
             "PACO-E0314",
             span,
@@ -5027,6 +5040,63 @@ fn infer_method_call(
     if let Some(bounds) = program.bounds.get(&callee) {
         check_bounds(bounds, &substitutions, &callee, span, program, Some(context), reporter);
     }
+    let result = substitute_generics(&signature.return_ty, &substitutions);
+    named::open_existentials(result, method, span, program, context)
+}
+
+/// A method call on a generic-parameter receiver (`x.method()` where
+/// `x: T` and `T` is bounded by one or more traits in the current generic
+/// scope) resolves through the bounding traits' resolved signatures
+/// (`TraitInfo.method_sigs`) instead of `target_type_name`'s concrete-type
+/// lookup, with `Self` substituted to the generic parameter itself — calls
+/// through a bound stay symbolic here, checked once per generic body
+/// rather than per concrete instantiation. Checking that a concrete type
+/// argument actually satisfies its bounds, and monomorphized dispatch, are
+/// not done here. A method absent from every bound is a compile error
+/// naming the parameter and its bounds.
+#[allow(clippy::too_many_arguments)]
+fn infer_bound_method_call(
+    name: &str,
+    method: &str,
+    args: &[Expr],
+    receiver: &Expr,
+    receiver_borrow: Option<bool>,
+    span: Span,
+    program: &Program,
+    context: &mut FunctionContext<'_>,
+    reporter: &mut Reporter,
+) -> Type {
+    let bounds = context.bounds.get(name).cloned().unwrap_or_default();
+    let found = bounds
+        .iter()
+        .find_map(|trait_name| program.traits.get(trait_name).and_then(|info| info.method_sigs.get(method)).cloned());
+    let Some(signature) = found else {
+        for arg in args {
+            infer_expr(arg, program, context, reporter);
+        }
+        reporter.push(Diagnostic::error(
+            "PACO-E0314",
+            span,
+            if bounds.is_empty() {
+                format!("method `{method}` not found")
+            } else {
+                format!("method `{method}` is not provided by the bounds of `{name}` ({})", bounds.join(" + "))
+            },
+        ));
+        return Type::Error;
+    };
+    if signature.receiver.as_ref().is_some_and(|receiver| receiver.mutable)
+        && !receiver_borrow.unwrap_or_else(|| is_mutable_place(receiver, program, context))
+    {
+        reporter.push(Diagnostic::error(
+            "PACO-E0307",
+            span,
+            "mutable method receiver requires a mutable binding",
+        ));
+    }
+    let mut substitutions = generic_substitutions(&signature.generics);
+    substitutions.insert("Self".to_string(), Type::Generic(name.to_string()));
+    check_args(args, &signature.params, span, program, context, reporter, &mut substitutions, None);
     let result = substitute_generics(&signature.return_ty, &substitutions);
     named::open_existentials(result, method, span, program, context)
 }

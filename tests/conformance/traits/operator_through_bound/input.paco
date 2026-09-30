@@ -1,0 +1,22 @@
+trait Add {
+    fn add(&self, other: Self) -> Self;
+}
+
+#[derive(Copy)]
+struct Vec2 {
+    x: i64,
+    y: i64,
+
+    fn add(&self, other: Self) -> Self {
+        Vec2 { x: self.x + other.x, y: self.y + other.y }
+    }
+}
+
+fn sum<T: Add + Copy>(a: T, b: T) -> T { a + b }
+
+fn main() {
+    print(sum(2, 3));
+    let v = sum(Vec2 { x: 1, y: 2 }, Vec2 { x: 10, y: 20 });
+    print(v.x);
+    print(v.y);
+}
