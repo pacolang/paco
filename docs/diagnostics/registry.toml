@@ -35,6 +35,20 @@ introduced_in = "real-programs-gaps"
 status = "active"
 lint = false
 
+[E0355]
+message_template = "`{type_name}` has no `index_mut` method; index assignment requires `fn index_mut(&mut self, i: Idx) -> &mut Output`"
+severity = "error"
+explanation = """
+Assigning through `a[i] = v` for a non-slice type calls its `fn index_mut(&mut self, i: Idx) -> &mut \
+Output` method. The type has none -- it may still support reading with `[]` through a separate \
+`index` method, since a type can expose one without the other."""
+cause = "A value whose type defines no `index_mut` method was assigned to with `a[i] = v`."
+fix = "Define `index_mut` on the type, or assign through a method that takes the value directly."
+spec_ref = "docs/design/spec.md#7-metaprogramming-special-traits--comptime-feature-2"
+introduced_in = "vec-index-assignment"
+status = "active"
+lint = false
+
 [E0353]
 message_template = "cannot derive `{trait_name}`: no `#[derivable(..)]` registration found"
 severity = "error"
