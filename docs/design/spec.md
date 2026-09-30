@@ -721,6 +721,10 @@ Notes:
   Paco function calls that led there.
 - Because the result comes back typed in a `Result`, you are *encouraged* to handle
   it — it isn't a loose, easy-to-forget recover.
+- A panic unwinds nothing: locals the panicking task owned at that point (a `Vec`,
+  a `string`, anything on the heap) are not dropped. This matches an aborting panic
+  in most native languages, and is the reason a panic should signal "this task's
+  work is unrecoverable," not be used for ordinary control flow.
 
 ### Channels (communication between tasks)
 
