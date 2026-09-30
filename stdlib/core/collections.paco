@@ -39,6 +39,10 @@ pub struct Vec<T> {
         &self.data[i]
     }
 
+    pub fn index_mut(&mut self, i: i64) -> &mut T {
+        &mut self.data[i]
+    }
+
     pub fn set(&mut self, i: i64, value: T) {
         self.data[i] = value
     }
