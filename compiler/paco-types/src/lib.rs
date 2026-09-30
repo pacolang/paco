@@ -1464,6 +1464,30 @@ impl Program {
             },
         );
         self.functions.insert(
+            "ptr_null".to_string(),
+            FunctionSig {
+                generics: vec!["T".to_string()],
+                params: Vec::new(),
+                body_params: Vec::new(),
+                return_ty: Type::RawPointer { mutable: false, ty: Box::new(Type::Generic("T".to_string())) },
+                receiver: None,
+                requires_unsafe: false,
+                requires_comptime: false,
+            },
+        );
+        self.functions.insert(
+            "ptr_null_mut".to_string(),
+            FunctionSig {
+                generics: vec!["T".to_string()],
+                params: Vec::new(),
+                body_params: Vec::new(),
+                return_ty: Type::RawPointer { mutable: true, ty: Box::new(Type::Generic("T".to_string())) },
+                receiver: None,
+                requires_unsafe: false,
+                requires_comptime: false,
+            },
+        );
+        self.functions.insert(
             "tcp_listen".to_string(),
             FunctionSig {
                 generics: Vec::new(),
@@ -4975,6 +4999,9 @@ fn infer_method_call(
     if matches!(receiver_ty, Type::Slice(_)) && method == "len" && args.is_empty() {
         return Type::Int(IntWidth::I64);
     }
+    if let Type::RawPointer { mutable, ty: pointee } = &receiver_ty {
+        return infer_pointer_method(&receiver_ty, *mutable, pointee, method, args, span, program, context, reporter);
+    }
     if receiver_ty == Type::Error {
         for arg in args {
             infer_expr(arg, program, context, reporter);
@@ -5083,6 +5110,67 @@ fn infer_method_call(
     }
     let result = substitute_generics(&signature.return_ty, &substitutions);
     named::open_existentials(result, method, span, program, context)
+}
+
+/// `offset`/`add` (element-scaled pointer arithmetic), `is_null`, `read`
+/// and `write` on a `*const T`/`*mut T` receiver. Computing a new pointer
+/// or testing for null is always safe; `read`/`write` need `unsafe`, since
+/// they touch the pointee, and `write` additionally needs a `*mut`
+/// receiver. Scaling `offset`/`add` by `size_of(T)` and actually moving or
+/// copying bytes through `read`/`write` are lowering's job, not checked
+/// here.
+#[allow(clippy::too_many_arguments)]
+fn infer_pointer_method(
+    receiver_ty: &Type,
+    mutable: bool,
+    pointee: &Type,
+    method: &str,
+    args: &[Expr],
+    span: Span,
+    program: &Program,
+    context: &mut FunctionContext<'_>,
+    reporter: &mut Reporter,
+) -> Type {
+    match method {
+        "offset" | "add" => {
+            check_args(args, &[Type::Int(IntWidth::I64)], span, program, context, reporter, &mut HashMap::new(), None);
+            receiver_ty.clone()
+        }
+        "is_null" => {
+            for arg in args {
+                infer_expr(arg, program, context, reporter);
+            }
+            if !args.is_empty() {
+                reporter.push(Diagnostic::error("PACO-E0305", span, format!("expected 0 arguments, found {}", args.len())));
+            }
+            Type::Bool
+        }
+        "read" => {
+            require_unsafe(reporter, span, context.in_unsafe, "reading through a raw pointer");
+            for arg in args {
+                infer_expr(arg, program, context, reporter);
+            }
+            if !args.is_empty() {
+                reporter.push(Diagnostic::error("PACO-E0305", span, format!("expected 0 arguments, found {}", args.len())));
+            }
+            pointee.clone()
+        }
+        "write" => {
+            require_unsafe(reporter, span, context.in_unsafe, "writing through a raw pointer");
+            if !mutable {
+                reporter.push(Diagnostic::error("PACO-E0330", span, format!("cannot write through {}: it is not `*mut`", receiver_ty.name())));
+            }
+            check_args(args, std::slice::from_ref(pointee), span, program, context, reporter, &mut HashMap::new(), None);
+            Type::Unit
+        }
+        _ => {
+            for arg in args {
+                infer_expr(arg, program, context, reporter);
+            }
+            reporter.push(Diagnostic::error("PACO-E0314", span, format!("method `{method}` not found")));
+            Type::Error
+        }
+    }
 }
 
 /// A method call on a generic-parameter receiver (`x.method()` where

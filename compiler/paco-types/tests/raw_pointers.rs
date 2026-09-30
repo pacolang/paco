@@ -126,3 +126,84 @@ fn a_pointer_still_cannot_cast_to_a_non_pointer_non_integer_type() {
     .expect("expected a cast error");
     assert!(error.contains("PACO-E0330"), "{error}");
 }
+
+#[test]
+fn offset_and_add_return_a_pointer_of_the_same_type() {
+    let error = check_source(
+        "
+        fn f(p: *const i64) -> *const i64 { p.offset(1) }
+        fn g(p: *mut i64) -> *mut i64 { p.add(1) }
+        fn main() {}
+        ",
+    );
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn is_null_returns_a_bool_without_unsafe() {
+    let error = check_source(
+        "
+        fn f(p: *const i64) -> bool { p.is_null() }
+        fn main() {}
+        ",
+    );
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn read_requires_unsafe_and_returns_the_pointee_type() {
+    let error = check_source(
+        "
+        fn f(p: *const i64) -> i64 { p.read() }
+        fn main() {}
+        ",
+    )
+    .expect("expected an unsafe-block error");
+    assert!(error.contains("PACO-E0325"), "{error}");
+}
+
+#[test]
+fn read_inside_unsafe_type_checks_with_no_diagnostics() {
+    let error = check_source(
+        "
+        fn f(p: *const i64) -> i64 { unsafe { p.read() } }
+        fn main() {}
+        ",
+    );
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn write_requires_unsafe_and_a_mutable_pointer() {
+    let error = check_source(
+        "
+        fn f(p: *const i64) { unsafe { p.write(1) } }
+        fn main() {}
+        ",
+    )
+    .expect("expected a mutability error");
+    assert!(error.contains("PACO-E0330"), "{error}");
+}
+
+#[test]
+fn write_through_a_mutable_pointer_inside_unsafe_type_checks_with_no_diagnostics() {
+    let error = check_source(
+        "
+        fn f(p: *mut i64) { unsafe { p.write(1) } }
+        fn main() {}
+        ",
+    );
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn ptr_null_and_ptr_null_mut_produce_the_expected_pointer_types() {
+    let error = check_source(
+        "
+        fn f() -> *const i64 { ptr_null<i64>() }
+        fn g() -> *mut i64 { ptr_null_mut<i64>() }
+        fn main() {}
+        ",
+    );
+    assert!(error.is_none(), "{error:?}");
+}
