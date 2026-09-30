@@ -3271,6 +3271,18 @@ impl<'a> Lowerer<'a> {
     /// `lower_method_call` already uses for ordinary calls) and returns its
     /// pointer result as an `Operand`, for `lower_place` to wrap in
     /// `Place::Deref`.
+    /// Calls `index` to get a non-slice receiver's element address, for
+    /// both a read place and a write place (an index expression is lowered
+    /// to a `Place` once, before its caller decides whether to read or
+    /// assign through it). This is why a write-only type -- one exposing
+    /// `index_mut` but no `index` -- passes type-checking (`index_mut` is
+    /// what that checks) yet has no working assignment target: lowering
+    /// only ever looks up `index` here, unconditionally. Every type this
+    /// is exercised against today (`Vec`) implements both with the same
+    /// address, so the gap is latent rather than observed; giving this
+    /// method a place-direction to choose `index`/`index_mut` from needs
+    /// `lower_place`'s read and write call sites to carry that direction
+    /// too, which is its own, separate change.
     fn lower_index_dispatch_address(&mut self, base: &Expr, index: &[Expr]) -> Operand {
         let receiver_ty = self.type_of(base);
         let type_name = type_name_of(&receiver_ty).unwrap_or_else(|| {

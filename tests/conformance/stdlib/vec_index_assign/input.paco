@@ -1,0 +1,6 @@
+fn main() {
+    let mut v: Vec<i64> = Vec::new();
+    v.push(1);
+    v[0] = 9;
+    print(v[0]);
+}
