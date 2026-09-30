@@ -1,0 +1,2 @@
+error[PACO-E0344] vecmod.paco:35:23: cannot infer `K`: it does not appear in `T2::add_scaled`'s parameters or return type
+  note: Paco has no turbofish syntax to supply it explicitly; use it in a parameter or return type, or remove it

@@ -2733,7 +2733,62 @@ fn check_attached_function(
         .get(&key)
         .or_else(|| program.associated.get(&key));
     if let Some(signature) = signature {
+        check_method_generics_inferable(function, type_name, signature, reporter);
         check_function(function, &format!("{type_name}::{}", function.name), signature, owner_params, program, reporter);
+    }
+}
+
+/// Whether `ty` mentions the generic/const parameter `name` — directly, in
+/// a dimension position, or nested inside a struct/enum/tuple/slice/
+/// pointer/borrow/function/pack type.
+fn type_references_param(ty: &Type, name: &str) -> bool {
+    match ty {
+        Type::Generic(other) | Type::Spread(other) => other == name,
+        Type::Dim(Dim::Const(expr)) => expr.any_name(|found| found == name),
+        Type::Struct(_, args) | Type::Enum(_, args) | Type::Pack(args) | Type::Tuple(args) => {
+            args.iter().any(|arg| type_references_param(arg, name))
+        }
+        Type::Borrow { ty, .. } | Type::RawPointer { ty, .. } | Type::Slice(ty) | Type::TypeValue(ty) => {
+            type_references_param(ty, name)
+        }
+        Type::Fn(params, ret) => params.iter().any(|param| type_references_param(param, name)) || type_references_param(ret, name),
+        _ => false,
+    }
+}
+
+/// A method's own generic/const parameter that appears in neither its
+/// parameter types nor its return type can never be supplied at a call
+/// site — Paco has no turbofish syntax — and a call to the method panics
+/// MIR lowering today instead of failing to type-check. Reject it at
+/// check time with the same "cannot infer" diagnostic family
+/// `PACO-E0344` already used for an unproved dimension parameter. Only
+/// the method's own declared generics are checked here: `owner_params`
+/// (the enclosing type/`methods<>` block's generics) are resolved by
+/// `Self` at the call site, not by this
+/// method's own signature.
+fn check_method_generics_inferable(function: &FnDecl, type_name: &str, signature: &FunctionSig, reporter: &mut Reporter) {
+    for param in &function.generics {
+        if matches!(param.kind, ast::GenericParamKind::Lifetime | ast::GenericParamKind::Dim) {
+            continue;
+        }
+        let appears = signature
+            .body_params
+            .iter()
+            .chain(std::iter::once(&signature.return_ty))
+            .any(|ty| type_references_param(ty, &param.name));
+        if !appears {
+            reporter.push(
+                Diagnostic::error(
+                    "PACO-E0344",
+                    param.span,
+                    format!(
+                        "cannot infer `{}`: it does not appear in `{type_name}::{}`'s parameters or return type",
+                        param.name, function.name
+                    ),
+                )
+                .with_note("Paco has no turbofish syntax to supply it explicitly; use it in a parameter or return type, or remove it"),
+            );
+        }
     }
 }
 
