@@ -3,6 +3,7 @@ module blas;
 use stdlib::math;
 use stdlib::numerics;
 
+#[link(name = "blas")]
 extern "C" {
     fn cblas_dgemm(
         order: i32, transa: i32, transb: i32,
