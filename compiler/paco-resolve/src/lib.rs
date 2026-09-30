@@ -64,6 +64,7 @@ const PRELUDE_VALUES: &[&str] = &[
     "rt_sleep_ns",
     "rt_monotonic_ns",
     "rt_wall_ns",
+    "rt_wait_fd",
 ];
 
 pub fn resolve_module(module: &Module, reporter: &mut Reporter) -> Result<(), ResolveError> {
