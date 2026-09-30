@@ -295,8 +295,11 @@ TupleType = "(" Type "," Type { "," Type } [ "," ] ")" ;
 (* dyn Sink   dyn Iterator<Item = int> — dynamic dispatch, visible vtable cost *)
 DynType = "dyn" ( Path | GenericType ) ;
 
-(* fn(int, string) -> bool — function type for higher-order parameters *)
-FnType = "fn" "(" [ TypeList ] ")" [ "->" Type ] ;
+(* fn(int, string) -> bool — function type for higher-order parameters.
+   extern "C" fn(*const u8) -> i32 — a thin, non-capturing C function
+   pointer; unsafe extern "C" fn(..) is what a foreign function coerces to. *)
+FnType = [ "unsafe" ] "extern" StringLiteral "fn" "(" [ TypeList ] ")" [ "->" Type ]
+       | "fn" "(" [ TypeList ] ")" [ "->" Type ] ;
 
 (* Vec<T>   Result<T, E>   Map<string, int> *)
 GenericType = Path "<" TypeList ">" ;
