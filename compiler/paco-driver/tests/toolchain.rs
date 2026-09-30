@@ -311,7 +311,11 @@ fn macos_builds_need_no_c_compiler_on_path() {
 #[test]
 fn macos_extern_libraries_resolve_from_the_sdk_or_report_the_searched_directories() {
     let (_dir, input) = scratch("macos-missing-lib", "use nosuchlib;\n\nfn main() {\n    print(1)\n}\n");
-    fs::write(input.with_file_name("nosuchlib.paco"), "extern \"C\" {\n    fn nosuchlib_fn() -> i64;\n}\n").unwrap();
+    fs::write(
+        input.with_file_name("nosuchlib.paco"),
+        "#[link(name = \"nosuchlib\")]\nextern \"C\" {\n    fn nosuchlib_fn() -> i64;\n}\n",
+    )
+    .unwrap();
     let output = paco(&[], &input);
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);

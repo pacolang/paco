@@ -125,6 +125,7 @@ pub fn link(objects: &[PathBuf], output: &std::path::Path) -> Result<(), String>
         output,
         mode: paco_link::LinkMode::Static,
         extra_libs: &[],
+        extra_search_dirs: &[],
         target: &native_target(),
         sysroot: None,
         debug: false,
