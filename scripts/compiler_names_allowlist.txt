@@ -1,19 +1,16 @@
 # Reviewed false positives for scripts/check_compiler_names.py, one
-# `path:line` per line.
+# `path:<the matched line's stripped text>` per line.
 #
-# `extract-domain-libraries` task 4.1/4.2: the transition-window alias table,
-# deprecation warning, missing-dependency error and missing-library hint
-# genuinely need to say `Tensor` by name — it is the whole point of each
-# diagnostic (design.md: "the compiler cannot tell this apart from an
-# unrelated user type... that ambiguity is inherent to a hint named after the
-# library's exact type name"). Temporary: tied to the same two-core-minor-
-# release transition window as the alias table itself (design.md "Window
-# length"); task 5.3 removes the alias table and this allowlisting along with
-# it once the window closes.
-compiler/paco-driver/src/lib.rs:776
-compiler/paco-driver/src/lib.rs:780
-compiler/paco-driver/src/lib.rs:2388
-compiler/paco-driver/src/lib.rs:2934
-compiler/paco-driver/src/lib.rs:2948
-compiler/paco-driver/src/lib.rs:2949
-compiler/paco-driver/src/lib.rs:2960
+# The transition-window alias table, deprecation warning, missing-dependency
+# error and missing-library hint genuinely need to say `Tensor` by name — it
+# is the whole point of each diagnostic (the compiler cannot tell this apart
+# from an unrelated user type of the same name; that ambiguity is inherent to
+# a hint named after the library's exact type name). Temporary: tied to the
+# same two-core-minor-release transition window as the alias table itself;
+# removing the alias table also removes this allowlisting.
+compiler/paco-driver/src/lib.rs:if name.rsplit("::").next() != Some("Tensor") {
+compiler/paco-driver/src/lib.rs:let mut hint = Diagnostic::error("PACO-E0903", span, format!("cannot find `Tensor`; add `use {library_path};`"));
+compiler/paco-driver/src/lib.rs:matches!(typed.type_of(receiver), Some(paco_types::Type::Struct(key, _)) if key.rsplit("::").next() == Some("Tensor"))
+compiler/paco-driver/src/lib.rs:reporter.push(e0306(&mut sources, "Tensor"));
+compiler/paco-driver/src/lib.rs:reporter.push(e0306(&mut sources, "tensor::Tensor"));
+compiler/paco-driver/src/lib.rs:reporter.push(e0306(&mut sources, "numerics::Tensor"));
