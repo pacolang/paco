@@ -20,7 +20,7 @@ pub fn ensure_available() -> Result<(), String> {
 /// returns the resolved commit `dest`'s checkout is at.
 pub fn clone_at_tag(url: &str, tag: &str, dest: &Path) -> Result<String, String> {
     ensure_available()?;
-    run(Command::new("git").args(["clone", "--quiet", "--branch", tag, "--depth", "1"]).arg(url).arg(dest), "git clone")?;
+    run(no_autocrlf(Command::new("git")).args(["clone", "--quiet", "--branch", tag, "--depth", "1"]).arg(url).arg(dest), "git clone")?;
     resolve_ref(dest, "HEAD")
 }
 
@@ -30,8 +30,8 @@ pub fn clone_at_tag(url: &str, tag: &str, dest: &Path) -> Result<String, String>
 /// clone does not accept a bare commit, only a tag or branch name.
 pub fn clone_and_checkout_commit(url: &str, commit: &str, dest: &Path) -> Result<String, String> {
     ensure_available()?;
-    run(Command::new("git").args(["clone", "--quiet"]).arg(url).arg(dest), "git clone")?;
-    run(Command::new("git").arg("-C").arg(dest).args(["checkout", "--quiet", "--detach", commit]), "git checkout")?;
+    run(no_autocrlf(Command::new("git")).args(["clone", "--quiet"]).arg(url).arg(dest), "git clone")?;
+    run(no_autocrlf(Command::new("git")).arg("-C").arg(dest).args(["checkout", "--quiet", "--detach", commit]), "git checkout")?;
     resolve_ref(dest, "HEAD")
 }
 
@@ -44,8 +44,18 @@ pub fn clone_and_checkout_commit(url: &str, commit: &str, dest: &Path) -> Result
 pub fn fetch_and_checkout_commit(repo_dir: &Path, commit: &str) -> Result<(), String> {
     ensure_available()?;
     run(Command::new("git").arg("-C").arg(repo_dir).args(["fetch", "--quiet", "--depth", "1", "origin", commit]), "git fetch")?;
-    run(Command::new("git").arg("-C").arg(repo_dir).args(["checkout", "--quiet", "--detach", commit]), "git checkout")?;
+    run(no_autocrlf(Command::new("git")).arg("-C").arg(repo_dir).args(["checkout", "--quiet", "--detach", commit]), "git checkout")?;
     Ok(())
+}
+
+/// Disables line-ending conversion for a `clone`/`checkout` invocation: a
+/// dependency's files must land on disk exactly as committed, regardless of
+/// the host's global `core.autocrlf` (Git for Windows commonly defaults it
+/// to `true`, which rewrites `\n` to `\r\n` on checkout and would silently
+/// corrupt any file a package ships with LF endings).
+fn no_autocrlf(mut command: Command) -> Command {
+    command.args(["-c", "core.autocrlf=false"]);
+    command
 }
 
 /// Resolves `reference` (a tag, branch or `HEAD`) to its commit hash inside
