@@ -2102,6 +2102,7 @@ impl Program {
     }
 
     fn collect_extern_functions(&mut self, block: &ExternBlock, reporter: &mut Reporter) {
+        check_link_attributes(&block.attrs, reporter);
         for function in &block.functions {
             self.extern_functions.insert(function.name.clone());
             let params = function
@@ -4557,6 +4558,51 @@ fn require_unsafe(reporter: &mut Reporter, span: Span, in_unsafe: bool, what: &s
             span,
             format!("{what} requires an `unsafe` block"),
         ));
+    }
+}
+
+/// `#[link(name = "...", kind = "static" | "dylib")]` on an extern block:
+/// every argument must be `key = "string"`, `key` must be `name` or
+/// `kind`, and `kind`'s value, when given, must be `"static"` or
+/// `"dylib"`. Collecting the requests this describes for the linker is a
+/// separate, later concern -- this only validates the attribute's own
+/// shape, the same way `check_derived_copy` validates `#[derive(Copy)]`
+/// without itself doing anything with a `Copy` type.
+fn check_link_attributes(attrs: &[ast::Attribute], reporter: &mut Reporter) {
+    for attr in attrs.iter().filter(|attr| attr.name == "link") {
+        for arg in &attr.args {
+            let ast::AttributeArg::AssignLiteral(key, literal, span) = arg else {
+                reporter.push(Diagnostic::error(
+                    "PACO-E0356",
+                    attr.span,
+                    "`#[link]` arguments must be `key = \"value\"`",
+                ));
+                continue;
+            };
+            match key.as_str() {
+                "name" => {
+                    if !matches!(literal, Literal::String(_)) {
+                        reporter.push(Diagnostic::error("PACO-E0356", *span, "`#[link]`'s `name` must be a string"));
+                    }
+                }
+                "kind" => {
+                    if !matches!(literal, Literal::String(value) if value == "static" || value == "dylib") {
+                        reporter.push(Diagnostic::error(
+                            "PACO-E0357",
+                            *span,
+                            "`#[link]`'s `kind` must be `\"static\"` or `\"dylib\"`",
+                        ));
+                    }
+                }
+                other => {
+                    reporter.push(Diagnostic::error(
+                        "PACO-E0356",
+                        *span,
+                        format!("`#[link]` has no `{other}` argument; expected `name` or `kind`"),
+                    ));
+                }
+            }
+        }
     }
 }
 

@@ -148,3 +148,38 @@ fn unsafe_fn_body_with_its_own_inner_unsafe_block_is_accepted() {
     let error = check_source(source);
     assert!(error.is_none(), "{error:?}");
 }
+
+#[test]
+fn a_link_attribute_naming_a_library_is_accepted() {
+    let source = r#"#[link(name = "m")] extern "C" { fn cbrt(x: f64) -> f64; }"#;
+    let error = check_source(source);
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn a_link_attribute_with_name_and_kind_is_accepted() {
+    let source = r#"#[link(name = "m", kind = "dylib")] extern "C" { fn cbrt(x: f64) -> f64; }"#;
+    let error = check_source(source);
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn an_extern_block_without_link_is_still_accepted() {
+    let source = r#"extern "C" { fn getpid() -> i32; }"#;
+    let error = check_source(source);
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn a_link_attribute_with_an_unknown_argument_is_rejected() {
+    let source = r#"#[link(namee = "m")] extern "C" { fn cbrt(x: f64) -> f64; }"#;
+    let error = check_source(source).expect("expected an error");
+    assert!(error.contains("PACO-E0356"), "{error}");
+}
+
+#[test]
+fn a_link_attribute_with_an_invalid_kind_is_rejected() {
+    let source = r#"#[link(name = "m", kind = "shared")] extern "C" { fn cbrt(x: f64) -> f64; }"#;
+    let error = check_source(source).expect("expected an error");
+    assert!(error.contains("PACO-E0357"), "{error}");
+}

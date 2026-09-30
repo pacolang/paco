@@ -67,7 +67,9 @@ impl Parser<'_, '_> {
                     decl.is_comptime = is_comptime;
                     items.push(Item::Fn(decl));
                 } else if let Some(abi) = extern_abi {
-                    items.push(Item::Extern(self.extern_block(abi)?));
+                    let mut block = self.extern_block(abi)?;
+                    block.attrs = attrs;
+                    items.push(Item::Extern(block));
                 } else {
                     self.error_here("PACO-E0110", "expected `fn` after `unsafe`");
                     self.synchronize_item();
@@ -232,7 +234,12 @@ impl Parser<'_, '_> {
             let mut path = vec![self.consume_identifier("expected identifier")?];
             if self.matches(TokenKind::Equal) {
                 let key = path.remove(0);
-                path.push(self.consume_identifier("expected a path after `=`")?);
+                if matches!(self.peek().kind, TokenKind::String | TokenKind::Integer | TokenKind::Float | TokenKind::True | TokenKind::False) {
+                    let literal = self.literal_token()?;
+                    let span = Span::new(self.previous().span.file_id(), start, self.previous().span.end());
+                    return Ok(AttributeArg::AssignLiteral(key, literal, span));
+                }
+                path.push(self.consume_identifier("expected a path or literal after `=`")?);
                 while self.matches(TokenKind::ColonColon) {
                     path.push(self.consume_identifier("expected identifier after `::`")?);
                 }
@@ -304,6 +311,7 @@ impl Parser<'_, '_> {
         Ok(ExternBlock {
             abi,
             functions,
+            attrs: Vec::new(),
             span: Span::new(right.span.file_id(), start, right.span.end()),
         })
     }
