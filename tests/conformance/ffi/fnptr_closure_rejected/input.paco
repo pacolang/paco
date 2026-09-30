@@ -1,0 +1,7 @@
+fn call_with(cmp: extern "C" fn(i64, i64) -> i64) -> i64 {
+    0
+}
+
+fn main() {
+    print(call_with(|a, b| a + b));
+}

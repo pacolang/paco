@@ -36,7 +36,7 @@ fn is_copy(ty: &Type) -> bool {
     matches!(
         ty,
         Type::Int(_) | Type::Float(_) | Type::Char | Type::Bool | Type::Borrow { .. } | Type::RawPointer { .. }
-    )
+    ) || matches!(ty, Type::Fn(_, _, Some(_), _))
 }
 
 /// The byte length to marshal a value of `ty` across the `paco-runtime-ffi`
@@ -841,6 +841,17 @@ impl<'a> Lowerer<'a> {
             Some(constant) => Operand::Constant(constant),
             None => self.lower_operand(init),
         }
+    }
+
+    /// The address of a bare `extern "C" fn` item's or foreign function's
+    /// name used as a value (a C function pointer type coerces from
+    /// either, per `ffi-unsafe`). `ty` is already known to be
+    /// `Type::Fn(.., Some(_), _)` by the caller.
+    fn lower_c_fn_pointer_address(&mut self, name: &str, ty: Type) -> Operand {
+        let symbol = self.registry.symbol(name);
+        let temp = self.declare_local(None, ty, false);
+        self.push(Statement::Assign(Place::Local(temp), Rvalue::FuncAddr(symbol)));
+        Operand::Copy(Place::Local(temp))
     }
 
     fn type_of(&self, expr: &Expr) -> Type {
@@ -1774,18 +1785,52 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// Calls a C function pointer value directly with the C calling
+    /// convention: unlike a closure, `pointer` is the callee's address
+    /// itself (no environment to load or thread through as a hidden first
+    /// argument) — matching how the value crossed in from or will cross
+    /// out to C in the first place.
+    fn lower_c_fn_pointer_call(&mut self, pointer: Place, args: &[Expr], expr: &Expr) -> Operand {
+        let callee = Operand::Copy(pointer);
+        let lowered = args.iter().map(|arg| self.lower_operand(arg)).collect();
+        let ty = self.type_of(expr);
+        let destination = if matches!(ty, Type::Unit) {
+            None
+        } else {
+            Some(Place::Local(self.declare_local(None, ty.clone(), false)))
+        };
+        let resume = self.reserve_block();
+        self.finish_current(Terminator::CallIndirect {
+            callee,
+            args: lowered,
+            destination: destination.clone(),
+            resume,
+        });
+        self.switch_to(resume);
+        match destination {
+            Some(place) if is_copy(&ty) => Operand::Copy(place),
+            Some(place) => Operand::Move(place),
+            None => Operand::Constant(Constant::Unit),
+        }
+    }
+
     fn lower_call(&mut self, expr: &Expr) -> Operand {
         let Expr::Call { callee, args, .. } = expr else {
             unreachable!()
         };
         let Expr::Ident(name, _) = callee.as_ref() else {
-            let closure = self.lower_place(callee);
-            return self.lower_closure_call(closure, args, expr);
+            let place = self.lower_place(callee);
+            return match self.type_of(callee) {
+                Type::Fn(_, _, Some(_), _) => self.lower_c_fn_pointer_call(place, args, expr),
+                _ => self.lower_closure_call(place, args, expr),
+            };
         };
-        if let Some(local) = self.try_resolve(callee)
-            && matches!(self.locals[local.0 as usize].ty, Type::Fn(..))
-        {
-            return self.lower_closure_call(Place::Local(local), args, expr);
+        if let Some(local) = self.try_resolve(callee) {
+            match &self.locals[local.0 as usize].ty {
+                Type::Fn(_, _, Some(_), _) => return self.lower_c_fn_pointer_call(Place::Local(local), args, expr),
+                Type::Fn(..) => return self.lower_closure_call(Place::Local(local), args, expr),
+                _ => {}
+            }
         }
         if self.registry.function(name).is_some_and(|function| function.is_iter) {
             return self.lower_iter_fn_call(name, args, expr);
@@ -2837,6 +2882,7 @@ impl<'a> Lowerer<'a> {
                 None => {
                     let operand = match self.type_of(expr) {
                         Type::TypeValue(ty) => Operand::Constant(Constant::Type(*ty)),
+                        ty @ Type::Fn(_, _, Some(_), _) => self.lower_c_fn_pointer_address(name, ty),
                         _ => self.lower_const(name),
                     };
                     let ty = self.type_of(expr);
@@ -2915,6 +2961,7 @@ impl<'a> Lowerer<'a> {
                     Some(operand) => operand,
                     None => match self.type_of(expr) {
                         Type::TypeValue(ty) => Operand::Constant(Constant::Type(*ty)),
+                        ty @ Type::Fn(_, _, Some(_), _) => self.lower_c_fn_pointer_address(name, ty),
                         _ => self.lower_const(name),
                     },
                 },

@@ -5,6 +5,7 @@ mod const_items;
 mod lower_channel;
 mod lower_control_flow;
 mod lower_destructors;
+mod lower_fn_pointer;
 mod lower_index;
 mod lower_iter_fn;
 mod lower_method_calls;

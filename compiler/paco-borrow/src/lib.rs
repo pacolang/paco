@@ -3447,7 +3447,12 @@ fn type_is_copy(ty: &paco_types::Type, copy_names: &HashSet<String>) -> Option<b
                 && args.iter().all(|arg| type_is_copy(arg, copy_names) == Some(true))
         }
         Type::Generic(name) => copy_names.contains(name),
-        Type::String | Type::Slice(_) | Type::Fn(..) => false,
+        // A closure carries a heap-allocated environment and is moved like
+        // any other owning value; a C function pointer (`extern_abi` set)
+        // is a bare code address with no environment to own — copied just
+        // like `RawPointer`/`Borrow` above.
+        Type::Fn(_, _, extern_abi, _) => extern_abi.is_some(),
+        Type::String | Type::Slice(_) => false,
     })
 }
 
