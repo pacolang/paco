@@ -90,6 +90,14 @@ impl Runtime {
     }
 
     /// Suspends the calling task (or, outside the scheduler, the calling
+    /// thread) until the raw, FFI-provided descriptor `fd` is ready for
+    /// `interest`, without blocking a worker.
+    #[cfg(unix)]
+    pub fn wait_fd(&self, fd: std::os::fd::RawFd, interest: crate::io::Interest) -> std::io::Result<()> {
+        self.io.wait_fd(fd, interest, &self.shared)
+    }
+
+    /// Suspends the calling task (or, outside the scheduler, the calling
     /// thread) until `deadline`, without blocking a worker.
     pub fn sleep_until(&self, deadline: std::time::Instant) {
         self.io.sleep_until(deadline, &self.shared)

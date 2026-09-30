@@ -45,6 +45,14 @@ pub trait Source: std::os::windows::io::AsRawSocket + std::os::windows::io::AsSo
 #[cfg(windows)]
 impl<T: std::os::windows::io::AsRawSocket + std::os::windows::io::AsSocket> Source for T {}
 
+/// Which readiness event `wait_fd` suspends for.
+#[cfg(unix)]
+#[derive(Clone, Copy)]
+pub enum Interest {
+    Readable,
+    Writable,
+}
+
 pub(crate) struct IoDriver {
     poller: Poller,
     waiters: Mutex<HashMap<usize, Notify>>,
@@ -78,6 +86,27 @@ impl IoDriver {
 
     pub(crate) fn wait_writable(&self, source: &impl Source, scheduler: &Arc<SchedulerShared>) -> io::Result<()> {
         self.wait_for(source, Event::writable, scheduler)
+    }
+
+    /// Suspends the caller until the bare, FFI-provided descriptor `fd` is
+    /// ready for `interest`, without blocking its worker. Unlike
+    /// `wait_readable`/`wait_writable`, `fd` need not implement `Source`:
+    /// the caller (a `std::net` socket wrapper over libc FFI) owns it and
+    /// guarantees it stays open and valid for the duration of this call.
+    #[cfg(unix)]
+    pub(crate) fn wait_fd(&self, fd: std::os::fd::RawFd, interest: Interest, scheduler: &Arc<SchedulerShared>) -> io::Result<()> {
+        let event_for = match interest {
+            Interest::Readable => Event::readable,
+            Interest::Writable => Event::writable,
+        };
+        let key = self.next_key.fetch_add(1, Ordering::AcqRel);
+        let notify = Notify::current(scheduler);
+        self.waiters.lock().unwrap().insert(key, notify.clone());
+        unsafe { self.poller.add(fd, event_for(key))? };
+        notify.park();
+        let borrowed = unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) };
+        let _ = self.poller.delete(borrowed);
+        Ok(())
     }
 
     fn wait_for(
