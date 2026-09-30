@@ -89,6 +89,12 @@ impl Runtime {
         self.io.wait_writable(source, &self.shared)
     }
 
+    /// Suspends the calling task (or, outside the scheduler, the calling
+    /// thread) until `deadline`, without blocking a worker.
+    pub fn sleep_until(&self, deadline: std::time::Instant) {
+        self.io.sleep_until(deadline, &self.shared)
+    }
+
     pub(crate) fn shared(&self) -> &Arc<SchedulerShared> {
         &self.shared
     }
