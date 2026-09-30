@@ -1685,6 +1685,7 @@ impl<'ctx, 'm, 'a> Generator<'ctx, 'm, 'a> {
                 | "rt_sleep_ns"
                 | "rt_monotonic_ns"
                 | "rt_wall_ns"
+                | "rt_wait_fd"
         ) {
             return false;
         }
@@ -1712,6 +1713,12 @@ impl<'ctx, 'm, 'a> Generator<'ctx, 'm, 'a> {
             "bytes_write_string" => {
                 let written = self.call_runtime(&runtime_name, &values, Some(self.i8().into())).expect("i8");
                 self.write_place(frame, destination(), written);
+            }
+            "rt_wait_fd" => {
+                let status = self
+                    .call_runtime(&runtime_name, &values, Some(self.context.i32_type().into()))
+                    .expect("i32");
+                self.write_place(frame, destination(), status);
             }
             "string_char_at" | "string_byte_at" | "string_slice_utf8" | "fs_read_to_string" | "string_from_bytes" => {
                 self.option_builtin(frame, &runtime_name, values, destination());

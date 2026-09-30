@@ -2025,7 +2025,7 @@ fn compile_builtin_call<M: Module>(
         | "string_slice_utf8" | "fs_read_to_string" | "stderr_write" | "string_concat" | "int_to_string" | "uint_to_string"
         | "bool_to_string" | "float_to_string" | "char_to_string" | "arg_count" | "arg_at" | "string_to_bytes"
         | "string_from_bytes" | "bytes_write_string" | "string_hash" | "slice_sort" | "rt_sleep_ns" | "rt_monotonic_ns"
-        | "rt_wall_ns" => format!("paco_{name}"),
+        | "rt_wall_ns" | "rt_wait_fd" => format!("paco_{name}"),
         _ => return false,
     };
     let mut values: Vec<Value> = Vec::with_capacity(args.len() + 1);
@@ -2050,6 +2050,10 @@ fn compile_builtin_call<M: Module>(
         "bytes_write_string" => {
             let written = call_returning(module, builder, &runtime_name, types::I8, &values);
             write_place(builder, destination.expect("returns a value"), written, cx);
+        }
+        "rt_wait_fd" => {
+            let status = call_returning(module, builder, &runtime_name, types::I32, &values);
+            write_place(builder, destination.expect("returns a value"), status, cx);
         }
         "string_char_at" | "string_byte_at" | "string_slice_utf8" | "fs_read_to_string" | "string_from_bytes" => {
             compile_option_builtin(module, builder, &runtime_name, values, destination.expect("returns a value"), cx);

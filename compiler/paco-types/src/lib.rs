@@ -1492,6 +1492,19 @@ impl Program {
             },
         );
         self.functions.insert(
+            "rt_wait_fd".to_string(),
+            FunctionSig {
+                generics: Vec::new(),
+                params: vec![Type::Int(IntWidth::I32), Type::Int(IntWidth::I32)],
+                body_params: vec![Type::Int(IntWidth::I32), Type::Int(IntWidth::I32)],
+                return_ty: Type::Int(IntWidth::I32),
+                receiver: None,
+                requires_unsafe: false,
+                requires_comptime: false,
+                extern_abi: None,
+            },
+        );
+        self.functions.insert(
             "fs_read_to_string".to_string(),
             FunctionSig {
                 generics: Vec::new(),
