@@ -1387,6 +1387,18 @@ fn paco_fmt_round_trips_inline_and_where_clause_bounds_to_the_same_output() {
 }
 
 #[test]
+fn paco_fmt_preserves_a_numeric_literals_base_and_separators() {
+    let source = "fn f() { let a = 0xFF; let b = 0o17; let c = 0b1010; let d = 1_000_000; }\n";
+    let module = parse_source(source);
+    let formatted = paco_syntax::fmt::format_module(&module, Some(source));
+    assert!(formatted.contains("0xFF"), "{formatted}");
+    assert!(formatted.contains("0o17"), "{formatted}");
+    assert!(formatted.contains("0b1010"), "{formatted}");
+    assert!(formatted.contains("1_000_000"), "{formatted}");
+    assert_eq!(paco_syntax::fmt::format_module(&parse_source(&formatted), Some(&formatted)), formatted);
+}
+
+#[test]
 fn hex_octal_and_binary_literals_parse_to_their_decimal_value() {
     let module = parse_source("fn f() { let a = 0xFF; let b = 0o17; let c = 0b1010; let d = 0x1_F; }");
     let Item::Fn(function) = &module.items[0] else { panic!("expected function item") };
