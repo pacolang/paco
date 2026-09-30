@@ -1,0 +1,15 @@
+trait Shape {
+    fn area(&self) -> i64;
+}
+
+struct Sq {
+    s: i64,
+
+    fn area(&self) -> i64 { self.s * self.s }
+}
+
+fn total<T: Shape>(x: &T) -> i64 { x.area() }
+
+fn main() {
+    print(total(&Sq { s: 3 }))
+}

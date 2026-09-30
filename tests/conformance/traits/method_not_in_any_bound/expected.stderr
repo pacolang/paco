@@ -1,0 +1,1 @@
+error[PACO-E0314] input.paco:5:32: method `perimeter` is not provided by the bounds of `T` (Shape)

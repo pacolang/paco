@@ -1,0 +1,7 @@
+trait Shape {
+    fn area(&self) -> i64;
+}
+
+fn f<T: Shape>(x: &T) -> i64 { x.perimeter() }
+
+fn main() {}
