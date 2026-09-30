@@ -242,7 +242,7 @@ pub(crate) fn atoms_in(ty: &Type, out: &mut Vec<String>) {
             items.iter().for_each(|item| atoms_in(item, out))
         }
         Type::Borrow { ty, .. } | Type::RawPointer { ty, .. } | Type::Slice(ty) => atoms_in(ty, out),
-        Type::Fn(params, ret) => {
+        Type::Fn(params, ret, ..) => {
             params.iter().for_each(|param| atoms_in(param, out));
             atoms_in(ret, out);
         }

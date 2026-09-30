@@ -1650,6 +1650,26 @@ pub extern "C" fn paco_kernel(data: *mut f32, len: i32) { /* ... */ }
 Paco can be loaded as a shared library by an existing system, so a team can
 replace one kernel without rewriting the program around it.
 
+### C function pointers
+
+```paco
+extern "C" {
+    fn qsort(base: *mut i64, n: u64, size: u64, cmp: extern "C" fn(*const u8, *const u8) -> i32);
+}
+
+extern "C" fn cmp(a: *const u8, b: *const u8) -> i32 { /* ... */ }
+```
+
+`extern "C" fn(A1, .., An) -> R` (optionally `unsafe extern "C" fn(..)`) is the
+type of a thin, non-capturing C function pointer — how a C library's callback
+parameter (`qsort`'s comparator, a `pthread` entry point, an SDL or GLFW
+callback) is written. An `extern "C" fn` item's name coerces to it; a foreign
+function coerces to the `unsafe` form. A closure never coerces — it carries a
+captured environment a bare code address has no room for — so a callback
+needing state threads it through a `*mut u8` user-data parameter, the usual C
+idiom. Calling a value of this type requires `unsafe`, same as calling a
+foreign function directly.
+
 ### Layout
 
 `#[repr(C)]` gives a struct the target's C ABI layout. Without it Paco makes no

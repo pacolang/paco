@@ -269,11 +269,11 @@ pub(crate) fn type_to_ty(ty: &Type, span: Span) -> Ty {
         Type::RawPointer { mutable, ty } => Ty::RawPointer { mutable: *mutable, ty: Box::new(type_to_ty(ty, span)), span },
         Type::Slice(ty) => Ty::Slice(Box::new(type_to_ty(ty, span)), span),
         Type::Tuple(items) => Ty::Tuple(items.iter().map(|item| type_to_ty(item, span)).collect(), span),
-        Type::Fn(params, ret) => Ty::Fn {
+        Type::Fn(params, ret, extern_abi, is_unsafe) => Ty::Fn {
             params: params.iter().map(|param| type_to_ty(param, span)).collect(),
             return_ty: Some(Box::new(type_to_ty(ret, span))),
-            extern_abi: None,
-            is_unsafe: false,
+            extern_abi: extern_abi.clone(),
+            is_unsafe: *is_unsafe,
             span,
         },
         Type::Unit => Ty::Tuple(Vec::new(), span),

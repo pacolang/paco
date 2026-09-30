@@ -498,7 +498,7 @@ const START: i128 = -1;
 enum CallKind {
     Plain,
     Nested { target: String, mask: Vec<bool> },
-    Custom { derivative: String, pullback: String, result: Type, residual: Type, gradients: Type, params: Vec<Type> },
+    Custom { derivative: String, pullback: String, result: Type, residual: Type, gradients: Box<Type>, params: Vec<Type> },
     PushFloat(FloatWidth),
     PopFloat(FloatWidth),
     TapeFree,
@@ -845,7 +845,7 @@ impl<'j, 'l, 'a> Job<'j, 'l, 'a> {
                 return CallKind::Plain;
             }
         };
-        CallKind::Custom { derivative, pullback, result, residual, gradients, params: param_types(body) }
+        CallKind::Custom { derivative, pullback, result, residual, gradients: Box::new(gradients), params: param_types(body) }
     }
 
     /// Locals the pullback reads, which the primal therefore saves.
