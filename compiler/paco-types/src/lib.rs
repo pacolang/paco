@@ -5536,6 +5536,100 @@ fn infer_index(
     }
 }
 
+/// `a[i]` as an assignment target: a `[]T` slice keeps its native place, and
+/// anything else resolves against `index_mut` rather than `index` --
+/// `IndexMut`'s own method, not `Index`'s, since a type may expose one
+/// without the other (a read-only view, or a write-only sink). Mirrors
+/// `infer_index`'s shape and diagnostics, one method name over.
+fn infer_index_mut(
+    base: &Expr,
+    index: &[Expr],
+    span: Span,
+    program: &Program,
+    context: &mut FunctionContext<'_>,
+    reporter: &mut Reporter,
+) -> Type {
+    let base_ty = infer_expr(base, program, context, reporter);
+    let receiver_ty = match &base_ty {
+        Type::Borrow { ty, .. } => ty.as_ref().clone(),
+        other => other.clone(),
+    };
+    let index_tys: Vec<Type> = index
+        .iter()
+        .map(|index_expr| infer_expr(index_expr, program, context, reporter))
+        .collect();
+
+    if let Type::Slice(elem) = &receiver_ty {
+        if index_tys.len() != 1 {
+            reporter.push(Diagnostic::error(
+                "PACO-E0331",
+                span,
+                format!("`[]T` indexing takes exactly one index, found {}", index_tys.len()),
+            ));
+            return Type::Error;
+        }
+        if !compatible(&index_tys[0], &Type::Int(IntWidth::I64)) {
+            reporter.push(Diagnostic::error(
+                "PACO-E0331",
+                span,
+                format!("slice index must be `i64`, found {}", index_tys[0].name()),
+            ));
+            return Type::Error;
+        }
+        return elem.as_ref().clone();
+    }
+
+    let Some(type_name) = target_type_name(&receiver_ty) else {
+        reporter.push(Diagnostic::error(
+            "PACO-E0355",
+            span,
+            format!("type `{}` does not support index assignment (no `index_mut` method)", receiver_ty.name()),
+        ));
+        return Type::Error;
+    };
+    let Some(signature) = program.methods.get(&(type_name.clone(), "index_mut".to_string())).cloned() else {
+        reporter.push(Diagnostic::error(
+            "PACO-E0355",
+            span,
+            format!(
+                "`{type_name}` has no `index_mut` method; index assignment requires `fn index_mut(&mut self, i: Idx) -> &mut Output`"
+            ),
+        ));
+        return Type::Error;
+    };
+
+    let idx_ty = if index_tys.len() == 1 {
+        index_tys.into_iter().next().expect("checked len == 1")
+    } else {
+        Type::Tuple(index_tys)
+    };
+
+    let mut substitutions = generic_substitutions(&signature.generics);
+    substitutions.insert("Self".to_string(), receiver_ty.clone());
+    if let Some(expected_receiver) = signature.body_params.first() {
+        unify_type(expected_receiver, &receiver_ty, &mut substitutions);
+    }
+    let matched = signature
+        .params
+        .first()
+        .is_some_and(|expected_idx| unify_type(expected_idx, &idx_ty, &mut substitutions));
+    if !matched {
+        let expected = signature.params.first().map(Type::name).unwrap_or_default();
+        reporter.push(Diagnostic::error(
+            "PACO-E0301",
+            span,
+            format!("type mismatch: `{type_name}::index_mut` expects {expected}, found {}", idx_ty.name()),
+        ));
+        return Type::Error;
+    }
+
+    let return_ty = substitute_generics(&signature.return_ty, &substitutions);
+    match return_ty {
+        Type::Borrow { ty, .. } => *ty,
+        other => other,
+    }
+}
+
 fn operator_trait_name(op: BinaryOp) -> &'static str {
     match op {
         BinaryOp::Add => "Add",
@@ -5682,7 +5776,7 @@ fn infer_assign(
                     "cannot assign through immutable binding or shared borrow",
                 ));
             }
-            infer_index(base, index, span, program, context, reporter)
+            infer_index_mut(base, index, span, program, context, reporter)
         }
         Expr::Unary { op: UnaryOp::Deref, expr: pointer, .. } => {
             match infer_expr(pointer, program, context, reporter) {

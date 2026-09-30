@@ -87,3 +87,75 @@ fn a_missing_index_method_is_a_dedicated_diagnostic_not_a_generic_method_not_fou
     assert!(error.contains("PACO-E0332"), "expected PACO-E0332, got: {error}");
     assert!(!error.contains("PACO-E0314"), "should not fall back to the generic method-not-found code");
 }
+
+#[test]
+fn index_assignment_on_a_slice_still_type_checks_natively() {
+    let error = check_source(
+        r#"
+        fn main() {
+            let mut s: []i64 = slice_of_zeros<i64>(3);
+            s[0] = 1;
+        }
+        "#,
+    );
+    assert_eq!(error, None);
+}
+
+#[test]
+fn index_assignment_resolves_against_index_mut_not_index() {
+    let error = check_source(
+        r#"
+        struct Slot {
+            value: i64,
+
+            fn index_mut(&mut self, i: i64) -> &mut i64 { &mut self.value }
+        }
+
+        fn main() {
+            let mut c = Slot { value: 0 };
+            c[0] = 9;
+        }
+        "#,
+    );
+    assert_eq!(error, None);
+}
+
+#[test]
+fn index_assignment_on_a_type_with_only_index_is_a_dedicated_diagnostic() {
+    let error = check_source(
+        r#"
+        struct ReadOnly {
+            value: i64,
+
+            fn index(&self, i: i64) -> &i64 { &self.value }
+        }
+
+        fn main() {
+            let mut r = ReadOnly { value: 0 };
+            r[0] = 9;
+        }
+        "#,
+    )
+    .expect("expected an error");
+    assert!(error.contains("PACO-E0355"), "expected PACO-E0355, got: {error}");
+}
+
+#[test]
+fn index_assignment_through_an_immutable_binding_is_rejected() {
+    let error = check_source(
+        r#"
+        struct Slot {
+            value: i64,
+
+            fn index_mut(&mut self, i: i64) -> &mut i64 { &mut self.value }
+        }
+
+        fn main() {
+            let c = Slot { value: 0 };
+            c[0] = 9;
+        }
+        "#,
+    )
+    .expect("expected an error");
+    assert!(error.contains("PACO-E0307"), "expected PACO-E0307, got: {error}");
+}
