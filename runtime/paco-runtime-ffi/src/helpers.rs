@@ -401,6 +401,16 @@ pub unsafe extern "C" fn paco_rt_main(argc: i32, argv: *const *const u8, _envp: 
     if unsafe { std::ptr::read_volatile(&raw const __paco_entry_returns_value) } != 0 { result as i32 } else { 0 }
 }
 
+/// Flushes buffered stdout and ends the process with `code`, without
+/// running any pending Paco destructor (`std::process::exit`'s own
+/// documented behavior — the same one `panic.rs`'s `raise` relies on for a
+/// panic that reaches the top of the process).
+#[unsafe(no_mangle)]
+pub extern "C" fn paco_rt_exit(code: i32) -> ! {
+    flush_stdout();
+    std::process::exit(code)
+}
+
 #[cfg(all(target_env = "gnu", target_arch = "x86_64"))]
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
