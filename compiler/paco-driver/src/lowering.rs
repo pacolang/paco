@@ -23,6 +23,7 @@ pub(crate) struct Session<'s, 'm> {
     /// caller has no `SourceMap` in hand (task 3.2's `Lowerer::source_text`
     /// itself defaults the same way).
     source_text: HashMap<Span, String>,
+    layouts: &'s paco_mir::TypeLayouts<'m>,
 }
 
 /// A generic item's declaration, its module, its bindings and its hidden
@@ -36,12 +37,17 @@ pub(crate) struct Lowered {
 }
 
 impl<'s, 'm> Session<'s, 'm> {
-    pub(crate) fn new(contexts: &'s [ModuleContext<'m>], profile: Profile) -> Self {
-        Self::with_source_text(contexts, profile, HashMap::new())
+    pub(crate) fn new(contexts: &'s [ModuleContext<'m>], layouts: &'s paco_mir::TypeLayouts<'m>, profile: Profile) -> Self {
+        Self::with_source_text(contexts, layouts, profile, HashMap::new())
     }
 
-    pub(crate) fn with_source_text(contexts: &'s [ModuleContext<'m>], profile: Profile, source_text: HashMap<Span, String>) -> Self {
-        Self { contexts, profile, instantiations: InstantiationRegistry::new(), done: RefCell::new(HashSet::new()), source_text }
+    pub(crate) fn with_source_text(
+        contexts: &'s [ModuleContext<'m>],
+        layouts: &'s paco_mir::TypeLayouts<'m>,
+        profile: Profile,
+        source_text: HashMap<Span, String>,
+    ) -> Self {
+        Self { contexts, profile, instantiations: InstantiationRegistry::new(), done: RefCell::new(HashSet::new()), source_text, layouts }
     }
 
     fn lower(
@@ -53,12 +59,12 @@ impl<'s, 'm> Session<'s, 'm> {
     ) -> (Body, Vec<(String, Body)>) {
         if function.is_iter {
             paco_mir::lower_iter_fn_with_substitutions(
-                function, &context.typed, &context.registry, &context.drops,
+                function, &context.typed, &context.registry, &context.drops, self.layouts,
                 self.profile, substitutions, &self.instantiations, &self.source_text,
             )
         } else {
             paco_mir::lower_instance(
-                function, &context.typed, &context.registry, &context.drops,
+                function, &context.typed, &context.registry, &context.drops, self.layouts,
                 self.profile, substitutions, hidden, &self.instantiations, &self.source_text,
             )
         }
@@ -288,13 +294,13 @@ pub(crate) fn lower_evaluating_comptime(
     output: &mut ComptimeOutput,
 ) -> Result<Lowered, ()> {
     let source_text = test_assert_source_text(modules, sources);
-    let evaluation = Session::with_source_text(contexts, Profile::Debug, source_text.clone());
+    let evaluation = Session::with_source_text(contexts, layouts, Profile::Debug, source_text.clone());
     let first = evaluation.lower_program();
     if !evaluation.instantiations.has_comptime_sites() {
         return if profile == Profile::Debug {
             differentiate(&evaluation, first, layouts, externs, reporter)
         } else {
-            let session = Session::with_source_text(contexts, profile, source_text);
+            let session = Session::with_source_text(contexts, layouts, profile, source_text);
             let lowered = session.lower_program();
             differentiate(&session, lowered, layouts, externs, reporter)
         };
@@ -303,7 +309,7 @@ pub(crate) fn lower_evaluating_comptime(
     let names = externs.iter().map(|(name, ..)| name.clone()).collect();
     let program = paco_comptime::Program { layouts, externs: names, structs, enums };
     let values = evaluate_sites(&evaluation, first.bodies, &program, reporter, output)?;
-    let session = Session::with_source_text(contexts, profile, source_text);
+    let session = Session::with_source_text(contexts, layouts, profile, source_text);
     session.instantiations.set_comptime_values(values);
     let lowered = session.lower_program();
     differentiate(&session, lowered, layouts, externs, reporter)

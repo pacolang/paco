@@ -23,6 +23,7 @@ fn method_calls_resolve_to_an_explicit_call_target() {
     let mut reporter = Reporter::new();
     let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
     let module = parse_module(&tokens, &mut reporter).unwrap();
+    let layouts = paco_mir::TypeLayouts::from_module(&module);
     assert!(!reporter.has_errors(), "{}", reporter.emit_to_string(&sources));
 
     let typed = infer_module(&module, &mut reporter).expect("module should type-check");
@@ -37,7 +38,7 @@ fn method_calls_resolve_to_an_explicit_call_target() {
         })
         .unwrap();
 
-    let (body, _outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, Profile::Debug);
+    let (body, _outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, Profile::Debug);
 
     let call_target = body.blocks.iter().find_map(|block| match &block.terminator {
         Terminator::Call { target, .. } => Some(target.clone()),

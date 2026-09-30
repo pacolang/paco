@@ -2094,7 +2094,7 @@ fn derive_items(
     let (structs, enums) = lowering::type_decls(&modules);
     let externs = modules.iter().flat_map(|module| extern_signatures(module)).map(|(name, ..)| name).collect();
     let program = paco_comptime::Program { layouts: &layouts, externs, structs, enums };
-    let session = lowering::Session::new(&contexts, paco_mir::Profile::Debug);
+    let session = lowering::Session::new(&contexts, &layouts, paco_mir::Profile::Debug);
     let mut provider = lowering::Provider::new(&session, Vec::new());
     let mut items = Vec::new();
     for request in requests {

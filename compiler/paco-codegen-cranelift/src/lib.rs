@@ -2372,6 +2372,7 @@ mod tests {
         let typed = infer_module(&module, &mut reporter).expect("module should type-check");
         let drops = paco_borrow::analyze_module(&module, &mut reporter).expect("module should borrow-check");
         let registry = paco_mir::TypeRegistry::from_module(&module);
+        let layouts = paco_mir::TypeLayouts::from_module(&module);
         let main = module
             .items
             .iter()
@@ -2381,7 +2382,7 @@ mod tests {
             })
             .unwrap();
 
-        (paco_mir::lower_function(main, &typed, &registry, &drops, paco_mir::Profile::Debug).0, module)
+        (paco_mir::lower_function(main, &typed, &registry, &drops, &layouts, paco_mir::Profile::Debug).0, module)
     }
 
     fn host_module() -> cranelift_object::ObjectModule {

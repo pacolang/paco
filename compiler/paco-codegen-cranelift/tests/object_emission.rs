@@ -30,7 +30,7 @@ fn object_file_symbol_table_contains_every_declared_function() {
         .flat_map(|item| match item {
             Item::Fn(function) => {
                 let (body, outlined) =
-                    paco_mir::lower_function(function, &typed, &registry, &drops, Profile::Debug);
+                    paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, Profile::Debug);
                 let mut result = vec![(function.name.clone(), body)];
                 result.extend(outlined);
                 result

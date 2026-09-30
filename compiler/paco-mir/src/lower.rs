@@ -23,6 +23,7 @@ use crate::body::{
 };
 use crate::comptime::{ComptimeKey, ComptimeValue, splice_sites};
 use crate::layout::scalar_layout;
+use crate::type_layout::TypeLayouts;
 
 /// Names the temporary a `?` unwraps; its payload is moved out rather than
 /// copied, since nothing else can observe the temporary afterwards.
@@ -39,18 +40,6 @@ fn is_copy(ty: &Type) -> bool {
     ) || matches!(ty, Type::Fn(_, _, Some(_), _))
 }
 
-/// The byte length to marshal a value of `ty` across the `paco-runtime-ffi`
-/// boundary (`channel`/`spawn`'s send/recv/result payloads). Only scalar
-/// (`scalar_layout`-computable) types are supported today: `Lowerer` has no
-/// `TypeLayouts` access (unlike `paco-codegen-cranelift`, which does), so a
-/// struct/enum-typed channel element or spawn result — needing a name-keyed
-/// aggregate layout lookup — isn't computable here. Every differential/
-/// driver test this change adds uses a scalar element type (`channel<i64>`
-/// etc., matching the existing `phase-8-concurrency` test corpus); this is a
-/// disclosed, narrower-than-general scope boundary, not a silent gap —
-/// extending it means threading `layouts: &TypeLayouts` into `Lowerer`,
-/// which would widen `lower_function`'s public signature for every caller
-/// in the workspace, so it was not attempted as part of this change.
 /// Every identifier `expr` references, in the order first encountered
 /// (duplicates included — callers dedupe). Reuses `paco-syntax::ast::Visit`
 /// instead of a hand-written recursive match over every `Expr` variant.
@@ -72,17 +61,6 @@ fn collect_referenced_idents(expr: &Expr) -> Vec<(String, Span)> {
     let mut collector = IdentCollector::default();
     collector.visit_expr(expr);
     collector.names
-}
-
-fn scalar_byte_len(ty: &Type) -> u64 {
-    scalar_layout(ty)
-        .unwrap_or_else(|| {
-            panic!(
-                "channel/spawn FFI marshaling only supports scalar element types today \
-                 (int widths, float, bool, char) — found {ty:?}"
-            )
-        })
-        .size
 }
 
 pub struct TypeRegistry<'a> {
@@ -634,6 +612,11 @@ struct Lowerer<'a> {
     /// compiled program — records a generic method call site's own
     /// concrete instantiation for `paco-driver`'s worklist to lower later.
     instantiations: &'a InstantiationRegistry,
+    /// Struct/enum field layouts for any aggregate type crossing the
+    /// `paco-runtime-ffi` boundary (channel elements, spawn/`spawn_blocking`
+    /// results, join payloads, generator yields) — the same source
+    /// `paco-codegen-cranelift` already uses for struct field offsets.
+    layouts: &'a TypeLayouts<'a>,
     locals: Vec<LocalDecl>,
     blocks: Vec<BasicBlock>,
     current: BasicBlockId,
@@ -682,6 +665,7 @@ impl<'a> Lowerer<'a> {
         profile: Profile,
         substitutions: &'a HashMap<String, Type>,
         instantiations: &'a InstantiationRegistry,
+        layouts: &'a TypeLayouts<'a>,
         source_text: &'a HashMap<Span, String>,
     ) -> Self {
         Self {
@@ -692,6 +676,7 @@ impl<'a> Lowerer<'a> {
             profile,
             substitutions,
             instantiations,
+            layouts,
             locals: Vec::new(),
             blocks: vec![placeholder_block()],
             current: BasicBlockId(0),
@@ -1056,7 +1041,7 @@ impl<'a> Lowerer<'a> {
             Place::Local(value_ptr),
             Rvalue::Ref { mutable: false, place: Place::Local(value_local) },
         ));
-        let value_len = scalar_byte_len(&value_ty);
+        let value_len = self.layouts.size_of(&value_ty);
 
         let status_local = self.declare_local(None, Type::Int(IntWidth::I32), false);
         let resume = self.reserve_block();
@@ -1108,7 +1093,7 @@ impl<'a> Lowerer<'a> {
             panic!("Receiver::recv() should type-check to Result<T, RecvError>, found {result_ty:?}");
         };
         let value_ty = type_args[0].clone();
-        let value_len = scalar_byte_len(&value_ty);
+        let value_len = self.layouts.size_of(&value_ty);
 
         let value_local = self.declare_local(None, value_ty, false);
         let value_ptr = self.declare_local(None, Type::Int(IntWidth::I64), false);
@@ -1157,7 +1142,7 @@ impl<'a> Lowerer<'a> {
             panic!("Generator::next() should type-check to Option<T>, found {option_ty:?}");
         };
         let elem_ty = type_args[0].clone();
-        let elem_len = scalar_byte_len(&elem_ty);
+        let elem_len = self.layouts.size_of(&elem_ty);
 
         let value_local = self.declare_local(None, elem_ty, false);
         let value_ptr = self.declare_local(None, Type::Int(IntWidth::I64), false);
@@ -1221,7 +1206,7 @@ impl<'a> Lowerer<'a> {
         };
         let value_ty = type_args[0].clone();
         let unit = matches!(value_ty, Type::Unit);
-        let value_len = if unit { 0 } else { scalar_byte_len(&value_ty) };
+        let value_len = if unit { 0 } else { self.layouts.size_of(&value_ty) };
 
         let value_local = self.declare_local(None, value_ty, false);
         let value_ptr = self.declare_local(None, Type::Int(IntWidth::I64), false);
@@ -1400,10 +1385,10 @@ impl<'a> Lowerer<'a> {
     /// The captures buffer uses one fixed 8-byte slot per captured
     /// variable (not a tightly packed struct layout) — simple, and
     /// sufficient since every captured variable this change supports is
-    /// already scalar and ≤ 8 bytes (`scalar_byte_len`'s own scoping,
-    /// shared with `channel`/`send`/`recv`'s marshaling); a struct/enum
-    /// capture would need real per-instantiation layout info this
-    /// `Lowerer` doesn't have, same boundary as task 3's.
+    /// already scalar and ≤ 8 bytes; a struct/enum capture needs a wider
+    /// per-slot layout than this fixed-stride buffer, a separate boundary
+    /// from the channel/spawn-result/join payload sizes `self.layouts`
+    /// already computes below.
     /// Lowers a call to an `iter fn` (`name` resolves to one, checked by
     /// the caller before this is reached) — reuses the exact same
     /// captures-buffer marshaling `lower_spawn` uses, but the "captures"
@@ -1471,7 +1456,7 @@ impl<'a> Lowerer<'a> {
             Place::Local(value_ptr),
             Rvalue::Ref { mutable: false, place: Place::Local(value_local) },
         ));
-        let value_len = scalar_byte_len(&value_ty);
+        let value_len = self.layouts.size_of(&value_ty);
         let cancelled = self.declare_local(None, Type::Int(IntWidth::I32), false);
         let resume = self.reserve_block();
         self.finish_current(Terminator::Call {
@@ -1541,7 +1526,7 @@ impl<'a> Lowerer<'a> {
         let thunk_addr = self.declare_local(None, Type::Int(IntWidth::I64), false);
         self.push(Statement::Assign(Place::Local(thunk_addr), Rvalue::FuncAddr(thunk_name)));
 
-        let result_len = if matches!(result_ty, Type::Unit) { 0 } else { scalar_byte_len(&result_ty) as i64 };
+        let result_len = if matches!(result_ty, Type::Unit) { 0 } else { self.layouts.size_of(&result_ty) as i64 };
 
         let handle_ty = Type::Struct("JoinHandle".to_string(), vec![result_ty]);
         let handle_local = self.declare_local(None, handle_ty, false);
@@ -1611,6 +1596,7 @@ impl<'a> Lowerer<'a> {
             self.profile,
             self.substitutions,
             self.instantiations,
+            self.layouts,
             self.source_text,
         );
 
@@ -1723,6 +1709,7 @@ impl<'a> Lowerer<'a> {
             self.profile,
             self.substitutions,
             self.instantiations,
+            self.layouts,
             self.source_text,
         );
         thunk.span = expr_span(body);
@@ -2185,6 +2172,7 @@ impl<'a> Lowerer<'a> {
             self.profile,
             self.substitutions,
             self.instantiations,
+            self.layouts,
             self.source_text,
         );
         body.in_comptime = true;
@@ -2579,7 +2567,7 @@ impl<'a> Lowerer<'a> {
                 Place::Local(value_ptr),
                 Rvalue::Ref { mutable: true, place: Place::Local(value_local) },
             ));
-            let value_len = scalar_byte_len(&elem_ty);
+            let value_len = self.layouts.size_of(&elem_ty);
             let recv_resume = self.reserve_block();
             self.finish_current(Terminator::Call {
                 target: CallTarget("paco_rt_recv".to_string()),
@@ -3392,9 +3380,9 @@ impl<'a> Lowerer<'a> {
     /// which already copies any sized `pointee` (aggregates included) —
     /// each backend resolves the concrete size from its own
     /// `TypeLayouts` at codegen time. `offset`/`add` are scoped to a
-    /// scalar pointee, like `scalar_byte_len` above: a struct/enum/tuple
-    /// pointee's size needs a name-keyed aggregate layout lookup this
-    /// `Lowerer` cannot make (no `TypeLayouts` access).
+    /// scalar pointee: extending them to a struct/enum/tuple pointee is a
+    /// separate, not-yet-done change to this method, not something
+    /// `self.layouts` being available here already covers.
     fn lower_pointer_method(&mut self, receiver: &Expr, pointee: &Type, method: &str, args: &[Expr], call_expr: &Expr) -> Operand {
         match method {
             "offset" | "add" => {
@@ -4048,6 +4036,7 @@ pub fn lower_function(
     typed: &TypedModule<'_>,
     registry: &TypeRegistry<'_>,
     drops: &DropPlan<'_>,
+    layouts: &TypeLayouts<'_>,
     profile: Profile,
 ) -> (Body, Vec<(String, Body)>) {
     lower_function_with_substitutions(
@@ -4055,6 +4044,7 @@ pub fn lower_function(
         typed,
         registry,
         drops,
+        layouts,
         profile,
         &HashMap::new(),
         &InstantiationRegistry::new(),
@@ -4070,16 +4060,18 @@ pub fn lower_function(
 /// `instantiations` (as `lower_function` passes) is exactly the pre-
 /// existing, non-generic behavior — `generic-function-codegen`'s own task
 /// 1.2 requirement.
+#[allow(clippy::too_many_arguments)]
 pub fn lower_function_with_substitutions(
     function: &FnDecl,
     typed: &TypedModule<'_>,
     registry: &TypeRegistry<'_>,
     drops: &DropPlan<'_>,
+    layouts: &TypeLayouts<'_>,
     profile: Profile,
     substitutions: &HashMap<String, Type>,
     instantiations: &InstantiationRegistry,
 ) -> (Body, Vec<(String, Body)>) {
-    lower_instance(function, typed, registry, drops, profile, substitutions, &[], instantiations, &HashMap::new())
+    lower_instance(function, typed, registry, drops, layouts, profile, substitutions, &[], instantiations, &HashMap::new())
 }
 
 /// Lowers one instance of a generic function. `hidden` names, in order, the
@@ -4093,6 +4085,7 @@ pub fn lower_instance(
     typed: &TypedModule<'_>,
     registry: &TypeRegistry<'_>,
     drops: &DropPlan<'_>,
+    layouts: &TypeLayouts<'_>,
     profile: Profile,
     substitutions: &HashMap<String, Type>,
     hidden: &[String],
@@ -4104,7 +4097,7 @@ pub fn lower_instance(
         .cloned()
         .unwrap_or(Type::Unknown);
     let expected_return = paco_types::erase_symbolic(&paco_types::substitute_generics(&expected_return, substitutions));
-    let mut lowerer = Lowerer::new(typed, registry, drops, expected_return, profile, substitutions, instantiations, source_text);
+    let mut lowerer = Lowerer::new(typed, registry, drops, expected_return, profile, substitutions, instantiations, layouts, source_text);
     lowerer.in_comptime = is_comptime_only(function);
     for name in hidden {
         let local = lowerer.declare_local(Some(paco_types::display_name(name)), Type::Int(IntWidth::I64), false);
@@ -4231,6 +4224,7 @@ pub fn lower_iter_fn(
     typed: &TypedModule<'_>,
     registry: &TypeRegistry<'_>,
     drops: &DropPlan<'_>,
+    layouts: &TypeLayouts<'_>,
     profile: Profile,
 ) -> (Body, Vec<(String, Body)>) {
     lower_iter_fn_with_substitutions(
@@ -4238,6 +4232,7 @@ pub fn lower_iter_fn(
         typed,
         registry,
         drops,
+        layouts,
         profile,
         &HashMap::new(),
         &InstantiationRegistry::new(),
@@ -4254,12 +4249,13 @@ pub fn lower_iter_fn_with_substitutions(
     typed: &TypedModule<'_>,
     registry: &TypeRegistry<'_>,
     drops: &DropPlan<'_>,
+    layouts: &TypeLayouts<'_>,
     profile: Profile,
     substitutions: &HashMap<String, Type>,
     instantiations: &InstantiationRegistry,
     source_text: &HashMap<Span, String>,
 ) -> (Body, Vec<(String, Body)>) {
-    let mut lowerer = Lowerer::new(typed, registry, drops, Type::Unit, profile, substitutions, instantiations, source_text);
+    let mut lowerer = Lowerer::new(typed, registry, drops, Type::Unit, profile, substitutions, instantiations, layouts, source_text);
 
     let captures_param = lowerer.declare_local(Some("__captures".to_string()), Type::Int(IntWidth::I64), false);
     let cancelled_param = lowerer.declare_local(Some("__cancelled".to_string()), Type::Int(IntWidth::I64), false);

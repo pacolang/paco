@@ -11,6 +11,7 @@ fn lower_module(source: &str) -> (paco_mir::Body, Vec<(String, Body)>, paco_mir:
     let mut reporter = Reporter::new();
     let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
     let module = parse_module(&tokens, &mut reporter).unwrap();
+    let layouts = paco_mir::TypeLayouts::from_module(&module);
     assert!(!reporter.has_errors(), "{}", reporter.emit_to_string(&sources));
 
     let typed = infer_module(&module, &mut reporter).expect("module should type-check");
@@ -35,9 +36,9 @@ fn lower_module(source: &str) -> (paco_mir::Body, Vec<(String, Body)>, paco_mir:
         .unwrap();
 
     let (thunk_body, thunk_outlined) =
-        paco_mir::lower_iter_fn(iter_fn, &typed, &registry, &drops, Profile::Debug);
+        paco_mir::lower_iter_fn(iter_fn, &typed, &registry, &drops, &layouts, Profile::Debug);
     let (main_body, main_outlined) =
-        paco_mir::lower_function(main, &typed, &registry, &drops, Profile::Debug);
+        paco_mir::lower_function(main, &typed, &registry, &drops, &layouts, Profile::Debug);
 
     let mut outlined = thunk_outlined;
     outlined.extend(main_outlined);

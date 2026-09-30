@@ -22,7 +22,7 @@ fn eval(source: &str) -> Result<ComptimeValue, String> {
     let mut bodies: HashMap<String, Rc<Body>> = HashMap::new();
     for item in &module.items {
         if let Item::Fn(function) = item {
-            let (body, outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, Profile::Debug);
+            let (body, outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, Profile::Debug);
             bodies.insert(function.name.clone(), Rc::new(body));
             bodies.extend(outlined.into_iter().map(|(name, body)| (name, Rc::new(body))));
         }

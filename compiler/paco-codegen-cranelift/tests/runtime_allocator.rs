@@ -23,7 +23,7 @@ fn compiled_objects_allocate_through_the_runtime_not_libc() {
         let mut backend = CraneliftBackend::new(Vec::new(), &layouts);
         for item in &module.items {
             if let Item::Fn(function) = item {
-                let (body, outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, Profile::Debug);
+                let (body, outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, Profile::Debug);
                 backend.lower_body(&function.name, &body).unwrap();
                 for (name, body) in outlined {
                     backend.lower_body(&name, &body).unwrap();

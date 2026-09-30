@@ -52,7 +52,7 @@ fn compile_program_object(source: &str) -> PathBuf {
         .flat_map(|item| match item {
             Item::Fn(function) => {
                 let (body, outlined) =
-                    paco_mir::lower_function(function, &typed, &registry, &drops, Profile::Debug);
+                    paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, Profile::Debug);
                 let name = if function.name == "main" {
                     paco_mir::ENTRY_SYMBOL.to_string()
                 } else {

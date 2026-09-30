@@ -32,7 +32,7 @@ fn compiled_ir_text(source: &str, profile: Profile) -> String {
             _ => None,
         })
         .expect("expected a `main` function");
-    let (body, _outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, profile);
+    let (body, _outlined) = paco_mir::lower_function(function, &typed, &registry, &drops, &layouts, profile);
 
     let mut flag_builder = cranelift_codegen::settings::builder();
     flag_builder.set("is_pic", "false").unwrap();
