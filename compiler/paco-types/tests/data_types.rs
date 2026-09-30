@@ -202,3 +202,92 @@ fn a_bare_unit_variant_joins_an_if_with_a_constructed_variant() {
 
     assert!(error.is_none(), "{error:?}");
 }
+
+#[test]
+fn a_generic_ctor_argument_resolves_from_the_receivers_own_bound_generic() {
+    let error = check_source(
+        "
+struct MyVec<T> {
+    v: T,
+    fn new() -> Self { panic(\"unreachable\") }
+}
+struct MyMap<K, V> {
+    k: K,
+    v: V,
+    fn insert(&mut self, key: K, value: V) {}
+}
+fn main() {
+    let mut m: MyMap<string, MyVec<i64>> = MyMap { k: \"\", v: MyVec::new() };
+    m.insert(\"a\", MyVec::new());
+}
+",
+    );
+
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn a_generic_ctor_argument_of_the_wrong_element_type_is_still_a_mismatch() {
+    let error = check_source(
+        "
+struct MyVec<T> {
+    v: T,
+    fn of(v: T) -> Self { MyVec { v: v } }
+}
+struct MyMap<K, V> {
+    k: K,
+    v: V,
+    fn insert(&mut self, key: K, value: V) {}
+}
+fn main() {
+    let mut m: MyMap<string, MyVec<i64>> = MyMap { k: \"\", v: MyVec::of(0) };
+    m.insert(\"a\", MyVec::of(\"wrong\"));
+}
+",
+    )
+    .expect("expected type error");
+
+    assert!(error.contains("PACO-E0302"));
+    assert!(error.contains("MyVec<i64>"));
+    assert!(error.contains("MyVec<string>"));
+}
+
+#[test]
+fn a_generic_ctor_call_as_the_first_of_two_match_arms_resolves_from_the_second() {
+    let error = check_source(
+        "
+struct MyVec<T> {
+    v: T,
+    fn new() -> Self { panic(\"unreachable\") }
+}
+fn pick(flag: bool) -> MyVec<i64> {
+    match flag {
+        true => MyVec::new(),
+        false => MyVec { v: 0 },
+    }
+}
+fn main() {}
+",
+    );
+
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn call_arguments_resolve_a_shared_generic_left_to_right() {
+    let error = check_source(
+        "
+struct MyVec<T> {
+    v: T,
+    fn new() -> Self { panic(\"unreachable\") }
+}
+fn f<T>(a: MyVec<T>, b: T) -> T { b }
+fn main() {
+    let r = f(MyVec::new(), 1);
+    print(r)
+}
+",
+    );
+
+    assert!(error.is_none(), "{error:?}");
+}

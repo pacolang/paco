@@ -1,0 +1,18 @@
+struct MyVec<T: Numeric> {
+    v: []T,
+
+    fn zeros(len: i64) -> Self {
+        MyVec { v: slice_of_zeros<T>(len) }
+    }
+}
+
+struct Holder {
+    fn show(&self, b: MyVec<i64>) {
+        print(b.v.len())
+    }
+}
+
+fn main() {
+    let h = Holder {};
+    h.show(MyVec::zeros(3));
+}
