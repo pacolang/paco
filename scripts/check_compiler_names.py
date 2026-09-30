@@ -17,8 +17,10 @@ local source as the generator; nothing else here changes.
 
 Deliberately dumb and syntactic, like check_docs_consistency.py: line-based
 `//` and `/* */` comment stripping, then a whole-word grep. False positives are
-suppressed with a reviewed entry (`path:line`) in
-scripts/compiler_names_allowlist.txt, not by narrowing the check.
+suppressed with a reviewed entry (`path:<the matched line's stripped text>`) in
+scripts/compiler_names_allowlist.txt, not by narrowing the check. Anchoring on
+the line's text rather than its number means the entry survives an unrelated
+edit moving it up or down the file.
 
 Exit 0 when clean, 1 with file:line for every unallowed hit.
 """
@@ -81,7 +83,7 @@ def main() -> int:
         rel = path.relative_to(ROOT)
         for lineno, line in enumerate(stripped.splitlines(), 1):
             match = pattern.search(line)
-            if match and f"{rel}:{lineno}" not in allowed:
+            if match and f"{rel}:{line.strip()}" not in allowed:
                 problems.append(f"{rel}:{lineno}: `{match.group(1)}` — a library's public item name in compiler/runtime source")
 
     if problems:
