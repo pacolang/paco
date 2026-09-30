@@ -398,6 +398,21 @@ introduced_in = "named-dynamic-dims"
 status = "active"
 lint = false
 
+[E0349]
+message_template = "`{name}` is not a trait"
+severity = "error"
+explanation = """
+A generic bound (`T: Name`, inline or in a `where` clause) names the capability a type parameter \
+must provide. `Name` must be a declared `trait`, or one of the built-in traits (`Add`, `Sub`, `Mul`, \
+`Div`, `Rem`, `Neg`, `Eq`, `Ord`, `Clone`, `Copy`, `Display`, `Numeric`, `Float`, `Differentiable`, \
+`Hash`, `Pullback`, `From`, `Into`, `Drop`, `Index`, `Iter`, `Call`)."""
+cause = "A bound names a struct, enum, or otherwise undeclared identifier instead of a trait."
+fix = "Declare `Name` as a trait, or fix the typo to name the intended trait."
+spec_ref = "docs/design/spec.md#6-traits-and-implicit-interfaces-features-3-and-part-of-2"
+introduced_in = "trait-bound-method-calls"
+status = "active"
+lint = false
+
 [E0801]
 message_template = "`std::autodiff::grad` cannot be built: no backend of this toolchain differentiates it"
 severity = "error"

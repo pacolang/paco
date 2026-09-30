@@ -1,0 +1,7 @@
+fn total<T: Nope>(x: T) -> i64 {
+    0
+}
+
+fn main() {
+    print(total(1))
+}

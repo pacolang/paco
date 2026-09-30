@@ -53,3 +53,28 @@ fn index_trait_with_self_output_and_unbound_generic_type_checks_with_no_diagnost
     );
     assert!(error.is_none(), "{error:?}");
 }
+
+#[test]
+fn unknown_type_in_a_trait_method_signature_is_reported_at_that_type() {
+    let error = check_source("trait T { fn f(&self) -> Missing; }").expect("expected error");
+    assert!(error.contains("PACO-E0306"), "{error}");
+    assert!(error.contains("Missing"), "{error}");
+}
+
+#[test]
+fn a_bound_naming_an_undeclared_trait_is_rejected() {
+    let error = check_source("fn f<T: Nope>(x: T) {}").expect("expected error");
+    assert!(error.contains("PACO-E0349"), "{error}");
+}
+
+#[test]
+fn a_bound_naming_a_declared_trait_is_accepted() {
+    let error = check_source("trait Shape { fn area(&self) -> i64; } fn f<T: Shape>(x: &T) {}");
+    assert!(error.is_none(), "{error:?}");
+}
+
+#[test]
+fn a_bound_naming_a_builtin_trait_is_accepted() {
+    let error = check_source("fn f<T: Add + Copy>(x: T) {}");
+    assert!(error.is_none(), "{error:?}");
+}

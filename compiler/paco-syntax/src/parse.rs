@@ -141,7 +141,7 @@ impl Parser<'_, '_> {
         } else {
             (self.consume_identifier("expected function name")?, None)
         };
-        let generics = self.generic_params()?;
+        let mut generics = self.generic_params()?;
         self.consume(TokenKind::LeftParen, "expected `(` after function name")?;
         let params = self.parameter_list()?;
         self.consume(TokenKind::RightParen, "expected `)` after parameters")?;
@@ -150,6 +150,7 @@ impl Parser<'_, '_> {
         } else {
             None
         };
+        self.where_clause(&mut generics)?;
         let body = self.block()?;
         let span = Span::new(
             self.previous().span.file_id(),
@@ -340,7 +341,8 @@ impl Parser<'_, '_> {
     fn struct_decl(&mut self, is_pub: bool) -> ParseResult<StructDecl> {
         let start = self.previous().span.start();
         let name = self.consume_identifier("expected struct name")?;
-        let generics = self.generic_params()?;
+        let mut generics = self.generic_params()?;
+        self.where_clause(&mut generics)?;
         self.consume(TokenKind::LeftBrace, "expected `{` before struct body")?;
         let mut fields = Vec::new();
         let mut methods = Vec::new();
@@ -400,7 +402,8 @@ impl Parser<'_, '_> {
     fn enum_decl(&mut self, is_pub: bool) -> ParseResult<EnumDecl> {
         let start = self.previous().span.start();
         let name = self.consume_identifier("expected enum name")?;
-        let generics = self.generic_params()?;
+        let mut generics = self.generic_params()?;
+        self.where_clause(&mut generics)?;
         self.consume(TokenKind::LeftBrace, "expected `{` before enum body")?;
         let mut variants = Vec::new();
         let mut methods = Vec::new();
@@ -459,8 +462,9 @@ impl Parser<'_, '_> {
 
     fn methods_block(&mut self) -> ParseResult<MethodsBlock> {
         let start = self.previous().span.start();
-        let generics = self.generic_params()?;
+        let mut generics = self.generic_params()?;
         let target = self.ty()?;
+        self.where_clause(&mut generics)?;
         self.consume(TokenKind::LeftBrace, "expected `{` before methods body")?;
         let mut methods = Vec::new();
         let mut consts = Vec::new();
@@ -558,7 +562,8 @@ impl Parser<'_, '_> {
     fn trait_decl(&mut self, is_pub: bool) -> ParseResult<TraitDecl> {
         let start = self.previous().span.start();
         let name = self.consume_identifier("expected trait name")?;
-        let generics = self.generic_params()?;
+        let mut generics = self.generic_params()?;
+        self.where_clause(&mut generics)?;
         self.consume(TokenKind::LeftBrace, "expected `{` before trait body")?;
         let mut methods = Vec::new();
         let mut consts = Vec::new();
@@ -593,7 +598,7 @@ impl Parser<'_, '_> {
     fn trait_fn_decl(&mut self) -> ParseResult<FnSignature> {
         let start = self.previous().span.start();
         let name = self.consume_identifier("expected function name")?;
-        let generics = self.generic_params()?;
+        let mut generics = self.generic_params()?;
         self.consume(TokenKind::LeftParen, "expected `(` after function name")?;
         let params = self.parameter_list()?;
         self.consume(TokenKind::RightParen, "expected `)` after parameters")?;
@@ -602,6 +607,7 @@ impl Parser<'_, '_> {
         } else {
             None
         };
+        self.where_clause(&mut generics)?;
         let body = if self.matches(TokenKind::Semicolon) {
             None
         } else {
@@ -739,6 +745,52 @@ impl Parser<'_, '_> {
         }
         self.consume(TokenKind::Greater, "expected `>` after generic parameters")?;
         Ok(params)
+    }
+
+    /// One bound in a `T: A + B` or `where` bound list: an optional leading
+    /// `?` (the grammar's `?Sized`-style opt-out marker; accepted
+    /// syntactically but rejected as not supported yet) followed by the
+    /// trait type.
+    fn consume_bound(&mut self) -> ParseResult<Ty> {
+        if self.matches(TokenKind::Question) {
+            self.error_here("PACO-E0114", "`?` bounds are not supported yet");
+        }
+        self.ty()
+    }
+
+    /// `where T: A + B, U: C` after a generic parameter list and before the
+    /// item's body/target — an alternative to inline `<T: A + B>` bounds,
+    /// folded into the same `GenericParam.bounds` so every later pass sees
+    /// one shape regardless of which syntax the source used. A `where`
+    /// clause naming a parameter not declared in `generics` is an error.
+    fn where_clause(&mut self, generics: &mut [GenericParam]) -> ParseResult<()> {
+        if !self.matches(TokenKind::Where) {
+            return Ok(());
+        }
+        loop {
+            let name_span = self.peek().span;
+            let name = self.consume_identifier("expected a generic parameter name after `where`")?;
+            self.consume(TokenKind::Colon, "expected `:` after a `where` parameter name")?;
+            let mut bounds = Vec::new();
+            loop {
+                bounds.push(self.consume_bound()?);
+                if !self.matches(TokenKind::Plus) {
+                    break;
+                }
+            }
+            match generics.iter_mut().find(|param| param.name == name) {
+                Some(param) => param.bounds.extend(bounds),
+                None => self.reporter.push(Diagnostic::error(
+                    "PACO-E0114",
+                    name_span,
+                    format!("`where` names `{name}`, which is not a declared generic parameter"),
+                )),
+            }
+            if !self.matches(TokenKind::Comma) {
+                break;
+            }
+        }
+        Ok(())
     }
 
     /// One generic argument: a type, the `Dyn` dimension marker, or a const
@@ -2256,7 +2308,7 @@ impl Parser<'_, '_> {
             let mut bounds = Vec::new();
             if self.matches(TokenKind::Colon) {
                 loop {
-                    bounds.push(self.ty()?);
+                    bounds.push(self.consume_bound()?);
                     if !self.matches(TokenKind::Plus) {
                         break;
                     }

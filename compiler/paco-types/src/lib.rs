@@ -17,7 +17,7 @@ use paco_match::{ConstructorSet, analyze_match};
 use paco_span::Span;
 use paco_resolve::LocalId;
 use paco_syntax::ast::{
-    self, BinaryOp, Block, ConstDecl, EnumDecl, Expr, ExternBlock, FnDecl, Item, LetStmt, Literal,
+    self, BinaryOp, Block, ConstDecl, EnumDecl, Expr, ExternBlock, FnDecl, FnSignature, Item, LetStmt, Literal,
     MatchArm, MethodsBlock, Module, Param, Pat, QuoteBody, Stmt, StructDecl, Ty, UnaryOp,
     VariantFields, Visit, walk_expr,
 };
@@ -665,6 +665,13 @@ struct ConstInfo {
 struct TraitInfo {
     generics: Vec<String>,
     methods: HashSet<String>,
+    /// Each own-module method's resolved signature (`Self`, the trait's own
+    /// generics and `Self::Assoc` projections already substituted to
+    /// `Type::Generic` placeholders). Keyed the same as `methods`; empty
+    /// for an imported trait until that module's own signatures are
+    /// resolved too (a separate map so the existing name-only `satisfies`
+    /// structural check is unaffected).
+    method_sigs: HashMap<String, FunctionSig>,
     assoc_types: HashSet<String>,
 }
 
@@ -905,6 +912,7 @@ impl Program {
         for (qualifier, imported_module) in imports {
             program.import_traits(imported_module, qualifier);
         }
+        program.check_generic_bounds_declared(module, reporter);
         program.validate_declared_types(module, reporter);
         program.collect_functions(module, reporter);
         program.collect_consts(module, reporter);
@@ -1905,14 +1913,60 @@ impl Program {
                 }
             }
 
+            let trait_generics = ast::generic_names(&decl.generics);
+            let method_sigs = decl
+                .methods
+                .iter()
+                .map(|method| (method.name.clone(), self.trait_method_sig(method, &trait_generics, reporter)))
+                .collect();
+
             self.traits.insert(
                 decl.name.clone(),
                 TraitInfo {
-                    generics: ast::generic_names(&decl.generics),
+                    generics: trait_generics,
                     methods,
+                    method_sigs,
                     assoc_types,
                 },
             );
+        }
+    }
+
+    /// Resolves a trait method's parameter and return types with `Self`,
+    /// the trait's own generics and the method's own generics all in
+    /// scope, so a `Self::Assoc` projection and a use of the trait's type
+    /// parameters type-check instead of reporting "type is not supported
+    /// yet". Trait method signatures were previously collected by name
+    /// only, never resolved.
+    fn trait_method_sig(&self, method: &FnSignature, trait_generics: &[String], reporter: &mut Reporter) -> FunctionSig {
+        let mut env = HashMap::new();
+        env.insert("Self".to_string(), Type::Generic("Self".to_string()));
+        for generic in trait_generics.iter().chain(ast::generic_names(&method.generics).iter()) {
+            env.insert(generic.clone(), Type::Generic(generic.clone()));
+        }
+        let receiver = method.params.first().and_then(receiver_from_param);
+        let body_params = method
+            .params
+            .iter()
+            .enumerate()
+            .map(|(index, param)| {
+                if index == 0 && receiver.is_some() {
+                    Type::Generic("Self".to_string())
+                } else {
+                    self.ty_from_ast(&param.ty, &env, reporter)
+                }
+            })
+            .collect::<Vec<_>>();
+        let params = if receiver.is_some() { body_params.iter().skip(1).cloned().collect() } else { body_params.clone() };
+        let return_ty = method.return_ty.as_ref().map_or(Type::Unit, |ty| self.ty_from_ast(ty, &env, reporter));
+        FunctionSig {
+            params,
+            body_params,
+            return_ty,
+            receiver,
+            generics: ast::generic_names(&method.generics),
+            requires_unsafe: false,
+            requires_comptime: false,
         }
     }
 
@@ -1927,12 +1981,75 @@ impl Program {
             let info = TraitInfo {
                 generics: ast::generic_names(&decl.generics),
                 methods: decl.methods.iter().map(|method| method.name.clone()).collect(),
+                method_sigs: HashMap::new(),
                 assoc_types: decl.assoc_types.iter().map(|assoc| assoc.name.clone()).collect(),
             };
             if !qualifier.is_empty() {
                 self.traits.entry(format!("{qualifier}::{}", decl.name)).or_insert_with(|| info.clone());
             }
             self.traits.entry(decl.name.clone()).or_insert(info);
+        }
+    }
+
+    /// `T: Trait1 + Trait2` naming something that is not a declared trait
+    /// is an error, checked once here over every generic parameter list
+    /// in the module rather than at each of `param_bounds`'s several call
+    /// sites, which build the bound-name index and are not the right
+    /// place for a diagnostic. `BUILTIN_TRAITS` are handled structurally
+    /// by `satisfies` rather than as declared `trait` items, so a bound
+    /// naming one of them is never "not a trait" even though it is absent
+    /// from `program.traits`.
+    fn check_generic_bounds_declared(&self, module: &Module, reporter: &mut Reporter) {
+        const BUILTIN_TRAITS: &[&str] = &[
+            "Add", "Sub", "Mul", "Div", "Rem", "Neg", "Eq", "Ord", "Clone", "Copy", "Display", "Numeric", "Float",
+            "Differentiable", "Hash", "Pullback", "From", "Into", "Drop", "Index", "Iter", "Call",
+        ];
+        let check_params = |params: &[ast::GenericParam], reporter: &mut Reporter| {
+            for param in params {
+                for bound in &param.bounds {
+                    let (path, span) = match bound {
+                        Ty::Path(path, span) => (path, *span),
+                        Ty::Generic { path, span, .. } => (path, *span),
+                        _ => continue,
+                    };
+                    if let Some(name) = path.last()
+                        && !self.traits.contains_key(name)
+                        && !BUILTIN_TRAITS.contains(&name.as_str())
+                    {
+                        reporter.push(Diagnostic::error("PACO-E0349", span, format!("`{name}` is not a trait")));
+                    }
+                }
+            }
+        };
+        for item in &module.items {
+            match item {
+                Item::Fn(decl) => check_params(&decl.generics, reporter),
+                Item::Struct(decl) => {
+                    check_params(&decl.generics, reporter);
+                    for method in &decl.methods {
+                        check_params(&method.generics, reporter);
+                    }
+                }
+                Item::Enum(decl) => {
+                    check_params(&decl.generics, reporter);
+                    for method in &decl.methods {
+                        check_params(&method.generics, reporter);
+                    }
+                }
+                Item::Trait(decl) => {
+                    check_params(&decl.generics, reporter);
+                    for method in &decl.methods {
+                        check_params(&method.generics, reporter);
+                    }
+                }
+                Item::Methods(block) => {
+                    check_params(&block.generics, reporter);
+                    for method in &block.methods {
+                        check_params(&method.generics, reporter);
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
@@ -2309,6 +2426,13 @@ impl Program {
                     && let Some(ty) = generics.get(&path[0])
                 {
                     ty.clone()
+                } else if path.len() == 2 && generics.contains_key(&path[0]) {
+                    // An associated-type projection (`Self::Output`, `T::Item`) on a
+                    // generic/`Self` parameter already in scope: not resolved to a
+                    // concrete binding here (that happens at instantiation), just a
+                    // distinct, stable name a trait-bound method signature or body
+                    // can refer to and later unify against.
+                    Type::Generic(format!("{}::{}", path[0], path[1]))
                 } else if let Some(info) = self.structs.get(&key) {
                     if !info.generics.is_empty() && !allow_omitted {
                         self.check_generic_arity(&key, info.generics.len(), 0, *span, reporter);
