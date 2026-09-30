@@ -1,0 +1,4 @@
+kind = "run"
+feature_min = 1
+build = true
+exit = 101

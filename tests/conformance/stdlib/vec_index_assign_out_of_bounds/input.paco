@@ -1,0 +1,4 @@
+fn main() {
+    let mut v: Vec<i64> = Vec::new();
+    v[3] = 1;
+}

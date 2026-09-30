@@ -5776,7 +5776,15 @@ fn infer_assign(
                     "cannot assign through immutable binding or shared borrow",
                 ));
             }
-            infer_index_mut(base, index, span, program, context, reporter)
+            let index_ty = infer_index_mut(base, index, span, program, context, reporter);
+            // `infer_index_mut` is called directly here rather than through
+            // `infer_expr` (an assignment target isn't an ordinary
+            // sub-expression), so it misses `infer_expr`'s own caching of
+            // the node's type by pointer identity -- which paco-mir's
+            // lowering needs for this same `Expr::Index` node when the
+            // receiver isn't a native slice. Cache it the same way.
+            program.types.borrow_mut().insert(target as *const Expr, index_ty.clone());
+            index_ty
         }
         Expr::Unary { op: UnaryOp::Deref, expr: pointer, .. } => {
             match infer_expr(pointer, program, context, reporter) {

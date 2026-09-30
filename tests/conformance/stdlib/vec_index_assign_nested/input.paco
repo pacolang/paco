@@ -1,0 +1,9 @@
+fn main() {
+    let mut row: Vec<i64> = Vec::new();
+    row.push(0);
+    row.push(0);
+    let mut g: Vec<Vec<i64>> = Vec::new();
+    g.push(row);
+    g[0][1] = 7;
+    print(g[0][1]);
+}
