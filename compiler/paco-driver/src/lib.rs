@@ -17,7 +17,7 @@ use clap::{Parser, Subcommand};
 use paco_diag::{Diagnostic, Reporter, Severity};
 use paco_span::{SourceMap, Span};
 use paco_syntax::{
-    ast::{Expr, FnDecl, Item, Module, Ty, UsePathKind},
+    ast::{AttributeArg, Expr, FnDecl, Item, Literal, Module, Ty, UsePathKind},
     lex::{Token, TokenKind, lex},
     parse::{expr_span, parse_module},
 };
@@ -50,6 +50,9 @@ pub enum Commands {
         /// The target system's root for dynamic cross builds; defaults to `PACO_SYSROOT`.
         #[arg(long)]
         sysroot: Option<PathBuf>,
+        /// A library search directory for `#[link]` resolution; repeatable.
+        #[arg(short = 'L', long = "search-dir")]
+        search_dir: Vec<PathBuf>,
     },
     Check {
         file: PathBuf,
@@ -176,6 +179,8 @@ pub struct BuildOptions {
     pub backend: BackendChoice,
     pub link: Option<LinkChoice>,
     pub sysroot: Option<PathBuf>,
+    /// Library search directories for `#[link]` resolution, from `-L`.
+    pub search_dirs: Vec<PathBuf>,
 }
 
 /// The link mode and complete triple for a build: an explicit `--link`
@@ -210,6 +215,81 @@ pub fn resolve_target(
     (mode, format!("{base}-{env}"))
 }
 
+/// The foreign libraries and search directories `#[link]` attributes and
+/// `-L` collect for `paco_link::LinkRequest`, ahead of kinds and search
+/// directories being threaded through the linker itself.
+struct LinkRequest {
+    libraries: Vec<String>,
+    search_dirs: Vec<PathBuf>,
+}
+
+/// Every `name` in a `#[link(name = "...", ...)]` attribute on an `extern`
+/// block, in source order, across `modules` — replacing the old heuristic
+/// of linking `-l<module-name>` for any module with an `extern` block,
+/// which made a libc-only binding module pull in a bogus library.
+fn collect_link_request(modules: &[&Module], search_dirs: Vec<PathBuf>) -> LinkRequest {
+    let libraries = modules
+        .iter()
+        .flat_map(|module| &module.items)
+        .filter_map(|item| match item {
+            Item::Extern(block) => Some(block),
+            _ => None,
+        })
+        .flat_map(|block| &block.attrs)
+        .filter(|attr| attr.name == "link")
+        .flat_map(|attr| &attr.args)
+        .filter_map(|arg| match arg {
+            AttributeArg::AssignLiteral(key, Literal::String(name), _) if key == "name" => Some(name.clone()),
+            _ => None,
+        })
+        .collect();
+    LinkRequest { libraries, search_dirs }
+}
+
+#[cfg(test)]
+mod link_request_tests {
+    use super::*;
+    use paco_diag::Reporter;
+
+    fn parse(source: &str) -> Module {
+        let mut reporter = Reporter::new();
+        let tokens = lex(source, paco_span::FileId::new(0), &mut reporter);
+        parse_module(&tokens, &mut reporter).expect("source should parse")
+    }
+
+    #[test]
+    fn a_libc_only_extern_block_without_link_asks_for_no_libraries() {
+        let module = parse(r#"extern "C" { fn getpid() -> i32; }"#);
+        let request = collect_link_request(&[&module], Vec::new());
+        assert_eq!(request.libraries, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_link_attribute_names_its_library_regardless_of_module_name() {
+        let module = parse(r#"#[link(name = "m")] extern "C" { fn cbrt(x: f64) -> f64; }"#);
+        let request = collect_link_request(&[&module], Vec::new());
+        assert_eq!(request.libraries, vec!["m".to_string()]);
+    }
+
+    #[test]
+    fn several_link_attributes_collect_every_library_in_source_order() {
+        let module = parse(
+            r#"#[link(name = "a")] extern "C" { fn f() -> i32; }
+               #[link(name = "b")] extern "C" { fn g() -> i32; }"#,
+        );
+        let request = collect_link_request(&[&module], Vec::new());
+        assert_eq!(request.libraries, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn search_dirs_pass_through_untouched() {
+        let module = parse(r#"extern "C" { fn getpid() -> i32; }"#);
+        let dirs = vec![PathBuf::from("native")];
+        let request = collect_link_request(&[&module], dirs.clone());
+        assert_eq!(request.search_dirs, dirs);
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DriverOutput {
     pub stdout: String,
@@ -238,12 +318,12 @@ fn run_command(cli: Cli) -> Result<DriverOutput, String> {
                 status => Err(format!("{}program exited with {}", output.stderr, status.map_or("a signal".to_string(), |code| format!("status {code}")))),
             }
         }
-        Commands::Build { path, release, target, backend, link, sysroot, .. } => {
+        Commands::Build { path, release, target, backend, link, sysroot, search_dir, .. } => {
             let backend = backend.unwrap_or(if release { BackendChoice::Llvm } else { BackendChoice::Cranelift });
             let sysroot = sysroot.or_else(|| std::env::var_os("PACO_SYSROOT").map(PathBuf::from));
             build_file(
                 path.unwrap_or_else(|| PathBuf::from("main.paco")),
-                BuildOptions { release, target, backend, link, sysroot },
+                BuildOptions { release, target, backend, link, sysroot, search_dirs: search_dir },
             )
         }
         Commands::Check { file, .. } => check_file(file),
@@ -1294,6 +1374,7 @@ pub fn build_cached(file: &std::path::Path, cache: &cache::Cache, compiler: &str
         backend: BackendChoice::Cranelift,
         link: None,
         sysroot: std::env::var_os("PACO_SYSROOT").map(PathBuf::from),
+        search_dirs: Vec::new(),
     };
     let entry = compile(file, options, &output)
         .and_then(|compilation| cache.publish(file, &key, &output, compilation.inputs, &compilation.stdout, &compilation.stderr));
@@ -1372,7 +1453,7 @@ fn compile_parsed_module(
     options: BuildOptions,
     output: &std::path::Path,
 ) -> Result<Compilation, String> {
-    let BuildOptions { release, target: requested_target, backend, link, sysroot } = options;
+    let BuildOptions { release, target: requested_target, backend, link, sysroot, search_dirs } = options;
     let profile = if release { paco_mir::Profile::Release } else { paco_mir::Profile::Debug };
 
     let entry_dir = use_resolution_dir.unwrap_or_else(|| file.parent().unwrap_or(std::path::Path::new(".")).to_path_buf());
@@ -1470,16 +1551,13 @@ fn compile_parsed_module(
         object_paths.push(path);
     }
 
-    let extra_libs: Vec<String> = discovered
-        .iter()
-        .filter(|discovered_file| discovered_file.module.items.iter().any(|item| matches!(item, Item::Extern(_))))
-        .map(|discovered_file| discovered_file.qualifier.clone())
-        .collect();
+    let link_request = collect_link_request(&modules, search_dirs);
     let link_result = paco_link::link_program(&paco_link::LinkRequest {
         objects: &object_paths,
         output,
         mode: link_mode,
-        extra_libs: &extra_libs,
+        extra_libs: &link_request.libraries,
+        extra_search_dirs: &link_request.search_dirs,
         target: &triple,
         sysroot: sysroot.as_deref(),
         debug: profile == paco_mir::Profile::Debug,
@@ -2621,7 +2699,14 @@ fn compile_test_binary(
     module.items.extend(main_module.items);
 
     let options =
-        BuildOptions { release: false, target: None, backend, link: None, sysroot: std::env::var_os("PACO_SYSROOT").map(PathBuf::from) };
+        BuildOptions {
+            release: false,
+            target: None,
+            backend,
+            link: None,
+            sysroot: std::env::var_os("PACO_SYSROOT").map(PathBuf::from),
+            search_dirs: Vec::new(),
+        };
     compile_parsed_module(module, heads, test_file, sources, reporter, use_resolution_dir, options, output)?;
     Ok(selected)
 }

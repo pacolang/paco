@@ -144,6 +144,7 @@ fn links_a_hand_built_object_calling_paco_rt_spawn_and_join() {
         output: &exe_path,
         mode: paco_link::LinkMode::Static,
         extra_libs: &[],
+        extra_search_dirs: &[],
         target: &crate::link::native_target(),
         sysroot: None,
         debug: false,

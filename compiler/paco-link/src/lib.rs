@@ -21,8 +21,10 @@ pub struct LinkRequest<'a> {
     pub objects: &'a [PathBuf],
     pub output: &'a Path,
     pub mode: LinkMode,
-    /// Libraries named by the program's `extern` blocks (`m` → `libm`).
+    /// Libraries named by the program's `extern` blocks' `#[link]` attributes.
     pub extra_libs: &'a [String],
+    /// Extra directories to search for `extra_libs`, from `paco build -L`.
+    pub extra_search_dirs: &'a [PathBuf],
     /// A complete triple, such as `aarch64-unknown-linux-musl`.
     pub target: &'a str,
     /// The target system's root for dynamic mode; `/` when `None`.
@@ -93,7 +95,8 @@ pub fn dynamic_arguments(toolchain: &Toolchain, request: &LinkRequest<'_>) -> Re
         other => return Err(format!("dynamic linking is not supported for the `{other}` architecture")),
     };
     let root = request.sysroot.unwrap_or(Path::new("/"));
-    let dirs = search_dirs(root, arch, request.sysroot.is_none());
+    let mut dirs: Vec<PathBuf> = request.extra_search_dirs.to_vec();
+    dirs.extend(search_dirs(root, arch, request.sysroot.is_none()));
     let mut arguments: Vec<String> = [
         "-pie",
         "--threads=1",
@@ -309,11 +312,13 @@ fn link_with_system_driver(toolchain: &Toolchain, request: &LinkRequest<'_>) -> 
     } else {
         command.arg("-Wl,--defsym=main=paco_rt_main").arg("-Wl,--undefined=paco_rt_main");
     }
-    let dirs = if request.extra_libs.is_empty() || cfg!(target_os = "macos") {
-        Vec::new()
-    } else {
-        search_dirs(Path::new("/"), std::env::consts::ARCH, true)
-    };
+    for dir in request.extra_search_dirs {
+        command.arg(format!("-L{}", dir.display()));
+    }
+    let mut dirs: Vec<PathBuf> = request.extra_search_dirs.to_vec();
+    if !request.extra_libs.is_empty() && !cfg!(target_os = "macos") {
+        dirs.extend(search_dirs(Path::new("/"), std::env::consts::ARCH, true));
+    }
     for lib in request.extra_libs {
         match find_library(&dirs, lib) {
             Some(path) if !path.to_string_lossy().ends_with(".so") && !path.to_string_lossy().ends_with(".a") => {
@@ -433,6 +438,7 @@ mod tests {
             output: Path::new("/p/main"),
             mode: LinkMode::Static,
             extra_libs: &[],
+            extra_search_dirs: &[],
             target,
             sysroot: None,
             debug: false,
@@ -473,6 +479,7 @@ mod tests {
             output: Path::new("/p/main"),
             mode: LinkMode::Dynamic,
             extra_libs: &[],
+            extra_search_dirs: &[],
             target: host_triple(),
             sysroot: Some(sysroot.path()),
             debug: false,
@@ -493,5 +500,32 @@ mod tests {
         std::fs::write(libdir.join("libmylib.so.3"), "").unwrap();
         let arguments = dynamic_arguments(&Toolchain::locate(), &request).unwrap();
         assert!(arguments.iter().any(|argument| argument.ends_with("libmylib.so.3")));
+    }
+
+    #[test]
+    fn dynamic_link_finds_a_library_in_an_extra_search_dir() {
+        let sysroot = tempfile::tempdir().unwrap();
+        let libdir = sysroot.path().join(format!("usr/lib/{}-linux-gnu", std::env::consts::ARCH));
+        std::fs::create_dir_all(&libdir).unwrap();
+        for file in ["libc.so.6", "libm.so.6", "libgcc_s.so.1"] {
+            std::fs::write(libdir.join(file), "").unwrap();
+        }
+        let native = tempfile::tempdir().unwrap();
+        std::fs::write(native.path().join("libfix.a"), "").unwrap();
+        let objects = [PathBuf::from("/p/main.o")];
+        let libs = ["fix".to_string()];
+        let search_dirs = [native.path().to_path_buf()];
+        let request = LinkRequest {
+            objects: &objects,
+            output: Path::new("/p/main"),
+            mode: LinkMode::Dynamic,
+            extra_libs: &libs,
+            extra_search_dirs: &search_dirs,
+            target: host_triple(),
+            sysroot: Some(sysroot.path()),
+            debug: false,
+        };
+        let arguments = dynamic_arguments(&Toolchain::locate(), &request).unwrap();
+        assert!(arguments.iter().any(|argument| argument.ends_with("libfix.a")), "{arguments:?}");
     }
 }

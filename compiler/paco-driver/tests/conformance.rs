@@ -165,6 +165,7 @@ fn conformance_tests() {
                             backend: None,
                             link: None,
                             sysroot: None,
+                            search_dir: Vec::new(),
                         },
                     };
                     let err = run(build).expect_err("expected `paco build` to fail");
@@ -216,6 +217,7 @@ fn build_and_run(
             backend: Some(backend),
             link: Some(link),
             sysroot: None,
+            search_dir: Vec::new(),
         },
     };
     if let Err(err) = run(build) {
