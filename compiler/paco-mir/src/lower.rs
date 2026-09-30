@@ -1838,6 +1838,9 @@ impl<'a> Lowerer<'a> {
         if !self.in_comptime && self.registry.function(name).is_some_and(is_comptime_only) {
             return self.lower_comptime(expr, expr);
         }
+        if (name == "ptr_null" || name == "ptr_null_mut") && self.registry.function(name).is_none() && args.is_empty() {
+            return Operand::Constant(Constant::Int(0, IntWidth::I64));
+        }
         if name == "hash_of" && self.registry.function(name).is_none() && let [arg] = args.as_slice() {
             return self.lower_hash_of(arg);
         }
@@ -3380,6 +3383,71 @@ impl<'a> Lowerer<'a> {
         self.lower_method_call_with(receiver, method, args, call_expr, false, None)
     }
 
+    /// `offset`/`add` (element-scaled pointer arithmetic) and `is_null` on
+    /// a `*const T`/`*mut T` receiver — composed from casts and ordinary
+    /// arithmetic already lowered elsewhere, so neither backend needs a
+    /// pointer-specific `Rvalue`. `read`/`write` are not lowered yet (a
+    /// later task). Scoped to a scalar pointee, like `scalar_byte_len`
+    /// above: a struct/enum/tuple pointee's size needs a name-keyed
+    /// aggregate layout lookup this `Lowerer` cannot make (no
+    /// `TypeLayouts` access).
+    fn lower_pointer_method(&mut self, receiver: &Expr, pointee: &Type, method: &str, args: &[Expr], call_expr: &Expr) -> Operand {
+        match method {
+            "offset" | "add" => {
+                let pointer = self.lower_operand(receiver);
+                let index = self.lower_operand(&args[0]);
+                let elem_size = scalar_layout(pointee)
+                    .unwrap_or_else(|| panic!("`{method}` on a pointer to `{pointee:?}` needs a full type layout, not available here"))
+                    .size;
+                let address = self.declare_local(None, Type::Int(IntWidth::I64), false);
+                self.push(Statement::Assign(
+                    Place::Local(address),
+                    Rvalue::Cast { operand: pointer, target: Type::Int(IntWidth::I64) },
+                ));
+                let byte_offset = self.declare_local(None, Type::Int(IntWidth::I64), false);
+                self.push(Statement::Assign(
+                    Place::Local(byte_offset),
+                    Rvalue::BinaryOp(BinOp::Mul, index, Operand::Constant(Constant::Int(elem_size as i64, IntWidth::I64))),
+                ));
+                let advanced = self.declare_local(None, Type::Int(IntWidth::I64), false);
+                self.push(Statement::Assign(
+                    Place::Local(advanced),
+                    Rvalue::BinaryOp(
+                        BinOp::WrappingAdd,
+                        Operand::Copy(Place::Local(address)),
+                        Operand::Copy(Place::Local(byte_offset)),
+                    ),
+                ));
+                let ty = self.type_of(call_expr);
+                let result = self.declare_local(None, ty.clone(), false);
+                self.push(Statement::Assign(
+                    Place::Local(result),
+                    Rvalue::Cast { operand: Operand::Copy(Place::Local(advanced)), target: ty },
+                ));
+                Operand::Copy(Place::Local(result))
+            }
+            "is_null" => {
+                let pointer = self.lower_operand(receiver);
+                let address = self.declare_local(None, Type::Int(IntWidth::U64), false);
+                self.push(Statement::Assign(
+                    Place::Local(address),
+                    Rvalue::Cast { operand: pointer, target: Type::Int(IntWidth::U64) },
+                ));
+                let result = self.declare_local(None, Type::Bool, false);
+                self.push(Statement::Assign(
+                    Place::Local(result),
+                    Rvalue::BinaryOp(
+                        BinOp::Eq,
+                        Operand::Copy(Place::Local(address)),
+                        Operand::Constant(Constant::Int(0, IntWidth::U64)),
+                    ),
+                ));
+                Operand::Copy(Place::Local(result))
+            }
+            _ => panic!("`{method}` on a raw pointer is not lowered yet"),
+        }
+    }
+
     /// `borrow_args` passes each argument by shared reference, as an
     /// overloaded operator does for a `&Self` parameter; `result_ty`
     /// overrides the call expression's type when the operator's value is
@@ -3424,6 +3492,10 @@ impl<'a> Lowerer<'a> {
             let len = self.declare_local(None, Type::Int(IntWidth::I64), false);
             self.push(Statement::Assign(Place::Local(len), Rvalue::SliceLen(place)));
             return Operand::Copy(Place::Local(len));
+        }
+        if let Type::RawPointer { ty: pointee, .. } = strip_borrow(&receiver_ty) {
+            let pointee = pointee.as_ref().clone();
+            return self.lower_pointer_method(receiver, &pointee, method, args, call_expr);
         }
         let type_name = type_name_of(&receiver_ty)
             .or_else(|| match strip_borrow(&receiver_ty) {

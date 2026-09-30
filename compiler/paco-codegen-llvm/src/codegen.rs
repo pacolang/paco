@@ -1431,6 +1431,20 @@ impl<'ctx, 'm, 'a> Generator<'ctx, 'm, 'a> {
             .expect("int to float");
             return self.f64_to_float(wide.into(), *to);
         }
+        let is_ptr_like = |ty: &Type| matches!(ty, Type::RawPointer { .. } | Type::Borrow { .. } | Type::Fn(..));
+        if is_ptr_like(source) && is_ptr_like(target) {
+            // Every pointer-like type shares LLVM's one opaque `ptr` type,
+            // so there is nothing to convert.
+            return value;
+        }
+        if is_ptr_like(source) {
+            let ptr = value.into_pointer_value();
+            return builder.build_ptr_to_int(ptr, target_llvm.into_int_type(), "").expect("ptrtoint").into();
+        }
+        if is_ptr_like(target) {
+            let int = value.into_int_value();
+            return builder.build_int_to_ptr(int, target_llvm.into_pointer_type(), "").expect("inttoptr").into();
+        }
         let int = value.into_int_value();
         let target_int = target_llvm.into_int_type();
         let (from_bits, to_bits) = (int.get_type().get_bit_width(), target_int.get_bit_width());

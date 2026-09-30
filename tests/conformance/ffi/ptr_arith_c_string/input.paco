@@ -1,0 +1,15 @@
+fn main() {
+    let mut buf: []u8 = slice_of_zeros<u8>(4);
+    buf[0] = 97 as u8;
+    buf[1] = 98 as u8;
+    buf[2] = 99 as u8;
+
+    unsafe {
+        let p = slice_as_ptr(&buf);
+        let mut i: i64 = 0;
+        while *p.add(i) != 0 as u8 {
+            print(*p.add(i));
+            i = i + 1;
+        }
+    }
+}

@@ -1,0 +1,18 @@
+extern "C" {
+    fn getenv(name: *const u8) -> *const u8;
+}
+
+fn main() {
+    let mut name_bytes: []u8 = slice_of_zeros<u8>(30);
+    let unset_name = "PACO_CONFORMANCE_UNSET_VAR";
+    let name_utf8 = string_to_bytes(&unset_name);
+    let mut i: i64 = 0;
+    while i < 26 {
+        name_bytes[i] = name_utf8[i];
+        i = i + 1;
+    }
+    unsafe {
+        let p = getenv(slice_as_ptr(&name_bytes));
+        print(p.is_null());
+    }
+}

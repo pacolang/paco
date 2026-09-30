@@ -1,0 +1,13 @@
+struct Pt {
+    x: i64,
+    y: i64,
+}
+
+fn main() {
+    let pt = Pt { x: 1, y: 2 };
+    let p: *const Pt = &pt as *const Pt;
+    let b: *const u8 = p as *const u8;
+    unsafe {
+        print(*b);
+    }
+}

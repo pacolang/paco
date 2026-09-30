@@ -1,0 +1,11 @@
+extern "C" {
+    fn memset(p: *mut i64, c: i32, n: i64) -> *mut i64;
+}
+
+fn main() {
+    let mut x: i64 = 7;
+    unsafe {
+        memset(&mut x as *mut i64, 0 as i32, 8);
+    }
+    print(x);
+}
