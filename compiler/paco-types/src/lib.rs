@@ -800,7 +800,7 @@ fn satisfies(ty: &Type, trait_name: &str, program: &Program, context: Option<&Fu
             "Float" | "Differentiable" => matches!(ty, Type::Float(width) if width.has_arithmetic()),
             "Add" | "Sub" | "Mul" | "Div" | "Rem" => arithmetic(ty),
             "Neg" => matches!(ty, Type::Int(width) if width.is_signed()) || matches!(ty, Type::Float(w) if w.has_arithmetic()),
-            "Ord" => arithmetic(ty) || matches!(ty, Type::Char),
+            "Ord" => arithmetic(ty) || matches!(ty, Type::Char | Type::Bool),
             "Hash" => !matches!(ty, Type::Float(_)),
             "Copy" => !matches!(ty, Type::String),
             _ => true,
@@ -6081,7 +6081,7 @@ fn infer_binary(
             {
                 reporter.push(fp8_arithmetic_diagnostic(span, *width));
                 Type::Error
-            } else if (matches!(&left_ty, Type::Int(_) | Type::Char | Type::Float(_)) && compatible(&left_ty, &right_ty))
+            } else if (matches!(&left_ty, Type::Int(_) | Type::Char | Type::Float(_) | Type::Bool) && compatible(&left_ty, &right_ty))
                 || (matches!(&left_ty, Type::Generic(_))
                     && left_ty == right_ty
                     && satisfies(&left_ty, "Ord", program, Some(context)))

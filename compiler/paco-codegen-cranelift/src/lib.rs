@@ -1536,11 +1536,17 @@ fn compile_binary(
             BinOp::Ge => builder.ins().fcmp(FloatCC::GreaterThanOrEqual, left, right),
             _ => panic!("operator `{op:?}` is not valid over float operands"),
         },
+        // `false` orders before `true`: ordering compares the 0/1
+        // representation numerically, unsigned.
         Type::Bool => match op {
             BinOp::And => builder.ins().band(left, right),
             BinOp::Or => builder.ins().bor(left, right),
             BinOp::Eq => builder.ins().icmp(IntCC::Equal, left, right),
             BinOp::Ne => builder.ins().icmp(IntCC::NotEqual, left, right),
+            BinOp::Lt => builder.ins().icmp(IntCC::UnsignedLessThan, left, right),
+            BinOp::Le => builder.ins().icmp(IntCC::UnsignedLessThanOrEqual, left, right),
+            BinOp::Gt => builder.ins().icmp(IntCC::UnsignedGreaterThan, left, right),
+            BinOp::Ge => builder.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, left, right),
             _ => panic!("operator `{op:?}` is not valid over bool operands"),
         },
         // A `char` is an unsigned 4-byte Unicode scalar value: ordering
