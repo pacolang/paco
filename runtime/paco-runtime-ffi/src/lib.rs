@@ -17,12 +17,14 @@ use std::sync::{Arc, Mutex, OnceLock};
 use corosensei::{Coroutine, CoroutineResult, Yielder};
 
 mod autodiff;
+mod fd;
 mod helpers;
 mod math;
 mod net;
 mod panic;
 mod time;
 mod trace;
+pub use fd::*;
 pub use helpers::*;
 pub use net::*;
 pub use panic::*;
