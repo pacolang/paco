@@ -216,17 +216,19 @@ pub fn resolve_target(
 }
 
 /// The foreign libraries and search directories `#[link]` attributes and
-/// `-L` collect for `paco_link::LinkRequest`, ahead of kinds and search
-/// directories being threaded through the linker itself.
+/// `-L` collect for `paco_link::LinkRequest`.
 struct LinkRequest {
-    libraries: Vec<String>,
+    libraries: Vec<paco_link::LinkLibrary>,
     search_dirs: Vec<PathBuf>,
 }
 
-/// Every `name` in a `#[link(name = "...", ...)]` attribute on an `extern`
-/// block, in source order, across `modules` — replacing the old heuristic
-/// of linking `-l<module-name>` for any module with an `extern` block,
-/// which made a libc-only binding module pull in a bogus library.
+/// One `paco_link::LinkLibrary` per `#[link(name = "...", kind = "...")]`
+/// attribute on an `extern` block, in source order, across `modules` —
+/// replacing the old heuristic of linking `-l<module-name>` for any module
+/// with an `extern` block, which made a libc-only binding module pull in a
+/// bogus library. An attribute's `kind`, if a recognized value, selects
+/// which form of the library the linker must find; an unrecognized `kind`
+/// (already rejected by `check_link_attributes`) is treated as absent.
 fn collect_link_request(modules: &[&Module], search_dirs: Vec<PathBuf>) -> LinkRequest {
     let libraries = modules
         .iter()
@@ -237,10 +239,24 @@ fn collect_link_request(modules: &[&Module], search_dirs: Vec<PathBuf>) -> LinkR
         })
         .flat_map(|block| &block.attrs)
         .filter(|attr| attr.name == "link")
-        .flat_map(|attr| &attr.args)
-        .filter_map(|arg| match arg {
-            AttributeArg::AssignLiteral(key, Literal::String(name), _) if key == "name" => Some(name.clone()),
-            _ => None,
+        .filter_map(|attr| {
+            let mut name = None;
+            let mut kind = None;
+            for arg in &attr.args {
+                let AttributeArg::AssignLiteral(key, Literal::String(value), _) = arg else { continue };
+                match key.as_str() {
+                    "name" => name = Some(value.clone()),
+                    "kind" => {
+                        kind = match value.as_str() {
+                            "static" => Some(paco_link::LinkKind::Static),
+                            "dylib" => Some(paco_link::LinkKind::Dylib),
+                            _ => None,
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            name.map(|name| paco_link::LinkLibrary { name, kind })
         })
         .collect();
     LinkRequest { libraries, search_dirs }
@@ -257,28 +273,39 @@ mod link_request_tests {
         parse_module(&tokens, &mut reporter).expect("source should parse")
     }
 
+    fn library(name: &str, kind: Option<paco_link::LinkKind>) -> paco_link::LinkLibrary {
+        paco_link::LinkLibrary { name: name.to_string(), kind }
+    }
+
     #[test]
     fn a_libc_only_extern_block_without_link_asks_for_no_libraries() {
         let module = parse(r#"extern "C" { fn getpid() -> i32; }"#);
         let request = collect_link_request(&[&module], Vec::new());
-        assert_eq!(request.libraries, Vec::<String>::new());
+        assert_eq!(request.libraries, Vec::new());
     }
 
     #[test]
     fn a_link_attribute_names_its_library_regardless_of_module_name() {
         let module = parse(r#"#[link(name = "m")] extern "C" { fn cbrt(x: f64) -> f64; }"#);
         let request = collect_link_request(&[&module], Vec::new());
-        assert_eq!(request.libraries, vec!["m".to_string()]);
+        assert_eq!(request.libraries, vec![library("m", None)]);
+    }
+
+    #[test]
+    fn a_link_attribute_with_a_kind_carries_it_through() {
+        let module = parse(r#"#[link(name = "SDL2", kind = "static")] extern "C" { fn f() -> i32; }"#);
+        let request = collect_link_request(&[&module], Vec::new());
+        assert_eq!(request.libraries, vec![library("SDL2", Some(paco_link::LinkKind::Static))]);
     }
 
     #[test]
     fn several_link_attributes_collect_every_library_in_source_order() {
         let module = parse(
             r#"#[link(name = "a")] extern "C" { fn f() -> i32; }
-               #[link(name = "b")] extern "C" { fn g() -> i32; }"#,
+               #[link(name = "b", kind = "dylib")] extern "C" { fn g() -> i32; }"#,
         );
         let request = collect_link_request(&[&module], Vec::new());
-        assert_eq!(request.libraries, vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(request.libraries, vec![library("a", None), library("b", Some(paco_link::LinkKind::Dylib))]);
     }
 
     #[test]

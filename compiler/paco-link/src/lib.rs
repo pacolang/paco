@@ -17,12 +17,27 @@ pub enum LinkMode {
     Dynamic,
 }
 
+/// A `#[link]` attribute's `kind`, selecting which form of a library to
+/// require; `None` (no `kind` given) accepts either.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LinkKind {
+    Static,
+    Dylib,
+}
+
+/// One library named by a `#[link(name = "...", kind = "...")]` attribute.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LinkLibrary {
+    pub name: String,
+    pub kind: Option<LinkKind>,
+}
+
 pub struct LinkRequest<'a> {
     pub objects: &'a [PathBuf],
     pub output: &'a Path,
     pub mode: LinkMode,
     /// Libraries named by the program's `extern` blocks' `#[link]` attributes.
-    pub extra_libs: &'a [String],
+    pub extra_libs: &'a [LinkLibrary],
     /// Extra directories to search for `extra_libs`, from `paco build -L`.
     pub extra_search_dirs: &'a [PathBuf],
     /// A complete triple, such as `aarch64-unknown-linux-musl`.
@@ -126,10 +141,11 @@ pub fn dynamic_arguments(toolchain: &Toolchain, request: &LinkRequest<'_>) -> Re
     };
     arguments.push(runtime.display().to_string());
     for lib in request.extra_libs {
-        let found = find_library(&dirs, lib).ok_or_else(|| {
+        let found = find_library(&dirs, &lib.name, lib.kind).ok_or_else(|| {
             format!(
-                "error[PACO-E0803]: library `lib{lib}` for the `extern` block in module `{lib}` was not found for target `{}`; \
+                "error[PACO-E0803]: library `lib{}` named by a `#[link]` attribute was not found for target `{}`; \
                  searched {}; pass the target system's root with `--sysroot <dir>`",
+                lib.name,
                 request.target,
                 list(&dirs)
             )
@@ -182,17 +198,28 @@ fn search_dirs(root: &Path, arch: &str, host: bool) -> Vec<PathBuf> {
     dirs
 }
 
-/// `lib<name>` as `.so`, `.dylib`, `.tbd` or `.a`, else the first versioned
-/// `lib<name>.so.N`.
-fn find_library(dirs: &[PathBuf], name: &str) -> Option<PathBuf> {
+/// `kind = Some(Static)` requires `lib<name>.a`; `kind = Some(Dylib)`
+/// requires `.so`, `.dylib` or `.tbd` (or the first versioned
+/// `lib<name>.so.N`); `kind = None` accepts either, shared forms first.
+fn find_library(dirs: &[PathBuf], name: &str, kind: Option<LinkKind>) -> Option<PathBuf> {
     let shared = format!("lib{name}.so");
-    let files = [shared.clone(), format!("lib{name}.dylib"), format!("lib{name}.tbd"), format!("lib{name}.a")];
+    let static_lib = format!("lib{name}.a");
+    let dylib = format!("lib{name}.dylib");
+    let tbd = format!("lib{name}.tbd");
+    let candidates: Vec<&str> = match kind {
+        Some(LinkKind::Static) => vec![static_lib.as_str()],
+        Some(LinkKind::Dylib) => vec![shared.as_str(), dylib.as_str(), tbd.as_str()],
+        None => vec![shared.as_str(), dylib.as_str(), tbd.as_str(), static_lib.as_str()],
+    };
     for dir in dirs {
-        for file in &files {
+        for file in &candidates {
             if dir.join(file).exists() {
                 return Some(dir.join(file));
             }
         }
+    }
+    if kind == Some(LinkKind::Static) {
+        return None;
     }
     let versioned = format!("{shared}.");
     dirs.iter().find_map(|dir| {
@@ -265,12 +292,14 @@ fn link_macho(toolchain: &Toolchain, request: &LinkRequest<'_>) -> Result<(), St
     };
     command.arg(runtime);
     if !request.extra_libs.is_empty() {
-        let dirs = macos_library_dirs(&sdk);
+        let mut dirs = request.extra_search_dirs.to_vec();
+        dirs.extend(macos_library_dirs(&sdk));
         for lib in request.extra_libs {
-            let found = find_library(&dirs, lib).ok_or_else(|| {
+            let found = find_library(&dirs, &lib.name, lib.kind).ok_or_else(|| {
                 format!(
-                    "error[PACO-E0803]: library `lib{lib}` for the `extern` block in module `{lib}` was not found for target `{}`; \
+                    "error[PACO-E0803]: library `lib{}` named by a `#[link]` attribute was not found for target `{}`; \
                      searched {}",
+                    lib.name,
                     request.target,
                     list(&dirs)
                 )
@@ -320,11 +349,11 @@ fn link_with_system_driver(toolchain: &Toolchain, request: &LinkRequest<'_>) -> 
         dirs.extend(search_dirs(Path::new("/"), std::env::consts::ARCH, true));
     }
     for lib in request.extra_libs {
-        match find_library(&dirs, lib) {
+        match find_library(&dirs, &lib.name, lib.kind) {
             Some(path) if !path.to_string_lossy().ends_with(".so") && !path.to_string_lossy().ends_with(".a") => {
                 command.arg(path)
             }
-            _ => command.arg(format!("-l{lib}")),
+            _ => command.arg(format!("-l{}", lib.name)),
         };
     }
     if cfg!(target_os = "linux") {
@@ -359,7 +388,8 @@ fn link_coff(toolchain: &Toolchain, request: &LinkRequest<'_>) -> Result<(), Str
         .map(|(_, value)| value.clone())
         .or_else(|| std::env::var_os("LIB"))
         .unwrap_or_default();
-    let dirs: Vec<PathBuf> = std::env::split_paths(&lib).filter(|dir| !dir.as_os_str().is_empty()).collect();
+    let mut dirs: Vec<PathBuf> = request.extra_search_dirs.to_vec();
+    dirs.extend(std::env::split_paths(&lib).filter(|dir| !dir.as_os_str().is_empty()));
     command.envs(environment);
     command.args([
         "-flavor",
@@ -381,10 +411,10 @@ fn link_coff(toolchain: &Toolchain, request: &LinkRequest<'_>) -> Result<(), Str
     };
     command.arg(runtime);
     for lib in request.extra_libs {
-        let file = format!("{lib}.lib");
+        let file = format!("{}.lib", lib.name);
         let found = dirs.iter().map(|dir| dir.join(&file)).find(|path| path.is_file()).ok_or_else(|| {
             format!(
-                "error[PACO-E0803]: library `{file}` for the `extern` block in module `{lib}` was not found for target `{}`; searched {}",
+                "error[PACO-E0803]: library `{file}` named by a `#[link]` attribute was not found for target `{}`; searched {}",
                 request.target,
                 list(&dirs)
             )
@@ -473,7 +503,7 @@ mod tests {
     fn dynamic_link_reports_missing_glibc_and_missing_extern_libraries() {
         let sysroot = tempfile::tempdir().unwrap();
         let objects = [PathBuf::from("/p/main.o")];
-        let libs = ["mylib".to_string()];
+        let libs = [LinkLibrary { name: "mylib".to_string(), kind: None }];
         let mut request = LinkRequest {
             objects: &objects,
             output: Path::new("/p/main"),
@@ -513,7 +543,7 @@ mod tests {
         let native = tempfile::tempdir().unwrap();
         std::fs::write(native.path().join("libfix.a"), "").unwrap();
         let objects = [PathBuf::from("/p/main.o")];
-        let libs = ["fix".to_string()];
+        let libs = [LinkLibrary { name: "fix".to_string(), kind: Some(LinkKind::Static) }];
         let search_dirs = [native.path().to_path_buf()];
         let request = LinkRequest {
             objects: &objects,
@@ -527,5 +557,32 @@ mod tests {
         };
         let arguments = dynamic_arguments(&Toolchain::locate(), &request).unwrap();
         assert!(arguments.iter().any(|argument| argument.ends_with("libfix.a")), "{arguments:?}");
+    }
+
+    #[test]
+    fn dynamic_link_rejects_a_static_only_library_when_kind_is_dylib() {
+        let sysroot = tempfile::tempdir().unwrap();
+        let libdir = sysroot.path().join(format!("usr/lib/{}-linux-gnu", std::env::consts::ARCH));
+        std::fs::create_dir_all(&libdir).unwrap();
+        for file in ["libc.so.6", "libm.so.6", "libgcc_s.so.1"] {
+            std::fs::write(libdir.join(file), "").unwrap();
+        }
+        let native = tempfile::tempdir().unwrap();
+        std::fs::write(native.path().join("libfix.a"), "").unwrap();
+        let objects = [PathBuf::from("/p/main.o")];
+        let libs = [LinkLibrary { name: "fix".to_string(), kind: Some(LinkKind::Dylib) }];
+        let search_dirs = [native.path().to_path_buf()];
+        let request = LinkRequest {
+            objects: &objects,
+            output: Path::new("/p/main"),
+            mode: LinkMode::Dynamic,
+            extra_libs: &libs,
+            extra_search_dirs: &search_dirs,
+            target: host_triple(),
+            sysroot: Some(sysroot.path()),
+            debug: false,
+        };
+        let error = dynamic_arguments(&Toolchain::locate(), &request).unwrap_err();
+        assert!(error.contains("PACO-E0803") && error.contains("libfix"), "{error}");
     }
 }
