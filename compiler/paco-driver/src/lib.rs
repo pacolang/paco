@@ -10,6 +10,7 @@ pub mod cache;
 pub mod git;
 pub mod manifest;
 pub mod pkg_cache;
+pub mod safetensors;
 mod lowering;
 
 use clap::{Parser, Subcommand};
