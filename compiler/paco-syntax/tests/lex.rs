@@ -253,3 +253,79 @@ fn lexer_tokenizes_caret_and_tilde() {
     );
     assert!(!reporter.has_errors());
 }
+
+#[test]
+fn lexer_tokenizes_hex_octal_and_binary_integer_literals() {
+    let mut sources = SourceMap::new();
+    let file = sources.add_file("main.paco", "0xFF 0o17 0b1010 0X1a 0O7 0B0");
+    let mut reporter = Reporter::new();
+
+    let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
+    let lexemes: Vec<_> = tokens.iter().map(|token| token.lexeme.as_str()).collect();
+
+    assert_eq!(lexemes, vec!["0xFF", "0o17", "0b1010", "0X1a", "0O7", "0B0", ""]);
+    assert!(tokens[..6].iter().all(|token| token.kind == TokenKind::Integer));
+    assert!(!reporter.has_errors());
+}
+
+#[test]
+fn lexer_accepts_underscore_separators_in_every_base() {
+    let mut sources = SourceMap::new();
+    let file = sources.add_file("main.paco", "1_000_000 0xFF_FF 0b1010_0101 0o17_17");
+    let mut reporter = Reporter::new();
+
+    let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
+
+    assert!(tokens[..4].iter().all(|token| token.kind == TokenKind::Integer));
+    assert!(!reporter.has_errors());
+}
+
+#[test]
+fn lexer_reports_a_digit_outside_the_literals_base() {
+    let mut sources = SourceMap::new();
+    let file = sources.add_file("main.paco", "0b012");
+    let mut reporter = Reporter::new();
+
+    lex(sources.source(file).unwrap(), file, &mut reporter);
+
+    assert!(reporter.has_errors());
+    let rendered = reporter.emit_to_string(&sources);
+    assert!(rendered.contains("PACO-E0103"), "{rendered}");
+    assert!(rendered.contains('2'), "{rendered}");
+}
+
+#[test]
+fn lexer_reports_an_empty_prefixed_literal() {
+    let mut sources = SourceMap::new();
+    let file = sources.add_file("main.paco", "0x");
+    let mut reporter = Reporter::new();
+
+    lex(sources.source(file).unwrap(), file, &mut reporter);
+
+    assert!(reporter.emit_to_string(&sources).contains("PACO-E0103"));
+}
+
+#[test]
+fn lexer_rejects_a_separator_right_after_the_prefix() {
+    let mut sources = SourceMap::new();
+    let file = sources.add_file("main.paco", "0x_FF");
+    let mut reporter = Reporter::new();
+
+    lex(sources.source(file).unwrap(), file, &mut reporter);
+
+    assert!(reporter.emit_to_string(&sources).contains("PACO-E0104"));
+}
+
+#[test]
+fn lexer_rejects_a_trailing_separator_in_any_base() {
+    for source in ["0xFF_", "0o17_", "0b10_", "1000_"] {
+        let mut sources = SourceMap::new();
+        let file = sources.add_file("main.paco", source);
+        let mut reporter = Reporter::new();
+
+        lex(sources.source(file).unwrap(), file, &mut reporter);
+
+        let rendered = reporter.emit_to_string(&sources);
+        assert!(rendered.contains("PACO-E0104"), "{source}: {rendered}");
+    }
+}

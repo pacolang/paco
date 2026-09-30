@@ -1385,3 +1385,22 @@ fn paco_fmt_round_trips_inline_and_where_clause_bounds_to_the_same_output() {
     assert_eq!(inline, where_clause);
     assert_eq!(paco_syntax::fmt::format_module(&parse_source(&inline), None), inline);
 }
+
+#[test]
+fn hex_octal_and_binary_literals_parse_to_their_decimal_value() {
+    let module = parse_source("fn f() { let a = 0xFF; let b = 0o17; let c = 0b1010; let d = 0x1_F; }");
+    let Item::Fn(function) = &module.items[0] else { panic!("expected function item") };
+    let values: Vec<i64> = function
+        .body
+        .stmts
+        .iter()
+        .map(|stmt| {
+            let Stmt::Let(let_stmt) = stmt else { panic!("expected a let statement") };
+            let Some(Expr::Literal(Literal::Int(value), _)) = &let_stmt.value else {
+                panic!("expected an integer literal initializer")
+            };
+            *value
+        })
+        .collect();
+    assert_eq!(values, vec![255, 15, 10, 31]);
+}
