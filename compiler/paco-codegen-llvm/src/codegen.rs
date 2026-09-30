@@ -1224,11 +1224,14 @@ impl<'ctx, 'm, 'a> Generator<'ctx, 'm, 'a> {
                     (BinOp::Ne, _) => compare(IntPredicate::NE, IntPredicate::NE),
                     (BinOp::And, Type::Bool) => builder.build_and(left, right, "").expect("and").into(),
                     (BinOp::Or, Type::Bool) => builder.build_or(left, right, "").expect("or").into(),
-                    (_, Type::Bool) => panic!("operator `{op:?}` is not valid over bool operands"),
+                    // `false` orders before `true`: ordering compares the
+                    // 0/1 representation numerically, unsigned (`signed`
+                    // is already false for both `Bool` and `Char`).
                     (BinOp::Lt, _) => compare(IntPredicate::SLT, IntPredicate::ULT),
                     (BinOp::Le, _) => compare(IntPredicate::SLE, IntPredicate::ULE),
                     (BinOp::Gt, _) => compare(IntPredicate::SGT, IntPredicate::UGT),
                     (BinOp::Ge, _) => compare(IntPredicate::SGE, IntPredicate::UGE),
+                    (_, Type::Bool) => panic!("operator `{op:?}` is not valid over bool operands"),
                     (_, Type::Char) => panic!("operator `{op:?}` is not valid over char operands"),
                     (BinOp::Add | BinOp::Sub | BinOp::Mul, _) => self.checked(frame, op, left, right, signed),
                     (BinOp::Div | BinOp::Rem, _) => self.divide(frame, op, left, right, signed),

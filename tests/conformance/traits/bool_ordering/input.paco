@@ -1,0 +1,10 @@
+fn max<T: Ord + Copy>(a: T, b: T) -> T {
+    if a > b { a } else { b }
+}
+
+fn main() {
+    print(max(false, true));
+    print(false < true);
+    print(true <= true);
+    print(true > false);
+}
