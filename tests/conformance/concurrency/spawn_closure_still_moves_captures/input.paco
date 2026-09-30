@@ -1,0 +1,5 @@
+fn main() {
+    let s = "x";
+    spawn (|| print(s))();
+    print(s);
+}
