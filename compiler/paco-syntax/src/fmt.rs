@@ -7,6 +7,7 @@ use crate::ast::{
     MethodsBlock, Module, Param, Pat, QuoteBody, Stmt, StructDecl, TraitDecl, Ty, UnaryOp, UseDecl,
     VariantFields,
 };
+use paco_span::Span;
 
 pub fn format_module(module: &Module, source: Option<&str>) -> String {
     let mut formatter = Formatter::new(source);
@@ -532,9 +533,12 @@ impl<'a> Formatter<'a> {
         }
     }
 
-    fn format_literal(&mut self, lit: &Literal) {
+    fn format_literal(&mut self, lit: &Literal, span: Span) {
         match lit {
-            Literal::Int(n) => self.write(&n.to_string()),
+            Literal::Int(n) => {
+                let text = self.int_literal_source(*n, span);
+                self.write(&text);
+            }
             Literal::Float(f) => {
                 let s = f.to_string();
                 if s.contains('.') || s.contains('e') || s.contains('E') {
@@ -573,11 +577,29 @@ impl<'a> Formatter<'a> {
         }
     }
 
+    /// An integer literal's own source text (`0xFF`, `1_000_000`), so its
+    /// base and separators survive formatting instead of being replaced by
+    /// `n`'s plain decimal digits. Falls back to the decimal form when no
+    /// original source is available, or when the span's text doesn't
+    /// re-parse to `n` (a mismatch that should never happen, but a
+    /// formatter must never silently emit a different value than the one
+    /// it read).
+    fn int_literal_source(&self, n: i64, span: Span) -> String {
+        if let Some(src) = self.source
+            && span.end() <= src.len()
+            && let Some(text) = src.get(span.start()..span.end())
+            && crate::parse::parse_int_literal(text) == n
+        {
+            return text.to_string();
+        }
+        n.to_string()
+    }
+
     fn format_pat(&mut self, pat: &Pat) {
         match pat {
             Pat::Ident(name, _) => self.write(name),
             Pat::Wildcard(_) => self.write("_"),
-            Pat::Literal(lit, _) => self.format_literal(lit),
+            Pat::Literal(lit, span) => self.format_literal(lit, *span),
             Pat::Tuple(pats, _) => {
                 self.write("(");
                 for (i, p) in pats.iter().enumerate() {
@@ -737,7 +759,7 @@ impl<'a> Formatter<'a> {
 
     fn format_expr(&mut self, expr: &Expr) {
         match expr {
-            Expr::Literal(lit, _) => self.format_literal(lit),
+            Expr::Literal(lit, span) => self.format_literal(lit, *span),
             Expr::Ident(name, _) => self.write(name),
             Expr::Block(block) => self.format_block(block),
             Expr::Unsafe(block, _) => {

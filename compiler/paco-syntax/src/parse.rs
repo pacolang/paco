@@ -2801,7 +2801,7 @@ fn decode_char(source: &str) -> char {
 /// (larger than `i64::MAX`, e.g. a `u64` literal past that point)
 /// defaults to `0`, the same fallback the plain-decimal case already had
 /// before hex/octal/binary forms existed.
-fn parse_int_literal(lexeme: &str) -> i64 {
+pub(crate) fn parse_int_literal(lexeme: &str) -> i64 {
     let digits = lexeme.replace('_', "");
     match digits.as_bytes() {
         [b'0', b'x' | b'X', rest @ ..] => i64::from_str_radix(std::str::from_utf8(rest).unwrap_or(""), 16),
