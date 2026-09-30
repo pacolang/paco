@@ -21,10 +21,12 @@ mod helpers;
 mod math;
 mod net;
 mod panic;
+mod time;
 mod trace;
 pub use helpers::*;
 pub use net::*;
 pub use panic::*;
+pub use time::*;
 
 static RUNTIME: OnceLock<paco_runtime::Runtime> = OnceLock::new();
 
