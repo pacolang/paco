@@ -1205,7 +1205,7 @@ impl<'a> Lowerer<'a> {
             panic!("JoinHandle::join() should type-check to Result<T, TaskPanic>, found {result_ty:?}");
         };
         let value_ty = type_args[0].clone();
-        let unit = matches!(value_ty, Type::Unit);
+        let unit = matches!(value_ty, Type::Unit | Type::Never);
         let value_len = if unit { 0 } else { self.layouts.size_of(&value_ty) };
 
         let value_local = self.declare_local(None, value_ty, false);
@@ -1526,7 +1526,7 @@ impl<'a> Lowerer<'a> {
         let thunk_addr = self.declare_local(None, Type::Int(IntWidth::I64), false);
         self.push(Statement::Assign(Place::Local(thunk_addr), Rvalue::FuncAddr(thunk_name)));
 
-        let result_len = if matches!(result_ty, Type::Unit) { 0 } else { self.layouts.size_of(&result_ty) as i64 };
+        let result_len = if matches!(result_ty, Type::Unit | Type::Never) { 0 } else { self.layouts.size_of(&result_ty) as i64 };
 
         let handle_ty = Type::Struct("JoinHandle".to_string(), vec![result_ty]);
         let handle_local = self.declare_local(None, handle_ty, false);
@@ -1613,7 +1613,7 @@ impl<'a> Lowerer<'a> {
         }
 
         let result_operand = thunk.lower_operand(operand);
-        if !matches!(result_ty, Type::Unit) {
+        if !matches!(result_ty, Type::Unit | Type::Never) {
             thunk.push(Statement::Store {
                 address: Operand::Copy(Place::Local(result_param)),
                 value: result_operand,

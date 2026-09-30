@@ -1005,7 +1005,7 @@ impl<'ctx, 'm, 'a> Generator<'ctx, 'm, 'a> {
                 }
             }
             Statement::Store { address, value, ty } => {
-                if matches!(ty, Type::Unit) {
+                if matches!(ty, Type::Unit | Type::Never) {
                     return;
                 }
                 let address = self.as_ptr(self.operand(frame, address));
