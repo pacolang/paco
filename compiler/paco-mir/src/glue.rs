@@ -81,7 +81,13 @@ impl<V> Analysis<'_, '_, V> {
             return false;
         }
         let result = match ty {
-            Type::String | Type::Slice(_) | Type::Fn(..) => true,
+            Type::String | Type::Slice(_) => true,
+            // A closure owns a heap-allocated, reference-counted
+            // environment and needs the usual drop/clone glue; a C
+            // function pointer (`extern_abi` set) is a bare code address
+            // with nothing to own — see `is_copy` in `lower.rs`, which
+            // draws the same line.
+            Type::Fn(_, _, extern_abi, _) => extern_abi.is_none(),
             _ if is_cell(ty, self.layouts) || handle_fns(ty, self.layouts).is_some() => true,
             _ if unresolved(ty) => false,
             Type::Struct(name, _) if !self.layouts.has_struct(name) => false,
