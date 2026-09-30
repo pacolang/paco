@@ -1641,6 +1641,19 @@ an escape hatch for ordinary Paco code — `Rc`/`Arc` remain the answer when
 ownership is awkward (§3). Converting a borrow to a raw pointer is safe;
 dereferencing one is not.
 
+Computing a pointer or its address is always safe; touching what it points to
+needs `unsafe`:
+
+| Operation | Needs `unsafe` |
+|---|---|
+| `&x as *const T`, `&mut x as *mut T` | no |
+| `p as *const U`, `p as *mut U` (pointee change), `p as u64`/`u64 as *const T` | no |
+| `p.offset(n)`, `p.add(n)` (element-scaled, wrapping) | no |
+| `ptr_null::<T>()`, `ptr_null_mut::<T>()` | no |
+| `p.is_null()` | no |
+| `*p`, `*p = v` | yes |
+| `p.read()`, `p.write(v)` (aggregates included; `write` does not drop the previous contents) | yes |
+
 ### Exporting to C
 
 ```paco
