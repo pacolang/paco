@@ -1,0 +1,12 @@
+fn main() {
+    print(0xFF);
+    print(0Xff);
+    print(0o17);
+    print(0O17);
+    print(0b1010);
+    print(0B1010);
+    print(1_000_000);
+    print(0x1_F);
+    print(0o1_7);
+    print(0b10_10);
+}
