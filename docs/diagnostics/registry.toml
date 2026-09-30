@@ -49,6 +49,33 @@ introduced_in = "vec-index-assignment"
 status = "active"
 lint = false
 
+[E0356]
+message_template = "`#[link]` has no `{key}` argument; expected `name` or `kind`"
+severity = "error"
+explanation = """
+`#[link(...)]` on an extern block takes only `name = "..."` (the library to link) and \
+`kind = "..."` (`"static"` or `"dylib"`), each a string. Any other argument, or one not \
+in `key = "value"` form, is rejected."""
+cause = "`#[link]` was given an argument other than name or kind, or one that isn't key = \"string\"."
+fix = "Use `name = \"...\"` and/or `kind = \"static\" | \"dylib\"`."
+spec_ref = "docs/design/spec.md"
+introduced_in = "ffi-link-attribute"
+status = "active"
+lint = false
+
+[E0357]
+message_template = "`#[link]`'s `kind` must be `\"static\"` or `\"dylib\"`"
+severity = "error"
+explanation = """
+`#[link(kind = "...")]` selects whether the named library must be linked as a static archive or a \
+shared library. No other value names a linking form the compiler understands."""
+cause = "`#[link]`'s `kind` argument has a value other than `\"static\"` or `\"dylib\"`."
+fix = "Use `kind = \"static\"` or `kind = \"dylib\"`, or omit `kind` to let the linker choose."
+spec_ref = "docs/design/spec.md"
+introduced_in = "ffi-link-attribute"
+status = "active"
+lint = false
+
 [E0353]
 message_template = "cannot derive `{trait_name}`: no `#[derivable(..)]` registration found"
 severity = "error"

@@ -57,12 +57,15 @@ pub enum AttributeArg {
     Nested(Attribute),
     /// `key = path`, as in `#[derivative(of = f)]`.
     Assign(String, Vec<String>, Span),
+    /// `key = literal`, as in `#[link(name = "m")]`.
+    AssignLiteral(String, Literal, Span),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExternBlock {
     pub abi: String,
     pub functions: Vec<FnSignature>,
+    pub attrs: Vec<Attribute>,
     pub span: Span,
 }
 

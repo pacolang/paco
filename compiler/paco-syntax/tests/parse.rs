@@ -1024,6 +1024,26 @@ fn parser_attaches_an_attribute_to_a_function() {
 }
 
 #[test]
+fn parser_attaches_a_link_attribute_to_an_extern_block() {
+    let module = parse_source("#[link(name = \"m\", kind = \"static\")]\nextern \"C\" { fn cbrt(x: f64) -> f64; }");
+    let Item::Extern(block) = &module.items[0] else {
+        panic!("expected extern item");
+    };
+    assert_eq!(block.attrs.len(), 1);
+    assert_eq!(block.attrs[0].name, "link");
+    let paco_syntax::ast::AttributeArg::AssignLiteral(key, Literal::String(value), _) = &block.attrs[0].args[0] else {
+        panic!("expected a key = \"literal\" attribute arg, got {:?}", block.attrs[0].args[0]);
+    };
+    assert_eq!(key, "name");
+    assert_eq!(value, "m");
+    let paco_syntax::ast::AttributeArg::AssignLiteral(key, Literal::String(value), _) = &block.attrs[0].args[1] else {
+        panic!("expected a key = \"literal\" attribute arg, got {:?}", block.attrs[0].args[1]);
+    };
+    assert_eq!(key, "kind");
+    assert_eq!(value, "static");
+}
+
+#[test]
 fn parser_attaches_an_attribute_to_a_struct_field() {
     let module = parse_source("struct Point { #[serde(\"X\")] x: i64, y: i64 }");
     let Item::Struct(decl) = &module.items[0] else {
