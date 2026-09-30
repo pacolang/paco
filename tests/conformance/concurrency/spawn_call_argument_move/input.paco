@@ -1,0 +1,9 @@
+fn show(s: string) {
+    print(s);
+}
+
+fn main() {
+    let s = "x";
+    spawn show(s);
+    print(s);
+}

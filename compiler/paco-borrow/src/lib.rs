@@ -1635,6 +1635,38 @@ fn check_expr(expr: &Expr, program: &Program, state: &mut OwnershipState, report
             state.reachable = false;
         }
         Expr::Spawn { expr, span } => {
+            if let Expr::Call { callee, args, .. } = expr.as_ref() {
+                // `spawn f(a1, ..., an)` evaluates like an ordinary call: an
+                // argument moves only if calling `f` ordinarily would move
+                // it, so a local an argument merely reads (`m` borrowed by
+                // `.clone()`'s `&self`) is not also force-moved. The callee
+                // is the one exception -- when it names a local value (a
+                // stored closure) rather than a function or type item, the
+                // value must move into the task, since unlike an ordinary
+                // call (which only borrows it for that one invocation) the
+                // task outlives this call and needs to own it.
+                for arg in args {
+                    check_shared_without_sync_capture(arg, *span, state, reporter);
+                }
+                if matches!(callee.as_ref(), Expr::Ident(..)) && state.get(callee).is_some() {
+                    consume_expr(callee, program, state, reporter);
+                } else {
+                    check_expr(callee, program, state, reporter);
+                }
+                let temporaries = check_argument_temporary_borrow_conflicts(args, program, state, reporter);
+                let signature = match callee.as_ref() {
+                    Expr::Ident(name, _) => program.functions.get(name),
+                    _ => None,
+                };
+                for (index, arg) in args.iter().enumerate() {
+                    if signature.and_then(|signature| signature.params.get(index)).is_some_and(|ty| ty_is_copy(ty, &state.copy_names)) {
+                        check_expr_with_temporary_borrows(arg, &temporaries, program, state, reporter);
+                    } else {
+                        consume_expr_with_temporary_borrows(arg, &temporaries, program, state, reporter);
+                    }
+                }
+                return;
+            }
             check_shared_without_sync_capture(expr, *span, state, reporter);
             consume_expr(expr, program, state, reporter);
             let mut uses = HashMap::new();

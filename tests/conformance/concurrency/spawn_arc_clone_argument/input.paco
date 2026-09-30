@@ -1,0 +1,14 @@
+fn bump(m: Arc<Mutex<i64>>) {
+    let current = m.get().lock();
+    m.get().set(current + 1);
+}
+
+fn main() {
+    let m = Arc::new(Mutex::new(0));
+    let handle = spawn bump(m.clone());
+    match handle.join() {
+        Result::Ok(_) => {},
+        Result::Err(e) => print(-1),
+    }
+    print(m.get().lock());
+}
