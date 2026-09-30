@@ -1321,7 +1321,7 @@ problem the language creates.
 | Group | Names |
 |---|---|
 | Desugaring targets | `Option`, `Some`, `None`, `Result`, `Ok`, `Err` |
-| Traits the compiler resolves | `From`, `Into`, `Display`, `Clone`, `Copy`, `Drop`, `Eq`, `Ord`, `Hash`, `Add`, `Sub`, `Mul`, `Div`, `Rem`, `Neg`, `Index`, `Iter`, `Call`, `Numeric` |
+| Traits the compiler resolves | `From`, `Into`, `Display`, `Clone`, `Copy`, `Drop`, `Eq`, `Ord`, `Hash`, `Add`, `Sub`, `Mul`, `Div`, `Rem`, `Neg`, `Index`, `IndexMut`, `Iter`, `Call`, `Numeric` |
 | Collections | `Vec`, `Map`, `Set`, `StringBuf` |
 | Ownership escape hatches | `Rc`, `Arc`, `Cell`, `RefCell`, `Mutex`, `RwLock` |
 | Concurrency | `channel`, `Sender`, `Receiver`, `spawn_blocking`, `TaskPanic` |

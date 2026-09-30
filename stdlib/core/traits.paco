@@ -66,6 +66,11 @@ pub trait Index<Idx> {
     fn index(&self, i: Idx) -> &Self::Output;
 }
 
+pub trait IndexMut<Idx> {
+    type Output;
+    fn index_mut(&mut self, i: Idx) -> &mut Self::Output;
+}
+
 pub trait Iter {
     type Item;
     fn next(&mut self) -> Option<Self::Item>;
