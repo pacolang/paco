@@ -661,6 +661,10 @@ impl<'a> Formatter<'a> {
                 self.write("@");
                 self.format_pat(pattern);
             }
+            Pat::Reference { mutable, pattern, .. } => {
+                self.write(if *mutable { "&mut " } else { "&" });
+                self.format_pat(pattern);
+            }
         }
     }
 

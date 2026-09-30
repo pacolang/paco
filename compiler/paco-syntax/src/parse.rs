@@ -1945,6 +1945,21 @@ impl Parser<'_, '_> {
     }
 
     fn pattern_atom(&mut self) -> ParseResult<Pat> {
+        if self.matches(TokenKind::Ampersand) {
+            let operator = self.previous().span;
+            let mutable = self.matches(TokenKind::Mut);
+            let pattern = self.pattern_atom()?;
+            let span = Span::new(
+                operator.file_id(),
+                operator.start(),
+                pat_span(&pattern).end(),
+            );
+            return Ok(Pat::Reference {
+                mutable,
+                pattern: Box::new(pattern),
+                span,
+            });
+        }
         if self.matches(TokenKind::Underscore) {
             return Ok(Pat::Wildcard(self.previous().span));
         }
@@ -2500,7 +2515,8 @@ fn pat_span(pattern: &Pat) -> Span {
         | Pat::Enum { span, .. }
         | Pat::Range { span, .. }
         | Pat::Or(_, span)
-        | Pat::Binding { span, .. } => *span,
+        | Pat::Binding { span, .. }
+        | Pat::Reference { span, .. } => *span,
     }
 }
 

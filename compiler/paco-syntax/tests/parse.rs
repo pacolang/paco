@@ -664,6 +664,31 @@ fn parser_parses_at_binding_with_range_pattern() {
 }
 
 #[test]
+fn parser_parses_reference_patterns() {
+    let module = parse_source(
+        "fn main() -> i64 { match pair { &(a, b) => a, &mut Maybe::Some(x) => x, _ => 0 } }",
+    );
+    let Item::Fn(function) = &module.items[0] else {
+        panic!("expected function item");
+    };
+    let Some(tail) = &function.body.tail else {
+        panic!("expected tail expression");
+    };
+    let Expr::Match { arms, .. } = tail.as_ref() else {
+        panic!("expected match expression");
+    };
+
+    assert!(matches!(
+        &arms[0].pattern,
+        Pat::Reference { mutable: false, pattern, .. } if matches!(pattern.as_ref(), Pat::Tuple(..))
+    ));
+    assert!(matches!(
+        &arms[1].pattern,
+        Pat::Reference { mutable: true, pattern, .. } if matches!(pattern.as_ref(), Pat::Enum { .. })
+    ));
+}
+
+#[test]
 fn parser_desugars_if_let_to_match_expression() {
     let module =
         parse_source("fn main() -> i64 { if let Maybe::Some(x) = value { x } else { 0 } }");

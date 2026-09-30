@@ -4280,6 +4280,13 @@ fn bind_pattern_types(
             bind_local(pattern, expected.clone(), false, program, context);
             bind_pattern_types(inner, expected, program, context, reporter);
         }
+        Pat::Reference { span, .. } => {
+            reporter.push(Diagnostic::error(
+                "PACO-E0359",
+                *span,
+                "reference patterns (`&pat`, `&mut pat`) are not supported yet",
+            ));
+        }
         Pat::Wildcard(_) => {}
         Pat::Literal(literal, span) => {
             let actual = literal_type(literal);
@@ -7132,7 +7139,8 @@ fn pattern_span(pattern: &Pat) -> Span {
         | Pat::Enum { span, .. }
         | Pat::Range { span, .. }
         | Pat::Or(_, span)
-        | Pat::Binding { span, .. } => *span,
+        | Pat::Binding { span, .. }
+        | Pat::Reference { span, .. } => *span,
     }
 }
 

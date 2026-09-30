@@ -91,6 +91,19 @@ introduced_in = "ffi-function-pointers"
 status = "active"
 lint = false
 
+[E0359]
+message_template = "reference patterns (`&pat`, `&mut pat`) are not supported yet"
+severity = "error"
+explanation = """
+`&pat` and `&mut pat` parse, but the type checker does not yet match them against a value: matching \
+through a borrow (default binding modes and explicit reference patterns) is still being built out."""
+cause = "A `match`, `if let`, `while let`, `let` or `for` pattern contains `&pat` or `&mut pat`."
+fix = "Match the dereferenced value instead, or bind the whole reference with an identifier pattern."
+spec_ref = "docs/design/spec.md"
+introduced_in = "reference-patterns"
+status = "active"
+lint = false
+
 [E0353]
 message_template = "cannot derive `{trait_name}`: no `#[derivable(..)]` registration found"
 severity = "error"
