@@ -241,6 +241,7 @@ pub struct FnSignature {
     pub params: Vec<Param>,
     pub return_ty: Option<Ty>,
     pub body: Option<Block>,
+    pub attrs: Vec<Attribute>,
     pub span: Span,
 }
 

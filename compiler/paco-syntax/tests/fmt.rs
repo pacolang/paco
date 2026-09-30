@@ -25,6 +25,7 @@ fn formats_a_trait_with_abstract_method_default_method_and_assoc_type() {
                     }],
                     return_ty: Some(Ty::Path(vec!["float".to_string()], span)),
                     body: None,
+                    attrs: Vec::new(),
                     span,
                 },
                 FnSignature {
@@ -37,6 +38,7 @@ fn formats_a_trait_with_abstract_method_default_method_and_assoc_type() {
                         tail: None,
                         span,
                     }),
+                    attrs: Vec::new(),
                     span,
                 },
             ],

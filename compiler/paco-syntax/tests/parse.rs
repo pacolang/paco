@@ -1101,6 +1101,18 @@ fn parser_attaches_a_link_attribute_to_an_extern_block() {
 }
 
 #[test]
+fn parser_attaches_an_attribute_to_one_function_inside_an_extern_block() {
+    let module = parse_source("extern \"C\" { #[nonblocking] fn getpid() -> i32; fn slow() -> i32; }");
+    let Item::Extern(block) = &module.items[0] else {
+        panic!("expected extern item");
+    };
+    assert_eq!(block.functions.len(), 2);
+    assert_eq!(block.functions[0].attrs.len(), 1);
+    assert_eq!(block.functions[0].attrs[0].name, "nonblocking");
+    assert!(block.functions[1].attrs.is_empty());
+}
+
+#[test]
 fn parser_attaches_an_attribute_to_a_struct_field() {
     let module = parse_source("struct Point { #[serde(\"X\")] x: i64, y: i64 }");
     let Item::Struct(decl) = &module.items[0] else {
