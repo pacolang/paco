@@ -252,7 +252,7 @@ impl Parser<'_, '_> {
 
     fn literal_token(&mut self) -> ParseResult<Literal> {
         if self.matches(TokenKind::Integer) {
-            let value = self.previous().lexeme.replace('_', "").parse().unwrap_or(0);
+            let value = parse_int_literal(&self.previous().lexeme);
             return Ok(Literal::Int(value));
         }
         if self.matches(TokenKind::Float) {
@@ -1483,7 +1483,7 @@ impl Parser<'_, '_> {
         }
         if self.matches(TokenKind::Integer) {
             let token = self.previous();
-            let value = token.lexeme.replace('_', "").parse().unwrap_or(0);
+            let value = parse_int_literal(&token.lexeme);
             return Ok(Expr::Literal(Literal::Int(value), token.span));
         }
         if self.matches(TokenKind::Float) {
@@ -1930,7 +1930,7 @@ impl Parser<'_, '_> {
         }
         if self.matches(TokenKind::Integer) {
             let token = self.previous();
-            let value = token.lexeme.replace('_', "").parse().unwrap_or(0);
+            let value = parse_int_literal(&token.lexeme);
             return Ok(Pat::Literal(Literal::Int(value), token.span));
         }
         if self.matches(TokenKind::String) {
@@ -2793,6 +2793,23 @@ fn decode_char(source: &str) -> char {
         Some(ch) => ch,
         None => '\0',
     }
+}
+
+/// A lexed integer literal's value: strips `_` separators, then a
+/// `0x`/`0o`/`0b` prefix selects that base; otherwise the digits are
+/// decimal. A value the lexer accepted but that doesn't fit `i64`
+/// (larger than `i64::MAX`, e.g. a `u64` literal past that point)
+/// defaults to `0`, the same fallback the plain-decimal case already had
+/// before hex/octal/binary forms existed.
+fn parse_int_literal(lexeme: &str) -> i64 {
+    let digits = lexeme.replace('_', "");
+    match digits.as_bytes() {
+        [b'0', b'x' | b'X', rest @ ..] => i64::from_str_radix(std::str::from_utf8(rest).unwrap_or(""), 16),
+        [b'0', b'o' | b'O', rest @ ..] => i64::from_str_radix(std::str::from_utf8(rest).unwrap_or(""), 8),
+        [b'0', b'b' | b'B', rest @ ..] => i64::from_str_radix(std::str::from_utf8(rest).unwrap_or(""), 2),
+        _ => digits.parse(),
+    }
+    .unwrap_or(0)
 }
 
 fn decode_string(source: &str) -> String {

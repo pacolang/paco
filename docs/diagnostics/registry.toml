@@ -698,6 +698,33 @@ introduced_in = "phase-1"
 status = "active"
 lint = false
 
+[E0103]
+message_template = "`{ch}` is not a valid base-{radix} digit"
+severity = "error"
+explanation = """
+A `0x`/`0o`/`0b` literal's digits after the prefix must all belong to that base: `0`-`9` and `a`-`f`/`A`-`F` \
+for hexadecimal, `0`-`7` for octal, `0`-`1` for binary."""
+cause = "A digit outside the literal's base appears after its 0x/0o/0b prefix, or the prefix is followed by no digit at all."
+fix = "Remove the invalid digit, or fix the prefix if a different base was intended."
+spec_ref = "docs/grammar/grammar.ebnf"
+introduced_in = "numeric-literal-forms-and-bitwise-ops"
+status = "active"
+lint = false
+
+[E0104]
+message_template = "a numeric literal can't start or end with a `_` separator"
+severity = "error"
+explanation = """
+The `_` digit separator groups a numeric literal's digits for readability; it must sit between two \
+digits, never as the first digit after a `0x`/`0o`/`0b` prefix (or the literal's first digit at all) \
+nor as its last character."""
+cause = "A numeric literal starts or ends with `_`."
+fix = "Remove the leading or trailing `_`."
+spec_ref = "docs/grammar/grammar.ebnf"
+introduced_in = "numeric-literal-forms-and-bitwise-ops"
+status = "active"
+lint = false
+
 [E0110]
 message_template = "expected item declaration"
 severity = "error"

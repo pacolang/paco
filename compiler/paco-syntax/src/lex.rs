@@ -252,9 +252,24 @@ impl Lexer<'_, '_> {
     }
 
     fn number(&mut self, start: usize) {
+        if self.source.as_bytes().get(start) == Some(&b'0') {
+            let radix = match self.peek() {
+                Some('x' | 'X') => Some(16),
+                Some('o' | 'O') => Some(8),
+                Some('b' | 'B') => Some(2),
+                _ => None,
+            };
+            if let Some(radix) = radix {
+                self.advance();
+                self.prefixed_digits(start, radix);
+                return;
+            }
+        }
+
         while matches!(self.peek(), Some(ch) if ch.is_ascii_digit() || ch == '_') {
             self.advance();
         }
+        self.check_no_trailing_separator(start);
 
         let mut kind = TokenKind::Integer;
         if self.peek() == Some('.') && self.peek_next().is_some_and(|ch| ch.is_ascii_digit()) {
@@ -263,9 +278,58 @@ impl Lexer<'_, '_> {
             while matches!(self.peek(), Some(ch) if ch.is_ascii_digit() || ch == '_') {
                 self.advance();
             }
+            self.check_no_trailing_separator(start);
         }
 
         self.push(kind, start);
+    }
+
+    /// The digits of a `0x`/`0o`/`0b` literal, `self.offset` already past the
+    /// prefix letter: every ASCII alphanumeric character and `_` belongs to
+    /// the literal (so a later token boundary can't accidentally swallow
+    /// part of it), with a `PACO-E0103` for each one not a valid digit of
+    /// `radix`, on top of the shared leading/trailing `_` check.
+    fn prefixed_digits(&mut self, start: usize, radix: u32) {
+        let digits_start = self.offset;
+        if self.peek() == Some('_') {
+            self.reporter.push(Diagnostic::error(
+                "PACO-E0104",
+                Span::new(self.file_id, self.offset, self.offset + 1),
+                "a numeric literal can't start with a `_` separator",
+            ));
+        }
+        while matches!(self.peek(), Some(ch) if ch.is_ascii_alphanumeric() || ch == '_') {
+            let ch = self.advance().expect("just peeked");
+            if ch != '_' && !ch.is_digit(radix) {
+                self.reporter.push(Diagnostic::error(
+                    "PACO-E0103",
+                    Span::new(self.file_id, self.offset - ch.len_utf8(), self.offset),
+                    format!("`{ch}` is not a valid base-{radix} digit"),
+                ));
+            }
+        }
+        if self.offset == digits_start {
+            self.reporter.push(Diagnostic::error(
+                "PACO-E0103",
+                Span::new(self.file_id, start, self.offset),
+                format!("expected at least one base-{radix} digit"),
+            ));
+        }
+        self.check_no_trailing_separator(start);
+        self.push(TokenKind::Integer, start);
+    }
+
+    /// `PACO-E0104`: a numeric literal's separator can't be its first digit
+    /// (checked at the call site right after a prefix, where one exists) or
+    /// its last.
+    fn check_no_trailing_separator(&mut self, start: usize) {
+        if self.source[start..self.offset].ends_with('_') {
+            self.reporter.push(Diagnostic::error(
+                "PACO-E0104",
+                Span::new(self.file_id, self.offset - 1, self.offset),
+                "a numeric literal can't end with a `_` separator",
+            ));
+        }
     }
 
     fn identifier(&mut self, start: usize) {
