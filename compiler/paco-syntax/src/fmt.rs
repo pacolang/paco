@@ -712,7 +712,15 @@ impl<'a> Formatter<'a> {
                 self.write("dyn ");
                 self.write(&trait_path.join("::"));
             }
-            Ty::Fn { params, return_ty, .. } => {
+            Ty::Fn { params, return_ty, extern_abi, is_unsafe, .. } => {
+                if *is_unsafe {
+                    self.write("unsafe ");
+                }
+                if let Some(abi) = extern_abi {
+                    self.write("extern \"");
+                    self.write(abi);
+                    self.write("\" ");
+                }
                 self.write("fn(");
                 for (i, param) in params.iter().enumerate() {
                     if i > 0 {

@@ -272,6 +272,8 @@ pub(crate) fn type_to_ty(ty: &Type, span: Span) -> Ty {
         Type::Fn(params, ret) => Ty::Fn {
             params: params.iter().map(|param| type_to_ty(param, span)).collect(),
             return_ty: Some(Box::new(type_to_ty(ret, span))),
+            extern_abi: None,
+            is_unsafe: false,
             span,
         },
         Type::Unit => Ty::Tuple(Vec::new(), span),

@@ -79,6 +79,38 @@ fn parser_rejects_const_without_a_type_annotation() {
 }
 
 #[test]
+fn parser_parses_a_c_function_pointer_parameter_type() {
+    let mut sources = SourceMap::new();
+    let source = "extern \"C\" { fn qsort(base: *mut i64, n: u64, size: u64, cmp: extern \"C\" fn(*const u8, *const u8) -> i32); }";
+    let file = sources.add_file("main.paco", source);
+    let mut reporter = Reporter::new();
+    let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
+
+    let module = parse_module(&tokens, &mut reporter).unwrap();
+
+    let Item::Extern(block) = &module.items[0] else { panic!("expected an extern block") };
+    let cmp = &block.functions[0].params.last().unwrap().ty;
+    let Ty::Fn { params, return_ty, extern_abi, is_unsafe, .. } = cmp else { panic!("expected a function type") };
+    assert_eq!(extern_abi.as_deref(), Some("C"));
+    assert!(!is_unsafe);
+    assert_eq!(params.len(), 2);
+    assert!(return_ty.is_some());
+}
+
+#[test]
+fn parser_rejects_unsafe_without_extern_in_a_function_type() {
+    let mut sources = SourceMap::new();
+    let file = sources.add_file("main.paco", "fn take(cb: unsafe fn(i64)) {}");
+    let mut reporter = Reporter::new();
+    let tokens = lex(sources.source(file).unwrap(), file, &mut reporter);
+
+    let result = parse_module(&tokens, &mut reporter);
+
+    assert!(result.is_err());
+    assert!(reporter.has_errors());
+}
+
+#[test]
 fn parser_parses_associated_consts() {
     let module = parse_source("struct Tensor<T> { data: T, const RANK: i64 = 2; }");
     let Item::Struct(decl) = &module.items[0] else {

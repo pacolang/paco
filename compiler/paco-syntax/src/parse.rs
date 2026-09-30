@@ -965,8 +965,18 @@ impl Parser<'_, '_> {
                 Ty::Tuple(items, span)
             });
         }
-        if self.matches(TokenKind::Fn) {
-            let fn_span = self.previous().span;
+        if self.check(TokenKind::Unsafe) || self.check(TokenKind::Extern) || self.check(TokenKind::Fn) {
+            let is_unsafe = self.matches(TokenKind::Unsafe);
+            let extern_abi = if self.matches(TokenKind::Extern) {
+                self.consume(TokenKind::String, "expected an ABI string literal after `extern`")?;
+                Some(decode_string(&self.previous().lexeme))
+            } else {
+                None
+            };
+            if is_unsafe && extern_abi.is_none() {
+                self.consume(TokenKind::Extern, "expected `extern` after `unsafe` in a function type")?;
+            }
+            let fn_span = self.consume(TokenKind::Fn, "expected `fn` in a function type")?.span;
             self.consume(TokenKind::LeftParen, "expected `(` after `fn` in a function type")?;
             let mut params = Vec::new();
             while !self.check(TokenKind::RightParen) {
@@ -986,6 +996,8 @@ impl Parser<'_, '_> {
             return Ok(Ty::Fn {
                 params,
                 return_ty,
+                extern_abi,
+                is_unsafe,
                 span: Span::new(fn_span.file_id(), start, end),
             });
         }

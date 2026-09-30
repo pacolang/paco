@@ -550,6 +550,11 @@ pub enum Ty {
     Fn {
         params: Vec<Ty>,
         return_ty: Option<Box<Ty>>,
+        /// `Some("C")` for `extern "C" fn(..)`; `None` for a plain `fn(..)`
+        /// higher-order-parameter type.
+        extern_abi: Option<String>,
+        /// `unsafe extern "C" fn(..)`, as a foreign function coerces to.
+        is_unsafe: bool,
         span: Span,
     },
     Infer(Span),

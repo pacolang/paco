@@ -3887,6 +3887,8 @@ fn substitute_ty(ty: Ty, substitutions: &HashMap<String, Ty>) -> Ty {
         Ty::Fn {
             params,
             return_ty,
+            extern_abi,
+            is_unsafe,
             span,
         } => Ty::Fn {
             params: params
@@ -3894,6 +3896,8 @@ fn substitute_ty(ty: Ty, substitutions: &HashMap<String, Ty>) -> Ty {
                 .map(|param| substitute_ty(param, substitutions))
                 .collect(),
             return_ty: return_ty.map(|ty| Box::new(substitute_ty(*ty, substitutions))),
+            extern_abi,
+            is_unsafe,
             span,
         },
         other => other,

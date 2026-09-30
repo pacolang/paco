@@ -118,6 +118,21 @@ fn function_types_round_trip_through_parse_and_fmt() {
 }
 
 #[test]
+fn c_function_pointer_types_round_trip_through_parse_and_fmt() {
+    let source = "extern \"C\" {\n    fn qsort(base: *mut i64, n: u64, size: u64, cmp: extern \"C\" fn(*const u8, *const u8) -> i32);\n}\nfn take(cb: unsafe extern \"C\" fn(i64) -> i64) -> i64 {\n    0\n}\n";
+    let module = parse_source(source);
+    let Item::Extern(block) = &module.items[0] else { panic!("expected an extern block") };
+    let cmp_ty = &block.functions[0].params.last().unwrap().ty;
+    assert!(matches!(cmp_ty, Ty::Fn { extern_abi: Some(abi), is_unsafe: false, .. } if abi == "C"));
+    let Item::Fn(take) = &module.items[1] else { panic!("expected a function") };
+    assert!(matches!(&take.params[0].ty, Ty::Fn { extern_abi: Some(abi), is_unsafe: true, .. } if abi == "C"));
+    let formatted = format_module(&module, Some(source));
+    assert!(formatted.contains("cmp: extern \"C\" fn(*const u8, *const u8) -> i32"), "{formatted}");
+    assert!(formatted.contains("cb: unsafe extern \"C\" fn(i64) -> i64"), "{formatted}");
+    assert_eq!(format_module(&parse_source(&formatted), Some(&formatted)), formatted);
+}
+
+#[test]
 fn formatter_emits_semicolons_and_is_idempotent() {
     let source = "module m;\nuse stdlib::io as sio;\nconst A: i64 = 1;\nstruct P { x: i64, const K: i64 = 2; }\nfn main() {\n    let mut y = 1;\n    let r = &mut y;\n    *r = 5;\n    if y > 0 { print(y); }\n    while false {}\n    loop { break; };\n    y\n}\n";
     let formatted = format_module(&parse_source(source), Some(source));
