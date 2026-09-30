@@ -520,6 +520,11 @@ pub enum Pat {
         pattern: Box<Pat>,
         span: Span,
     },
+    Reference {
+        mutable: bool,
+        pattern: Box<Pat>,
+        span: Span,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -1856,6 +1856,7 @@ fn collect_pattern_ids(pattern: &Pat, locals: &Locals, ids: &mut HashSet<LocalId
             items.iter().for_each(|item| collect_pattern_ids(item, locals, ids));
         }
         Pat::Struct { fields, .. } => fields.iter().for_each(|(_, item)| collect_pattern_ids(item, locals, ids)),
+        Pat::Reference { pattern: inner, .. } => collect_pattern_ids(inner, locals, ids),
         Pat::Range { .. } | Pat::Wildcard(_) | Pat::Literal(..) => {}
     }
 }
@@ -2622,6 +2623,7 @@ fn bind_pattern(
                 );
             }
         }
+        Pat::Reference { pattern: inner, .. } => bind_pattern(inner, copy, ty, program, state),
         Pat::Range { .. } | Pat::Wildcard(_) | Pat::Literal(_, _) => {}
     }
 }

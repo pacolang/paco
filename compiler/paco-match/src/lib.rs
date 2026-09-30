@@ -219,7 +219,7 @@ impl IntRange {
 fn pattern_coverage(pattern: &Pat) -> PatternCoverage {
     match pattern {
         Pat::Wildcard(_) | Pat::Ident(_, _) => PatternCoverage::CatchAll,
-        Pat::Binding { pattern, .. } => pattern_coverage(pattern),
+        Pat::Binding { pattern, .. } | Pat::Reference { pattern, .. } => pattern_coverage(pattern),
         Pat::Literal(literal, _) => {
             PatternCoverage::Covered(CoveredPatterns::key(literal_key(literal)))
         }
@@ -265,7 +265,7 @@ fn int_literal(pattern: &Pat) -> Option<i64> {
 fn is_irrefutable_pattern(pattern: &Pat) -> bool {
     match pattern {
         Pat::Wildcard(_) | Pat::Ident(_, _) => true,
-        Pat::Binding { pattern, .. } => is_irrefutable_pattern(pattern),
+        Pat::Binding { pattern, .. } | Pat::Reference { pattern, .. } => is_irrefutable_pattern(pattern),
         Pat::Or(patterns, _) => patterns.iter().any(is_irrefutable_pattern),
         Pat::Struct { fields, .. } => fields.iter().all(|(_, pattern)| is_irrefutable_pattern(pattern)),
         Pat::Literal(_, _)

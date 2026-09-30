@@ -376,6 +376,7 @@ impl Resolver<'_, '_> {
                 self.bind_pattern(start, alias, bound);
                 self.bind_pattern(end, alias, bound);
             }
+            Pat::Reference { pattern, .. } => self.bind_pattern(pattern, alias, bound),
             Pat::Wildcard(_) | Pat::Literal(_, _) => {}
         }
     }

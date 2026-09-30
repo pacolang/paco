@@ -133,6 +133,21 @@ fn c_function_pointer_types_round_trip_through_parse_and_fmt() {
 }
 
 #[test]
+fn reference_patterns_round_trip_through_parse_and_fmt() {
+    let source = "fn main() -> i64 {\n    match pair {\n        &(a, b) => a,\n        &mut Maybe::Some(x) => x,\n        _ => 0,\n    }\n}\n";
+    let module = parse_source(source);
+    let Item::Fn(function) = &module.items[0] else { panic!("expected a function") };
+    let Some(tail) = &function.body.tail else { panic!("expected tail expression") };
+    let paco_syntax::ast::Expr::Match { arms, .. } = tail.as_ref() else { panic!("expected match expression") };
+    assert!(matches!(&arms[0].pattern, Pat::Reference { mutable: false, .. }));
+    assert!(matches!(&arms[1].pattern, Pat::Reference { mutable: true, .. }));
+    let formatted = format_module(&module, Some(source));
+    assert!(formatted.contains("&(a, b)"), "{formatted}");
+    assert!(formatted.contains("&mut Maybe::Some(x)"), "{formatted}");
+    assert_eq!(format_module(&parse_source(&formatted), Some(&formatted)), formatted);
+}
+
+#[test]
 fn formatter_emits_semicolons_and_is_idempotent() {
     let source = "module m;\nuse stdlib::io as sio;\nconst A: i64 = 1;\nstruct P { x: i64, const K: i64 = 2; }\nfn main() {\n    let mut y = 1;\n    let r = &mut y;\n    *r = 5;\n    if y > 0 { print(y); }\n    while false {}\n    loop { break; };\n    y\n}\n";
     let formatted = format_module(&parse_source(source), Some(source));

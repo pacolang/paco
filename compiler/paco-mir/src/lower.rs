@@ -2686,7 +2686,7 @@ impl<'a> Lowerer<'a> {
         }
         match pattern {
             Pat::Wildcard(_) | Pat::Ident(_, _) => {}
-            Pat::Binding { pattern, .. } => self.lower_pattern_test(pattern, place, ty, fail),
+            Pat::Binding { pattern, .. } | Pat::Reference { pattern, .. } => self.lower_pattern_test(pattern, place, ty, fail),
             Pat::Literal(literal, _) => {
                 let test = self.compare_place(BinOp::Eq, place, lower_literal(literal, ty));
                 self.branch_unless(test, fail);
@@ -2836,6 +2836,7 @@ impl<'a> Lowerer<'a> {
                     self.bind_pattern_at(field_pattern, field_place, field_ty, mutable);
                 }
             }
+            Pat::Reference { pattern: inner, .. } => self.bind_pattern_at(inner, place, ty, mutable),
             Pat::Or(..) | Pat::Wildcard(_) | Pat::Literal(_, _) | Pat::Range { .. } => {}
             Pat::Struct { fields, .. } => {
                 let Type::Struct(name, args) = strip_borrow(&ty).clone() else {
@@ -3841,6 +3842,7 @@ fn pattern_binds(pattern: &Pat) -> bool {
         Pat::Ident(_, _) | Pat::Binding { .. } => true,
         Pat::Tuple(patterns, _) | Pat::Or(patterns, _) | Pat::Enum { fields: patterns, .. } => patterns.iter().any(pattern_binds),
         Pat::Struct { fields, .. } => fields.iter().any(|(_, pattern)| pattern_binds(pattern)),
+        Pat::Reference { pattern, .. } => pattern_binds(pattern),
         Pat::Wildcard(_) | Pat::Literal(_, _) | Pat::Range { .. } => false,
     }
 }
